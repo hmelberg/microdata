@@ -80,21 +80,8 @@
     du får en kryptert artefakt du kan publisere hvor som helst (f.eks. GitHub).
   </p>
 
-  <section class="card">
-    <h2>Velg krypteringstype</h2>
-    <label style="display:block;margin-bottom:.4rem">
-      <input type="radio" name="encmode" value="he" checked>
-      <strong>Homomorf</strong> (safepy-he-v1) — analyse uten dekryptering; kun trygge aggregater frigis
-    </label>
-    <label style="display:block">
-      <input type="radio" name="encmode" value="aes">
-      <strong>Vanlig kryptering</strong> (safepy-enc-v1, AES-256-GCM) — hele filen krypteres;
-      autoriserte brukere dekrypterer lokalt i nettleseren
-    </label>
-  </section>
-
-  <section class="card hide" id="aesCard">
-    <h2><span class="step-n">1</span>Krypter fil (AES)</h2>
+  <section class="card" id="aesCard">
+    <h2><span class="step-n">1</span>Krypter fil (AES-256-GCM)</h2>
     <input type="file" id="aesFile" accept=".csv,.parquet,text/csv">
     <p class="muted" id="aesInfo"></p>
     <div class="actions">
@@ -104,109 +91,27 @@
     <div class="hide" id="aesResult">
       <p class="warn" style="margin-top:1rem">
         <strong>Nøkkelen vises kun én gang.</strong>
-        Del den bare med dem som skal lese dataene — eller lagre den hos
-        tjenesten ved registrering (da slipper brukerne å taste den).
+        Del den bare med dem som skal lese dataene.
       </p>
       <p style="margin:.9rem 0 .3rem"><strong>Nøkkel:</strong></p>
       <div class="fp" id="aesKeyOut"></div>
       <p style="margin:.9rem 0 .3rem"><strong>Fingeravtrykk</strong>
-        (registreres hos tjenesten som bytte-vern):</p>
+        (kan brukes til å verifisere at filen ikke er endret):</p>
       <div class="fp" id="aesFpOut"></div>
       <div class="actions">
         <a class="download" id="aesDl"><button>Last ned kryptert fil (.enc.json)</button></a>
-        <a id="aesRegisterLink"><button class="secondary">Registrer hos tjenesten →</button></a>
       </div>
     </div>
-  </section>
-
-  <section class="card" id="heFileCard">
-    <h2><span class="step-n">1</span>Velg CSV-fil</h2>
-    <input type="file" id="file" accept=".csv,text/csv">
-    <p class="muted" id="fileInfo"></p>
-  </section>
-
-  <section class="card hide" id="configCard">
-    <h2><span class="step-n">2</span>Velg kolonner og innstillinger</h2>
-    <p class="muted">
-      <strong>Verdi</strong> = krypteres (tallkolonner du vil analysere).
-      <strong>Gruppe</strong> = holdes i klartekst for gruppering/filtrering
-      (grovinndel identifiserende kolonner selv før kryptering).
-      <strong>Ignorer</strong> = utelates.
-    </p>
-    <div class="cols" id="colPicker"></div>
-    <div class="row" style="margin-top:1.1rem">
-      <div>
-        <label for="scale">Skala (desimalpresisjon)</label>
-        <input type="number" id="scale" value="1000000" min="1" step="1">
-      </div>
-      <div>
-        <label for="keybits">Nøkkelstørrelse (bit)</label>
-        <select id="keybits">
-          <option value="2048" selected>2048 (anbefalt)</option>
-          <option value="3072">3072</option>
-          <option value="1024">1024 (rask, mindre sikker)</option>
-        </select>
-      </div>
-      <div>
-        <label for="winsor">Winsorisering</label>
-        <select id="winsor">
-          <option value="">Ingen</option>
-          <option value="0.01,0.99" selected>1 % / 99 % (for «protected»)</option>
-          <option value="0.05,0.95">5 % / 95 %</option>
-        </select>
-      </div>
-    </div>
-    <p class="muted" style="margin-top:.9rem">
-      Merk: for «protected»-nivå må winsorisering settes til 1 %/99 % for at
-      gjennomsnitt/varians skal frigis. Median og filtre på krypterte kolonner
-      er ikke mulig — bruk grupper i klartekst.
-    </p>
-    <div class="actions">
-      <button id="encryptBtn">Krypter</button>
-      <span id="status"></span>
-    </div>
-  </section>
-
-  <section class="card hide" id="resultCard">
-    <h2><span class="step-n">3</span>Last ned og registrer</h2>
-    <p class="warn">
-      <strong>Ta vare på nøkkelfila.</strong> Den lar analysetjenesten regne på
-      dataene dine. Del den kun med tjenesten (autoriteten), aldri med analytikere.
-      Uten nøkkelen kan ingen — heller ikke du — dekryptere resultater.
-    </p>
-    <p style="margin:.9rem 0 .3rem"><strong>Fingeravtrykk</strong>
-      (registreres hos tjenesten som beskyttelse mot fil-bytte):</p>
-    <div class="fp" id="fpOut"></div>
-    <div class="actions">
-      <a class="download" id="dlDataset"><button>Last ned kryptert datasett</button></a>
-      <a class="download" id="dlKey"><button class="secondary">Last ned nøkkel</button></a>
-      <a id="heRegisterLink"><button class="secondary">Registrer hos tjenesten →</button></a>
-    </div>
-    <p class="muted" style="margin:.6rem 0 0">
-      Ved registrering: lim inn innholdet i nøkkelfila i feltet «Homomorf
-      autoritetsnøkkel». Velg hvem som får bruke kilden (også «alle uten
-      innlogging» er mulig) — HE-analyse skjer alltid på serveren.
-    </p>
   </section>
 </main>
 
 <script src="js/enc-crypto.js"></script>
 <script>
-// ---- AES-modus (safepy-enc-v1) — spec 2026-07-05 §2. Ren WebCrypto, ingen deps.
+// safepy-enc-v1 — ren WebCrypto, ingen server-avhengighet.
 (function () {
   var EC = window.EncCrypto;
   var $$ = function (id) { return document.getElementById(id); };
   var aesBytes = null, aesName = "", aesFormat = "csv";
-
-  document.querySelectorAll('input[name="encmode"]').forEach(function (r) {
-    r.addEventListener("change", function () {
-      var aes = document.querySelector('input[name="encmode"]:checked').value === "aes";
-      $$("aesCard").classList.toggle("hide", !aes);
-      $$("heFileCard").classList.toggle("hide", aes);
-      // HE-kortene 2/3 vises av HE-flyten; skjul dem alltid ved bytte til AES
-      if (aes) { $$("configCard").classList.add("hide"); $$("resultCard").classList.add("hide"); }
-    });
-  });
 
   $$("aesFile").addEventListener("change", function (ev) {
     var f = ev.target.files[0];
@@ -228,8 +133,6 @@
       $$("aesDl").download = aesName + ".enc.json";
       $$("aesKeyOut").textContent = res.key;
       $$("aesFpOut").textContent = res.envelope.fingerprint;
-      $$("aesRegisterLink").href = "deldata.html?fingerprint=" + res.envelope.fingerprint
-        + "&format=" + aesFormat + "&name=" + encodeURIComponent(aesName);
       $$("aesResult").classList.remove("hide");
       $$("aesStatus").textContent = "Ferdig — filen forlot aldri maskinen.";
     }, function (e) {
@@ -237,122 +140,6 @@
     });
   });
 })();
-</script>
-<script type="module">
-import * as paillier from "https://esm.sh/paillier-bigint@3";
-import { encryptDataframe } from "./js/he-encrypt.js";
-
-const $ = (id) => document.getElementById(id);
-let rows = [], columns = [];
-
-// --- minimal RFC-4180-ish CSV parser (handles quotes and embedded commas) ---
-function parseCsv(text) {
-  const out = []; let field = "", row = [], inQ = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQ) {
-      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
-      else field += c;
-    } else if (c === '"') inQ = true;
-    else if (c === ",") { row.push(field); field = ""; }
-    else if (c === "\n" || c === "\r") {
-      if (c === "\r" && text[i + 1] === "\n") i++;
-      if (field !== "" || row.length) { row.push(field); out.push(row); row = []; field = ""; }
-    } else field += c;
-  }
-  if (field !== "" || row.length) { row.push(field); out.push(row); }
-  return out;
-}
-
-function toRows(matrix) {
-  const header = matrix[0].map((h) => h.trim());
-  const body = matrix.slice(1).filter((r) => r.length === header.length);
-  const num = (v) => (v === "" ? NaN : Number(v));
-  return {
-    columns: header,
-    rows: body.map((r) => {
-      const o = {};
-      header.forEach((h, j) => { o[h] = r[j]; });
-      // keep numeric where every non-empty value parses as a number
-      return o;
-    }),
-    numericGuess: header.filter((h) =>
-      body.some((r) => r[header.indexOf(h)] !== "") &&
-      body.every((r) => r[header.indexOf(h)] === "" ||
-        Number.isFinite(num(r[header.indexOf(h)])))),
-  };
-}
-
-$("file").addEventListener("change", async (e) => {
-  const f = e.target.files[0];
-  if (!f) return;
-  const text = await f.text();
-  const parsed = toRows(parseCsv(text));
-  rows = parsed.rows; columns = parsed.columns;
-  $("fileInfo").textContent =
-    `${f.name} — ${rows.length} rader, ${columns.length} kolonner`;
-  const picker = $("colPicker"); picker.innerHTML = "";
-  for (const c of columns) {
-    const isNum = parsed.numericGuess.includes(c);
-    const nameEl = document.createElement("div");
-    nameEl.className = "name"; nameEl.textContent = c;
-    const sel = document.createElement("select");
-    sel.dataset.col = c;
-    for (const [val, txt] of [["ignore", "Ignorer"], ["group", "Gruppe (klartekst)"],
-                              ["value", "Verdi (krypter)"]]) {
-      const o = document.createElement("option");
-      o.value = val; o.textContent = txt; sel.appendChild(o);
-    }
-    sel.value = isNum ? "value" : "group";   // sensible default
-    picker.appendChild(nameEl); picker.appendChild(sel);
-  }
-  $("configCard").classList.remove("hide");
-  $("resultCard").classList.add("hide");
-});
-
-function download(anchorId, filename, obj) {
-  const blob = new Blob([JSON.stringify(obj)], { type: "application/json" });
-  const a = $(anchorId);
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-}
-
-$("encryptBtn").addEventListener("click", async () => {
-  const picks = [...document.querySelectorAll("#colPicker select")];
-  const valueCols = picks.filter((s) => s.value === "value").map((s) => s.dataset.col);
-  const groupCols = picks.filter((s) => s.value === "group").map((s) => s.dataset.col);
-  if (!valueCols.length) { $("status").textContent = "Velg minst én verdikolonne."; return; }
-
-  const w = $("winsor").value;
-  const opts = {
-    valueCols, groupCols,
-    scale: Number($("scale").value) || 1_000_000,
-    keyBits: Number($("keybits").value),
-    winsorize: w ? w.split(",").map(Number) : null,
-    onProgress: (done, total) => {
-      $("status").textContent = `Krypterer … ${done} / ${total} celler`;
-    },
-  };
-  $("encryptBtn").disabled = true;
-  $("status").textContent = "Genererer nøkkel …";
-  try {
-    // yield so the "Genererer nøkkel" paint lands before the blocking keygen
-    await new Promise((r) => setTimeout(r, 30));
-    const { dataset, key, fingerprint } = await encryptDataframe(paillier, rows, opts);
-    $("fpOut").textContent = fingerprint;
-    const base = (rows.length ? "datasett" : "datasett");
-    download("dlDataset", `${base}.he.json`, dataset);
-    download("dlKey", `${base}.key.json`, key);
-    $("heRegisterLink").href = `deldata.html?he=1&format=he&name=${encodeURIComponent(base)}`;
-    $("status").innerHTML = '<span class="ok">Ferdig.</span>';
-    $("resultCard").classList.remove("hide");
-    $("resultCard").scrollIntoView({ behavior: "smooth" });
-  } catch (err) {
-    $("status").textContent = "Feil: " + (err && err.message || err);
-  } finally {
-    $("encryptBtn").disabled = false;
-  }
-});
 </script>
 </body>
 </html>
