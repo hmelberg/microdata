@@ -10,10 +10,10 @@ paths in m2py.py and the new realism framework in mockdata_realism.py:
     - synth_education(...)         deterministic education level per unit_id,
                                    conditional on age and the import date
 
-Constants (_DEMO_REF_YEAR, _NORWAY_LATENT_*) are duplicated here for now so
-that mockdata_realism.py can import them without depending on m2py. During
-a later cleanup pass, m2py.py can import from this module and the duplicates
-there can be removed.
+Constants (_DEMO_REF_YEAR, _NORWAY_LATENT_*) live here — mockdata_realism.py
+imports them without depending on m2py, and m2py.py imports them from here
+too (no longer duplicated as of 2026-07-07; this module has no m2py
+dependency, so the import direction is one-way and safe).
 
 Pyodide note: stdlib + numpy only. No pandas dependency at import time.
 """
@@ -25,7 +25,7 @@ import numpy as np
 
 
 # ---------------------------------------------------------------------------
-# Constants (mirror m2py.py:1028-1037)
+# Constants (source of truth — m2py.py imports these, not the other way)
 # ---------------------------------------------------------------------------
 
 _DEMO_REF_YEAR = 2025
@@ -154,6 +154,11 @@ def synth_education(unit_id, age: int | None = None, as_of_year: int | None = No
         birth_year = ref_year - 40  # working-age fallback
     else:
         birth_year = ref_year - int(age)
+        # Children/teens can't yet hold a NUS2000 attainment level — without
+        # this guard, birth years > 2005 fall into the youngest cohort bucket
+        # (9999), which still assigns 30% "high" (tertiary) to 10-year-olds.
+        if int(age) < 18:
+            return "low"
 
     probs = _edu_prior_for_birth_year(birth_year)
 

@@ -267,6 +267,46 @@ class TestTabulateSummarizeDisclosure:
 
 
 # ---------------------------------------------------------------------------
+# 6b. D1 (kodegjennomgang 2026-07-07): tabulate-panel og transitions-panel
+# gikk helt utenom T5 — en tabell tabulate blokkerer ble vist med råceller
+# på 1-2 via panelvariantene (transitions-panel til og med som rad-
+# normaliserte overgangssannsynligheter fra celler på størrelse 1).
+# ---------------------------------------------------------------------------
+
+class TestPanelTablesDisclosure:
+    def _tiny_panel_df(self):
+        # 6 grupper à 2 enheter, 2 tidspunkter => alle råceller har frekvens < 5
+        rows = []
+        for tid in (2019, 2020):
+            for g in range(6):
+                for i in range(2):
+                    rows.append({"unit_id": g * 2 + i + 1, "tid": tid, "grp": g})
+        return pd.DataFrame(rows)
+
+    def test_tabulate_blocks_small_cells_sanity(self, dc_on):
+        # Sanity: samme data blokkeres av vanlig tabulate (T5).
+        it = _interp(self._tiny_panel_df())
+        out = _run(it, "tabulate grp")
+        assert "FEIL" in out and "celler" in out
+
+    def test_tabulate_panel_blocked_like_tabulate(self, dc_on):
+        it = _interp(self._tiny_panel_df())
+        out = _run(it, "tabulate-panel grp")
+        assert "FEIL" in out and "celler" in out
+
+    def test_transitions_panel_blocked(self, dc_on):
+        it = _interp(self._tiny_panel_df())
+        out = _run(it, "transitions-panel grp")
+        assert "FEIL" in out and "celler" in out
+
+    def test_panel_tables_allowed_when_dc_off(self, dc_off):
+        it = _interp(self._tiny_panel_df())
+        out = _run(it, "tabulate-panel grp")
+        out += _run(it, "transitions-panel grp")
+        assert "FEIL" not in out
+
+
+# ---------------------------------------------------------------------------
 # 7. destring force: uten force skal ikke-numeriske verdier gi FEIL (hele
 # operasjonen avbrytes, jf. manualen). Med force → missing. Tidligere var
 # begge grener errors='coerce', så force var død og verdier ble stille NaN.
@@ -445,3 +485,344 @@ class TestConfigurableThresholds:
     def test_t5_lowered_allows(self, dc_on, monkeypatch):
         monkeypatch.setitem(m2py.M2PY_DEFAULTS, "dc_tabulate_low_cell", 2)
         assert "FEIL" not in _run(_interp(self._tiny3()), "tabulate grp")
+
+
+# ---------------------------------------------------------------------------
+# 9. D2 (kodegjennomgang 2026-07-07): figurkommandoer gikk utenom
+# avsløringskontrollen. piechart, diskret histogram og sankey viste de samme
+# råtellingene som tabulate ville blokkert (T5); barchart med (min)/(max)/
+# (mean) viste eksakte, uwinsoriserte gruppe-ekstremer (T2).
+# ---------------------------------------------------------------------------
+
+class TestGraphDisclosure:
+    def _tiny_cells_df(self):
+        # 6 kategorier à 2 rader => alle celler har frekvens < 5 (100 % små)
+        grp = [g for g in range(6) for _ in range(2)]
+        return pd.DataFrame({"grp": grp, "grp2": [0, 1] * 6})
+
+    def test_piechart_blocked_small_cells(self, dc_on):
+        out = _run(_interp(self._tiny_cells_df()), "piechart grp")
+        assert "FEIL" in out and "celler" in out
+
+    def test_discrete_histogram_blocked_small_cells(self, dc_on):
+        out = _run(_interp(self._tiny_cells_df()), "histogram grp, discrete")
+        assert "FEIL" in out and "celler" in out
+
+    def test_sankey_blocked_small_links(self, dc_on):
+        out = _run(_interp(self._tiny_cells_df()), "sankey grp grp2")
+        assert "FEIL" in out and "celler" in out
+
+    def test_graphs_allowed_when_dc_off(self, dc_off):
+        it = _interp(self._tiny_cells_df())
+        out = _run(it, "piechart grp")
+        out += _run(it, "histogram grp, discrete")
+        out += _run(it, "sankey grp grp2")
+        assert "FEIL" not in out
+
+    def test_piechart_allowed_with_big_cells(self, dc_on):
+        grp = [g for g in range(3) for _ in range(20)]
+        out = _run(_interp(pd.DataFrame({"grp": grp})), "piechart grp")
+        assert "FEIL" not in out
+
+
+class TestBarchartWinsorization:
+    """barchart (min)/(max)/(mean) skal bruke samme T2-winsorisering som
+    histogram/boxplot/scatter — ellers viser (min)-søylen den eksakte
+    laveste enkeltverdien i hver gruppe."""
+
+    def _df(self):
+        # Én ekstrem enkeltverdi (0.0) i gruppe 1 — resten ligger rundt 1000+
+        lonn = [0.0] + [1000.0 + i for i in range(99)] + [2000.0 + i for i in range(100)]
+        g = [1] * 100 + [2] * 100
+        return pd.DataFrame({"lonn": lonn, "g": g})
+
+    def test_barchart_min_over_group_is_winsorized(self, dc_on):
+        df = self._df()
+        fig = m2py.PlotHandler().execute(
+            "barchart", df, {"stat": "min", "vars": ["lonn"]}, {"over": "g"}
+        )
+        w = m2py._winsorize_series(df["lonn"])
+        expected = w.groupby(df["g"]).min()
+        y = [float(v) for v in fig.data[0].y]
+        assert 0.0 not in y
+        assert y == pytest.approx([expected.loc[1], expected.loc[2]])
+
+    def test_barchart_min_exact_when_dc_off(self, dc_off):
+        df = self._df()
+        fig = m2py.PlotHandler().execute(
+            "barchart", df, {"stat": "min", "vars": ["lonn"]}, {"over": "g"}
+        )
+        y = [float(v) for v in fig.data[0].y]
+        assert 0.0 in y
+
+    def test_barchart_mean_single_var_is_winsorized(self, dc_on):
+        df = self._df()
+        fig = m2py.PlotHandler().execute(
+            "barchart", df, {"stat": "mean", "vars": ["lonn"]}, {}
+        )
+        w = m2py._winsorize_series(df["lonn"])
+        y = [float(v) for v in fig.data[0].y]
+        assert y[0] == pytest.approx(w.mean())
+        assert y[0] != pytest.approx(df["lonn"].mean())
+
+
+# ---------------------------------------------------------------------------
+# 10. D3 (kodegjennomgang 2026-07-07): tabulate ..., summarize(var) —
+# volumtabellen hoppet over T2-winsorisering og T8-avrunding som vanlig
+# summarize bruker: rå gruppegjennomsnitt og persentiler i full presisjon.
+# ---------------------------------------------------------------------------
+
+class TestVolumeTableWinsorizeAndRound:
+    def _df(self):
+        # 2 grupper à 25 (alle celler >= 5, T5 passerer); én ekstrem outlier
+        grp = [0] * 25 + [1] * 25
+        inntekt = (
+            [100.0 + i for i in range(24)] + [1e9]
+            + [200.0 + i for i in range(25)]
+        )
+        return pd.DataFrame({"grp": grp, "inntekt": inntekt})
+
+    def test_volume_mean_uses_winsorized_column(self, dc_on):
+        from m2py import StatsEngine
+        df = self._df()
+        tb = StatsEngine().execute("tabulate", df, ["grp"], {"summarize": "inntekt"})
+        w = m2py._winsorize_series(df["inntekt"])
+        expected = w[df["grp"] == 0].mean()
+        raw = df.loc[df["grp"] == 0, "inntekt"].mean()
+        assert float(tb.loc[0]) == pytest.approx(expected)
+        assert float(tb.loc[0]) != pytest.approx(raw)
+
+    def test_volume_crosstab_mean_uses_winsorized_column(self, dc_on):
+        from m2py import StatsEngine
+        df = self._df()
+        df["kjonn"] = ([0] * 13 + [1] * 12) * 2
+        tb = StatsEngine().execute(
+            "tabulate", df, ["grp", "kjonn"], {"summarize": "inntekt"}
+        )
+        w = m2py._winsorize_series(df["inntekt"])
+        expected = w[(df["grp"] == 0) & (df["kjonn"] == 1)].mean()
+        assert float(tb.loc[0, 1]) == pytest.approx(expected)
+
+    def test_volume_p50_rounded_to_3_sig_digits(self, dc_on):
+        from m2py import StatsEngine
+        grp = [0] * 25 + [1] * 25
+        inntekt = [123456.789 + i for i in range(50)]
+        df = pd.DataFrame({"grp": grp, "inntekt": inntekt})
+        tb = StatsEngine().execute(
+            "tabulate", df, ["grp"], {"summarize": "inntekt", "p50": True}
+        )
+        raw_p50 = df.loc[df["grp"] == 0, "inntekt"].quantile(0.5)
+        assert float(tb.loc[0]) == m2py._round_to_sig_digits(raw_p50)
+        assert float(tb.loc[0]) != pytest.approx(raw_p50)
+
+    def test_volume_table_unchanged_when_dc_off(self, dc_off):
+        from m2py import StatsEngine
+        df = self._df()
+        tb = StatsEngine().execute("tabulate", df, ["grp"], {"summarize": "inntekt"})
+        raw = df.loc[df["grp"] == 0, "inntekt"].mean()
+        assert float(tb.loc[0]) == pytest.approx(raw)
+
+
+# ---------------------------------------------------------------------------
+# 11. D4 (kodegjennomgang 2026-07-07): gruppert summarize svakere enn vanlig
+# summarize — T7 sjekket bare total-N (gruppe på 2 fikk mean/min/max),
+# summarize-panel winsoriserte ikke, og gini ble beregnet på rå kolonne
+# mens gjennomsnittet var winsorisert.
+# ---------------------------------------------------------------------------
+
+class TestGroupedSummarizeT7:
+    def test_summarize_by_small_group_refused(self, dc_on):
+        # Total (103) passerer T7, men gruppe 1 har bare 3 enheter.
+        df = pd.DataFrame({
+            "g": [1] * 3 + [2] * 100,
+            "x": [float(i) for i in range(103)],
+        })
+        out = _run(_interp(df), "summarize x, by(g)")
+        assert "FEIL" in out
+
+    def test_summarize_by_big_groups_allowed(self, dc_on):
+        df = pd.DataFrame({
+            "g": [1] * 50 + [2] * 50,
+            "x": [float(i) for i in range(100)],
+        })
+        out = _run(_interp(df), "summarize x, by(g)")
+        assert "FEIL" not in out
+
+    def test_summarize_panel_small_tid_group_refused(self, dc_on):
+        df = pd.DataFrame({
+            "unit_id": list(range(100)) + [1, 2, 3],
+            "tid": [2019] * 100 + [2020] * 3,
+            "x": [float(i) for i in range(103)],
+        })
+        out = _run(_interp(df), "summarize-panel x")
+        assert "FEIL" in out
+
+    def test_small_groups_allowed_when_dc_off(self, dc_off):
+        df = pd.DataFrame({
+            "g": [1] * 3 + [2] * 100,
+            "x": [float(i) for i in range(103)],
+        })
+        out = _run(_interp(df), "summarize x, by(g)")
+        assert "FEIL" not in out
+
+
+class TestSummarizePanelWinsorize:
+    def _df(self):
+        x = [100.0 + i for i in range(24)] + [1e9] + [200.0 + i for i in range(25)]
+        return pd.DataFrame({
+            "unit_id": list(range(25)) * 2,
+            "tid": [2019] * 25 + [2020] * 25,
+            "x": x,
+        })
+
+    def test_panel_mean_uses_winsorized_column(self, dc_on):
+        from m2py import StatsEngine
+        df = self._df()
+        res = StatsEngine().execute("summarize-panel", df, ["x"], {})
+        w = m2py._winsorize_series(df["x"])
+        expected = w[df["tid"] == 2019].mean()
+        raw = df.loc[df["tid"] == 2019, "x"].mean()
+        assert float(res.loc[2019, ("x", "mean")]) == pytest.approx(expected)
+        assert float(res.loc[2019, ("x", "mean")]) != pytest.approx(raw)
+
+    def test_panel_mean_raw_when_dc_off(self, dc_off):
+        from m2py import StatsEngine
+        df = self._df()
+        res = StatsEngine().execute("summarize-panel", df, ["x"], {})
+        raw = df.loc[df["tid"] == 2019, "x"].mean()
+        assert float(res.loc[2019, ("x", "mean")]) == pytest.approx(raw)
+
+
+class TestGiniOnWinsorizedColumn:
+    """gini skal beregnes på samme winsoriserte kolonne som mean/std (T2) —
+    ellers avslører den rå kolonne-informasjon som resten av tabellen skjuler."""
+
+    def _df(self):
+        x = [100.0 + i for i in range(49)] + [1e9]
+        return pd.DataFrame({"g": [1] * 25 + [2] * 25, "x": x})
+
+    def test_plain_summarize_gini_winsorized(self, dc_on):
+        from m2py import StatsEngine
+        df = self._df()
+        res = StatsEngine().execute("summarize", df, ["x"], {"gini": True})
+        w = m2py._winsorize_series(df["x"])
+        assert float(res.loc["x", "Gini"]) == pytest.approx(m2py.calculate_gini(w))
+        assert float(res.loc["x", "Gini"]) != pytest.approx(m2py.calculate_gini(df["x"]))
+
+    def test_grouped_summarize_gini_winsorized(self, dc_on):
+        from m2py import StatsEngine
+        df = self._df()
+        res = StatsEngine().execute("summarize", df, ["x"], {"gini": True, "by": "g"})
+        w = m2py._winsorize_series(df["x"])
+        expected = m2py.calculate_gini(w[df["g"] == 2])
+        raw = m2py.calculate_gini(df.loc[df["g"] == 2, "x"])
+        assert float(res.loc[2, ("x", "gini")]) == pytest.approx(expected)
+        assert float(res.loc[2, ("x", "gini")]) != pytest.approx(raw)
+
+    def test_plain_summarize_gini_raw_when_dc_off(self, dc_off):
+        from m2py import StatsEngine
+        df = self._df()
+        res = StatsEngine().execute("summarize", df, ["x"], {"gini": True})
+        assert float(res.loc["x", "Gini"]) == pytest.approx(m2py.calculate_gini(df["x"]))
+
+
+# ---------------------------------------------------------------------------
+# 13. D5 (kodegjennomgang 2026-07-07): regresjon/overlevelse hadde ikke noe
+# populasjonsminimum — `regress`/`logit`/`cox`/`kaplan-meier` kjørte på
+# subsett summarize ville T7-nektet. Samme T7-sjekk (totalt N; for
+# kaplan-meier by() også per gruppe) skal gjelde. DC av: uendret.
+# ---------------------------------------------------------------------------
+
+class TestModelPopulationMinimum:
+    def _reg_df(self, n=8):
+        rng = np.random.default_rng(1)
+        x = rng.normal(size=n)
+        return pd.DataFrame({"y": 2 * x + rng.normal(size=n), "x": x})
+
+    def _surv_df(self, n=8, groups=None):
+        rng = np.random.default_rng(2)
+        df = pd.DataFrame({
+            "dead": rng.integers(0, 2, size=n),
+            "tid": rng.uniform(1, 10, size=n),
+        })
+        if groups is not None:
+            df["g"] = groups
+        return df
+
+    def test_regress_blocked_below_t7(self, dc_on):
+        it = _interp(self._reg_df(8))
+        out = _run(it, "regress y x")
+        assert "FEIL" in out and "minst 10" in out
+
+    def test_regress_allowed_at_t7(self, dc_on):
+        it = _interp(self._reg_df(30))
+        out = _run(it, "regress y x")
+        assert "FEIL" not in out
+
+    def test_regress_if_subset_blocked(self, dc_on):
+        df = self._reg_df(30)
+        df["grp"] = [1] * 5 + [0] * 25
+        it = _interp(df)
+        out = _run(it, "regress y x if grp == 1")
+        assert "FEIL" in out and "minst 10" in out
+
+    def test_logit_blocked_below_t7(self, dc_on):
+        df = self._reg_df(8)
+        df["y"] = (df["y"] > 0).astype(float)
+        it = _interp(df)
+        out = _run(it, "logit y x")
+        assert "FEIL" in out and "minst 10" in out
+
+    def test_coefplot_blocked_below_t7(self, dc_on):
+        it = _interp(self._reg_df(8))
+        out = _run(it, "coefplot y x")
+        assert "FEIL" in out and "minst 10" in out
+
+    def test_cox_blocked_below_t7(self, dc_on):
+        it = _interp(self._surv_df(8))
+        out = _run(it, "cox dead tid")
+        assert "FEIL" in out and "minst 10" in out
+
+    def test_kaplan_meier_blocked_below_t7(self, dc_on):
+        it = _interp(self._surv_df(8))
+        out = _run(it, "kaplan-meier dead tid")
+        assert "FEIL" in out and "minst 10" in out
+
+    def test_kaplan_meier_by_group_blocked_per_group(self, dc_on):
+        # Totalt N=33 passerer, men én gruppe har 3 — per-gruppe-sjekk skal slå til
+        groups = [1] * 30 + [2] * 3
+        it = _interp(self._surv_df(33, groups=groups))
+        out = _run(it, "kaplan-meier dead tid, by(g)")
+        assert "FEIL" in out and "Gruppen" in out and "minst 10" in out
+
+    def test_kaplan_meier_by_group_allowed_when_all_big(self, dc_on):
+        groups = [1] * 15 + [2] * 15
+        it = _interp(self._surv_df(30, groups=groups))
+        out = _run(it, "kaplan-meier dead tid, by(g)")
+        assert "FEIL" not in out
+
+    def test_dc_off_unchanged(self, dc_off):
+        it = _interp(self._reg_df(8))
+        out = _run(it, "regress y x")
+        assert "FEIL" not in out
+        it2 = _interp(self._surv_df(8))
+        out2 = _run(it2, "kaplan-meier dead tid")
+        assert "FEIL" not in out2
+
+
+# ---------------------------------------------------------------------------
+# 14. S4 (kodegjennomgang 2026-07-07): variabelnavn interpoleres i
+# data-var1/data-var2-attributtene i tablehtml-embeds og konsumeres via
+# innerHTML — de skal HTML-escapes (inkl. anførselstegn).
+# ---------------------------------------------------------------------------
+
+class TestTablehtmlAttributeEscaping:
+    def test_data_var_attributes_are_escaped(self):
+        name = 'a"b'
+        it = _interp(pd.DataFrame({name: ["x"] * 6 + ["y"] * 6}))
+        _run(it, f"tabulate {name}")
+        embeds = [str(m) for m in it.output_log if "data-var1" in str(m)]
+        assert embeds, "forventet tablehtml-embed med data-var1"
+        html = embeds[0]
+        assert 'data-var1="a&quot;b"' in html
+        assert 'data-var1="a"b"' not in html
