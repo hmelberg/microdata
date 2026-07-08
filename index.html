@@ -3534,7 +3534,8 @@
       const tolk = document.getElementById('btnTolkFooter');
       if (tolk) tolk.style.display = '';
       const dm = document.getElementById('btnDmQuick');
-      if (dm) dm.style.display = (activeEditorMode === 'microdata') ? 'inline-flex' : 'none';
+      // activeEditorMode is declared later in this script; defer so we don't hit its TDZ.
+      if (dm) setTimeout(function () { dm.style.display = (activeEditorMode === 'microdata') ? 'inline-flex' : 'none'; }, 0);
     })();
 
     const outputScrollWrap = document.getElementById('outputScrollWrap');
