@@ -3316,14 +3316,27 @@
           b.classList.toggle('active', b.dataset.mode === activeEditorMode);
         });
       }
-      // Oversett + Vurder personvern: for now only in microdata mode.
-      var _shows = (activeEditorMode === 'microdata');
-      var oBtn = document.getElementById('oversettBtn');
-      if (oBtn) oBtn.style.display = _shows ? '' : 'none';
-      var dmB = document.getElementById('btnDmQuick');
-      if (dmB) dmB.style.display = _shows ? 'inline-flex' : 'none';
+      // Oversett + Vurder personvern are URL-gated (applyMicroGating), not mode-gated.
+      if (window.mdApplyMicroGating) window.mdApplyMicroGating();
       if (typeof updateModeGuiBar==='function') updateModeGuiBar();
     }
+
+    // Microdata-specific UI is shown only when the URL (before any #) contains
+    // "micro". OpenStat has no login, so btnDmQuick is purely micro-gated here.
+    function applyMicroGating() {
+      var micro = !!(window.NotebookLinks && window.NotebookLinks.urlHasMicro(location.href));
+      ['oversettBtn', 'btnDmQuick', 'menuSokData', 'menuOfflineBtn'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.style.display = micro ? '' : 'none';
+      });
+      ['menuDisclosureControl', 'menuDataSource', 'settingLabelFormat', 'settingImportLimit'].forEach(function (id) {
+        var el = document.getElementById(id);
+        var field = el && el.closest ? el.closest('.settings-field') : null;
+        if (field) field.style.display = micro ? '' : 'none';
+      });
+    }
+    window.mdApplyMicroGating = applyMicroGating;
+    applyMicroGating();
 
     function updateModeGuiBar() {
       var bar = document.getElementById('modeGuiBar');
@@ -3533,9 +3546,7 @@
       ask.style.display = '';
       const tolk = document.getElementById('btnTolkFooter');
       if (tolk) tolk.style.display = '';
-      const dm = document.getElementById('btnDmQuick');
-      // activeEditorMode is declared later in this script; defer so we don't hit its TDZ.
-      if (dm) setTimeout(function () { dm.style.display = (activeEditorMode === 'microdata') ? 'inline-flex' : 'none'; }, 0);
+      // btnDmQuick visibility is handled by applyMicroGating() (URL-gated).
     })();
 
     const outputScrollWrap = document.getElementById('outputScrollWrap');
