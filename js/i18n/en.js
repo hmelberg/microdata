@@ -129,8 +129,6 @@ window.M2PY_I18N.en = {
   "Kode": "Code",
   "⏳ Logger inn…": "⏳ Logging in…",
   "Velkommen til OpenStat!": "Welcome to OpenStat!",
-  "OpenStat er en åpen side der du kan øve på å kjøre analyser i microdata.no-stil.": "OpenStat is an open site where you can practise running analyses in the microdata.no style.",
-  "OpenStat inneholder ikke ekte tall. Det er et hobbyprosjekt og er ikke laget av microdata.no selv. Den kommer uten garantier for at analysene er korrekt implementert. Søsterversjonen SafeStat støtter i tillegg kryptert, beskyttet og ekstern analyse.": "OpenStat contains no real figures. It is a hobby project and is <strong>not</strong> made by microdata.no itself. It comes with no guarantees that the analyses are correctly implemented. The sister version <a href=\"https://github.com/hmelberg/safestat\" target=\"_blank\" rel=\"noopener\">SafeStat</a> additionally supports encrypted, protected and remote analysis.",
   "Velkommen!": "Welcome!",
   "Velkommen til {app}!": "Welcome to {app}!",
   "Øv på å kjøre analyser i microdata.no-stil. Inneholder ikke ekte tall; et hobbyprosjekt, ikke laget av microdata.no.": "Practise running analyses in the microdata.no style. No real figures; a hobby project, not made by microdata.no.",
