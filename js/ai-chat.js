@@ -1367,18 +1367,20 @@
           });
         }
 
-        // Web mode is never reached through this path — it has its own
-        // dedicated button (aiSendWebBtn) below.
+        // Send is routed by the URL (urlHasMicro): "micro" → microdata AI
+        // (kode-svar); otherwise the agentic data-svar flow (search data → script
+        // in the active mode's language → run → revise).
         function sendCurrent() {
-          sendMessage();
+          if (window.NotebookLinks && window.NotebookLinks.urlHasMicro(location.href)) {
+            sendMessage();
+          } else {
+            sendWebMessage();
+          }
         }
         if (dom.aiSendFastBtn) dom.aiSendFastBtn.addEventListener('click', sendCurrent);
         if (dom.aiSendV2Btn) dom.aiSendV2Btn.addEventListener('click', () => sendMessage(true));
-        // Web is a dedicated send button (python/r/duckdb, BYOK-eligible only),
-        // not a hidden state of the fast menu cycler — see syncWebBtnVisibility().
-        // It consumes the same textarea/state.sending discipline as the other
-        // send buttons; sendWebMessage() itself does its own auth/sending gate.
-        if (dom.aiSendWebBtn) dom.aiSendWebBtn.addEventListener('click', () => { sendWebMessage(); });
+        // The old Web button is subsumed by the URL-routed Send; keep it hidden.
+        if (dom.aiSendWebBtn) { dom.aiSendWebBtn.style.display = 'none'; dom.aiSendWebBtn.addEventListener('click', () => { sendWebMessage(); }); }
         if (dom.aiAbortBtn) dom.aiAbortBtn.addEventListener('click', () => { if (state.abortCtrl) state.abortCtrl.abort(); });
         dom.aiInput.addEventListener('input', autoresize);
         dom.aiInput.addEventListener('keydown', (e) => {
@@ -1392,8 +1394,8 @@
         // Called after login/user fetch (refreshUserPanel), on editor-mode changes
         // (see switchEditorMode() in index.html), and once here at init.
         function syncWebBtnVisibility() {
-          if (!dom.aiSendWebBtn) return;
-          dom.aiSendWebBtn.style.display = webModeEligible() ? '' : 'none';
+          // The Web button is subsumed by the URL-routed Send; keep it hidden.
+          if (dom.aiSendWebBtn) dom.aiSendWebBtn.style.display = 'none';
         }
         window.mdSyncWebBtnVisibility = syncWebBtnVisibility;
         syncWebBtnVisibility();
