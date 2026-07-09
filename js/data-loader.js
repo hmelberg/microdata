@@ -14,6 +14,18 @@
     return _registryCache;
   }
 
+  // Module-scoped (not per-call, like _registryCache above): every click of
+  // Run previously re-fetched (and for duckdb/sqlite, re-extracted) every
+  // source from scratch, even when nothing about the script changed since
+  // the last run — the highest-frequency friction point in the app given
+  // how often a script gets tweaked and re-run during iteration. Keyed by
+  // resolved URL; only raw bytes are cached (decryption still runs fresh
+  // per item/run, and strict-source key authorization is deliberately never
+  // cached — see authorizeStrict below). No TTL/invalidation, same as
+  // _registryCache above — a page reload is the reset, by design (2026-07-07,
+  // docs/superpowers/2026-07-07-code-review.md §6 item 1).
+  var _bufCache = {};
+
   // Proxy-auth: innloggingstoken har forrang; ellers BYOK-nøkkel (hent-
   // endepunktet godtar X-Anthropic-Key via allowByok, jf. B5 i roadmapen).
   function proxyHeaders(authToken, anthropicKey) {
@@ -44,17 +56,23 @@
     }
   }
 
-  function sniffFormat(resp, url) {
+  function sniffFormat(resp, url, kind) {
+    // Eksplisitt kind() vinner alltid — sniffing er en heuristikk for de
+    // uregistrerte tilfellene (spec 2026-07-06-remote-columnar-sources §4).
+    if (kind) return kind;
     var ct = (resp.headers.get('content-type') || '').toLowerCase();
     if (ct.indexOf('parquet') >= 0 || /\.parquet(\?|$)/.test(url)) return 'parquet';
+    if (/\.duckdb(\?|$)/.test(url)) return 'duckdb';
+    if (/\.sqlite3?(\?|$)/.test(url)) return 'sqlite';
     if (ct.indexOf('json') >= 0) return 'json';
     if (ct.indexOf('html') >= 0) return 'html';   // f.eks. Wikipedia: bind som råtekst
     return 'csv';
   }
 
-  // Hoved-API: {loads: [{alias, bytes(Uint8Array), format}], remote: []}
-  // eller kast norsk feil. `remote` er alltid tom i denne appen (ingen
-  // registrerte kilder / server-eksekvering) — bevart for kall-kompatibilitet.
+  // Hoved-API: {loads: [{alias, bytes(Uint8Array), format}],
+  //             remote: [{alias, sourceId, key}]} eller kast norsk feil.
+  // remote = registrerte kilder som IKKE kan analyseres lokalt (level != public):
+  // index.html ruter hele scriptet til serveren med source_keys (spec §4).
   async function resolveAndFetchLoads(script, deps) {
     deps = deps || {};
     var fetchImpl = deps.fetchImpl || (typeof fetch !== 'undefined' ? fetch.bind(global) : null);
@@ -67,20 +85,117 @@
     var bad = resolved.filter(function (r) { return r.error; });
     if (bad.length) throw new Error('Direktivfeil: ' + bad.map(function (b) { return b.error; }).join('; '));
 
-    resolved.forEach(function (item) {
-      if (item.exec === 'remote') throw new Error('exec(remote) støttes ikke: ' + item.alias);
-    });
+    var remote = [];
+    var localItems = [];
+    for (var i = 0; i < resolved.length; i++) {
+      var item = resolved[i];
+      if (item.anvil) {
+        var grant = await fetchSourceAccess(item, deps, fetchImpl);
+        if (grant.remote_only || item.exec === 'remote') {
+          if (item.exec === 'local') throw new Error('«' + item.anvil + '» er ikke offentlig — kan ikke kjøres lokalt (kjøres på server).');
+          remote.push({ alias: item.alias, sourceId: item.anvil, key: item.key });
+          continue;
+        }
+        item.url = grant.location;
+        item.grant = grant;
+        item.viaProxy = false;
+      } else if (item.exec === 'remote') {
+        throw new Error('exec(remote) krever en registrert kilde (navn), ikke URL: ' + item.alias);
+      }
+      localItems.push(item);
+    }
 
-    var loads = await Promise.all(resolved.map(async function (item) {
-      var resp = await fetchLoadTarget(item, fetchImpl, deps.authToken || null, deps.anthropicKey || null);
-      var buf = new Uint8Array(await resp.arrayBuffer());
-      var format = sniffFormat(resp, item.url);
-      var dec = await maybeDecrypt(item, buf, format, deps);
+    var loads = await fetchResolvedItems(localItems, deps);
+    return { loads: loads, remote: remote };
+  }
+
+  // Fetch+decrypt+cache for an already-resolved item list (each
+  // {alias, url, kind, key, table, viaProxy, grant?}) — the part of
+  // resolveAndFetchLoads that doesn't depend on connect/load-directive
+  // syntax at all. Extracted (2026-07-09) so a mode with its OWN directive
+  // syntax (SafeStat mode's bare `require <url> as <alias>` DSL statement,
+  // not a "#"/"--"/"//"-prefixed comment directive DataDirectives.parse can
+  // recognize) can still get key()/kind()/caching for free instead of a
+  // second, narrower hand-rolled fetch — see index.html's runSafeStatScript.
+  // -> [{alias, bytes, format, table?, kind?, envelope?, key?, level?, strict?}]
+  async function fetchResolvedItems(localItems, deps) {
+    deps = deps || {};
+    var fetchImpl = deps.fetchImpl || (typeof fetch !== 'undefined' ? fetch.bind(global) : null);
+    // V3 (spec browser-strict): strict-kilder får ALDRI nøkkel via
+    // /source_access — HVER strict-kjøring (kryptert eller ei) autoriseres og
+    // logges via /local_run_authorize (deps.authorizeStrict), som utleverer
+    // eventuelle nøkler. Ingen caching: callbacken kalles per kjøring.
+    var strictItems = localItems.filter(function (it) {
+      return it.grant && it.grant.local_profile === 'strict';
+    });
+    if (strictItems.length) {
+      if (!deps.authorizeStrict) throw new Error('strict-kilder krever autorisert kjøring — mangler authorizeStrict');
+      var runKeys = await deps.authorizeStrict(strictItems.map(function (it) { return it.anvil; }));
+      strictItems.forEach(function (it) {
+        if (runKeys && runKeys[it.anvil]) it.grant = Object.assign({}, it.grant, { key: runKeys[it.anvil] });
+      });
+    }
+
+    function fetchBytes(item) {
+      var k = item.url;
+      if (!_bufCache[k]) {
+        _bufCache[k] = fetchLoadTarget(item, fetchImpl, deps.authToken || null, deps.anthropicKey || null)
+          .then(function (resp) {
+            return resp.arrayBuffer().then(function (ab) { return { resp: resp, buf: new Uint8Array(ab) }; });
+          });
+        // A failed fetch must NOT poison future runs — _bufCache is now
+        // module-scoped (persists across runs, not just within one), so a
+        // transient network error would otherwise be "cached" forever until
+        // a page reload. Drop the entry on rejection so the next run retries.
+        _bufCache[k].catch(function () { delete _bufCache[k]; });
+      }
+      return _bufCache[k];
+    }
+    return Promise.all(localItems.map(async function (item) {
+      var fetched = await fetchBytes(item);
+      var format = sniffFormat(fetched.resp, item.url, item.kind);
+      var dec = await maybeDecrypt(item, fetched.buf, format, deps);
       var out = { alias: item.alias, bytes: dec.bytes, format: dec.format };
+      if (item.table) out.table = item.table;
+      if (item.kind) out.kind = item.kind;
       if (dec.envelope) { out.envelope = dec.envelope; out.key = dec.key; }
+      // out.level is exposed for ANY registered grant, not just strict — the
+      // sidebar's click-to-view gating needs the real level even for a
+      // protected/sensitive source whose local_mode happens to be "open"
+      // (allowed to run in the ordinary non-strict path). l.strict (only true
+      // for local_profile==='strict') still separately gates the actual
+      // STRICT execution route; this is purely informational for the UI.
+      if (item.grant && item.grant.level) out.level = item.grant.level;
+      if (item.grant && item.grant.local_profile === 'strict') {
+        // strict-grant (spec 2026-07-05-browser-strict-execution §2): rammen
+        // får KUN gå inn i safepy-fasaden; nivået velger policy-tier lokalt.
+        out.strict = true;
+        out.level = item.grant.level || 'protected';
+      }
       return out;
     }));
-    return { loads: loads, remote: [] };
+  }
+
+  function fetchSourceAccess(item, deps, fetchImpl) {
+    var base = (deps.apiBase || '').replace(/\/+$/, '');
+    if (!base) return Promise.reject(new Error('ingen API-base konfigurert for kilden «' + item.anvil + '»'));
+    var headers = deps.authToken ? { 'Authorization': 'Bearer ' + deps.authToken } : {};
+    return fetchImpl(base + '/_/api/source_access?id=' + encodeURIComponent(item.anvil), { headers: headers })
+      .then(function (r) {
+        if (r.status === 404) {
+          // roadmap §2a: tagged so the UI can offer "request access" instead
+          // of a dead end (POST /access_request, apiBase-relative — see
+          // index.html's renderAccessDeniedError). Same message either way —
+          // 404 here already means "unknown OR denied", never leak which.
+          var e = new Error('Fant ikke kilden «' + item.anvil + '» eller du mangler tilgang — logg inn, eller kontakt eieren.');
+          e.accessDenied = true;
+          e.sourceId = item.anvil;
+          e.apiBase = base;
+          throw e;
+        }
+        if (!r.ok) throw new Error('source_access ' + r.status + ' for «' + item.anvil + '»');
+        return r.json();
+      });
   }
 
   // safepy-enc-v1: sniffFormat sier json — sjekk konvolutt, verifiser
@@ -94,10 +209,28 @@
     var computed = await EC.envelopeFingerprint(env);
     if (env.fingerprint && computed !== env.fingerprint)
       throw new Error('«' + item.alias + '»: ødelagt fil (fingerprint stemmer ikke)');
-    var key = (item.key && item.key !== 'ask') ? item.key
-        : deps.promptKey ? await deps.promptKey(item.alias)
-        : null;
-    if (!key) throw new Error('«' + item.alias + '» er kryptert og krever nøkkel — bruk key(...) eller key(ask)');
+    if (item.grant && item.grant.fingerprint && computed !== item.grant.fingerprint)
+      throw new Error('«' + item.alias + '»: filen er endret siden den ble registrert — kontakt eieren');
+    var key;
+    if (item.grant && item.grant.local_profile === 'strict') {
+      // Strict: nøkkelen kommer fra per-kjørings-autorisasjonen (V3) eller et
+      // eksplisitt key()-literal (mode 2). ALDRI promptKey/økt-cache — mangler
+      // nøkkelen, nektes kjøringen.
+      key = (item.grant && item.grant.key) || (item.key && item.key !== 'ask' ? item.key : null);
+      if (!key) throw new Error('«' + item.alias + '»: kjøringen ble ikke autorisert med nøkkel — strict-kilder bruker aldri lagrede/spurte nøkler; prøv igjen eller bruk key(<nøkkel>)');
+    } else {
+      key = (item.key && item.key !== 'ask') ? item.key
+          : (item.grant && item.grant.key) ? item.grant.key
+          : deps.promptKey ? await deps.promptKey(item.alias)
+          : null;
+      if (!key) throw new Error('«' + item.alias + '» er kryptert og krever nøkkel — bruk key(...) eller key(ask)');
+    }
+    if (item.grant && item.grant.local_profile === 'strict') {
+      // V4 (spec browser-strict): ingen klartekst i JS eller på Pyodide-FS for
+      // strict — konvolutten og nøkkelen sendes videre og dekrypteres først
+      // INNE i kjøringen (safepy.encfile); klartekst slippes etter kjøringen.
+      return { bytes: null, format: env.payload_format || 'csv', envelope: env, key: key };
+    }
     var plain = await EC.decryptEnvelope(env, key);
     return { bytes: plain, format: env.payload_format || 'csv' };
   }
@@ -119,10 +252,58 @@
     // pipeline against just the connect lines, so each source is fetched
     // exactly once (skip any original bare `load` lines from the script).
     var connectLines = script.split(/\r?\n/).filter(function (ln) { return /^[ \t]*(?:#|--|\/\/)[ \t]*connect\b/i.test(ln); }).join('\n');
-    var srcScript = connectLines + '\n' + spec.sources.map(function (a) { return '# load ' + a + ' as ' + a; }).join('\n');
+    var tables = spec.sourceTables || {};
+    var srcScript = connectLines + '\n' + spec.sources.map(function (a) {
+      var t = tables[a];
+      var target = t ? (t.source + '/' + t.table) : a;
+      return '# load ' + target + ' as ' + a;
+    }).join('\n');
     var loaded = await resolveAndFetchLoads(srcScript, deps);
     return { sources: loaded.loads, remote: loaded.remote, spec: spec };
   }
 
-  global.DataLoader = { resolveAndFetchLoads: resolveAndFetchLoads, resolveAndAssemble: resolveAndAssemble, _sniffFormat: sniffFormat };
+  // Phase 2: resolve connect/load/import/join into per-source {url, format,
+  // table} WITHOUT fetching bytes — used to decide pushdown-eligibility and
+  // to feed AssemblyDuckdb.compile() before any network request happens.
+  async function resolveSourcesOnly(script, deps) {
+    deps = deps || {};
+    var DD = global.DataDirectives;
+    if (!DD) return { spec: { sources: [], datasets: [] }, descriptors: {} };
+    var parsed = DD.parseAssembly(script);
+    if (parsed.errors.length) throw new Error('Monteringsfeil: ' + parsed.errors.join('; '));
+    var spec = parsed.spec;
+    var tables = spec.sourceTables || {};
+    var connectLines = script.split(/\r?\n/).filter(function (ln) { return /^[ \t]*(?:#|--|\/\/)[ \t]*connect\b/i.test(ln); }).join('\n');
+    var descLines = connectLines + '\n' + spec.sources.map(function (a) {
+      var t = tables[a];
+      return '# load ' + (t ? (t.source + '/' + t.table) : a) + ' as ' + a;
+    }).join('\n');
+    var parsedLoads = DD.parse(descLines);
+    // Same registry-loading convention as resolveAndFetchLoads: use whatever
+    // was passed in, or load+memoize the web registry on demand (a tiny JSON
+    // manifest, not the large source itself — resolving named registry
+    // sources correctly here matters more than avoiding this one small fetch).
+    var fetchImpl = deps.fetchImpl || (typeof fetch !== 'undefined' ? fetch.bind(global) : null);
+    var registry = deps.registry || (fetchImpl ? await loadRegistry(fetchImpl) : []);
+    var resolved = DD.resolve(parsedLoads, registry);
+    var descriptors = {};
+    resolved.forEach(function (r) {
+      if (r.error || r.anvil) return; // protected/anvil/error sources are never pushdown-eligible
+      // .csv-sniff siden trinn B: bare .parquet/.csv-endelser gjenkjennes uten
+      // eksplisitt kind() — alt annet er 'other' og aldri pushdown-kandidat.
+      descriptors[r.alias] = { url: r.url,
+        format: r.kind || (/\.parquet(\?|$)/.test(r.url) ? 'parquet' : /\.csv(\?|$)/.test(r.url) ? 'csv' : 'other'),
+        table: r.table };
+    });
+    return { spec: spec, descriptors: descriptors };
+  }
+
+  global.DataLoader = { resolveAndFetchLoads: resolveAndFetchLoads, resolveAndAssemble: resolveAndAssemble,
+    resolveSourcesOnly: resolveSourcesOnly, fetchResolvedItems: fetchResolvedItems, _sniffFormat: sniffFormat,
+    // Test-only: the cross-run fetch cache is module-scoped by design (see
+    // _bufCache above), which is exactly wrong for a test file that evals
+    // this module once and shares it across every Deno.test case — without
+    // this, tests using the same placeholder URL leak cached bytes into
+    // each other. Not used by index.html.
+    _resetCacheForTests: function () { _bufCache = {}; } };
 })(typeof window !== 'undefined' ? window : globalThis);
