@@ -2847,7 +2847,8 @@ def violin(data, x=None, y=None, color=None, text=None, hover_name=None, hover_d
     
     traces = []
     layout = {}
-    
+    data = ensure_data_dict(data)
+
     x_data = data.get(x)
     y_data = data.get(y)
     color_data = data.get(color)
@@ -3009,7 +3010,8 @@ def scatter_3d(data=None, x=None, y=None, z=None, color=None, size=None,
     
     traces = []
     layout = {}
-    
+    data = ensure_data_dict(data)
+
     # Handle case where data is not provided but x, y, and z are
     if data is None and x is not None and y is not None and z is not None:
         # Create data dict from x, y, and z lists
@@ -3192,8 +3194,7 @@ def imshow(data, title=None, height=None, width=None, config=None, static=None,
         if yaxis_range:
             layout['yaxis']['range'] = yaxis_range
     
-    # Return plain JSON string (no special prefix)
-    import json
+    # Return PlotlyFigure so callers can use to_plotly_json_str() like other px functions
     clean_config = config or {}
     if resolve_static(static):
         clean_config = dict(clean_config)
@@ -3204,7 +3205,7 @@ def imshow(data, title=None, height=None, width=None, config=None, static=None,
         "layout": layout,
         "config": clean_config
     }
-    return json.dumps(plot_data)
+    return PlotlyFigure(plot_data)
 
 # Add a simple test function to verify the module works
 def test_module():
