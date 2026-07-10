@@ -1,9 +1,12 @@
-# OpenStat — microdata.no emulator (public, BYOK-only build)
+# Microdata — microdata.no-emulator (public, BYOK-only build)
 
-> Sister project: [SafeStat](https://github.com/hmelberg/safestat) — the full
-> build with login, protected/encrypted data sources, restricted (strict)
-> execution, and server-side remote analysis. OpenStat is the open subset;
-> engine fixes land in SafeStat first and are ported here.
+> Sister projects: [SafeStat](https://github.com/hmelberg/safestat) — the full
+> build with login, protected data sources and remote analysis — and
+> [OpenStat](https://github.com/hmelberg/openstat) — the general browser
+> statistics workbench (microdata, Python, R, DuckDB, Brython, jamovi, Statx).
+> This repo is the dedicated microdata.no emulator: the microdata persona is
+> always on, and the UI is meant to track microdata.no as closely as possible
+> over time. Engine fixes land in SafeStat first and are ported here.
 
 A browser app that emulates [microdata.no](https://microdata.no): it translates
 microdata scripts to Python and runs them in the browser via Pyodide, generates
@@ -35,21 +38,30 @@ statement.
 | `manual_scripts/` | End-to-end example scripts run as a smoke suite. |
 | `tests/` | pytest suite (engine, regressions, equivalence, mock-data, performance). |
 
-### Relationship to the full/advanced `m2py` repo
+### Relationship to the sibling repos (safestat, openstat)
 
-This repo was forked from the sibling `m2py` repo, which additionally supports
-protected/sensitive data sources, Anvil-hosted login and AI, and server-side
-remote execution. Those features (and their supporting files —
-`m2py_remote.py`, `m2py_protection.py`, `js/login.js`, `js/strict-worker.js`,
-`vendor/safepy.zip`, `sync_to_api.py`) were removed here on purpose; they are
-not needed for the public/lite use case.
+This repo was cloned from `openstat` (2026-07-10) with full git history, so
+changes can be ported between the repos with `git cherry-pick` (remotes
+`openstat-local` and `safestat` point at the local sibling checkouts).
+`openstat` was in turn forked from `safestat`, which additionally supports
+protected/sensitive data sources, login, and server-side remote execution.
 
-The two repos share a core engine — `m2py.py`, `functions.py`,
-`m2py_translate.py`, `m2py_runtime/`, `py2m/`, `r2m/`, `protect.py`, and most of
-`index.html`'s mode-switching/editor/run-pipeline logic. There is no shared
-package or submodule between them (deliberately, to avoid infrastructure this
-project doesn't need yet) — when you fix a bug in one of those files, check
-whether the sibling repo has the same bug.
+What differs here from `openstat`:
+- The microdata persona is **locked on**: `NL.hostnameMode()` and
+  `NL.urlHasMicro()` in `js/notebook-links.js` return constants, so the
+  microdata UI (Oversett, Søk om data, disclosure control, data source,
+  label/import settings, microdata AI routing) is always visible and
+  microdata is always the default mode. Other languages stay available in
+  the mode menu, but are never the default.
+- The UI is allowed to drift toward microdata.no (layout, icons, menus)
+  independently of the siblings.
+
+The three repos share a core engine — `m2py.py`, `functions.py`,
+`m2py_translate.py`, `mockdata_*.py`, `py2m/`, `r2m/`, `protect.py`,
+`variable_metadata.json`, `codelists/` — with no shared package or submodule
+(deliberately). **Engine fixes land in SafeStat first** and are ported to
+openstat and here; when you fix a bug in a core file, check the siblings.
+UI files (`index.html`, `js/`) drift freely and should not be blind-synced.
 
 ## Common commands
 

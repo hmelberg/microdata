@@ -3,24 +3,14 @@ const test = require('node:test');
 const assert = require('node:assert');
 const NL = require('../../js/notebook-links.js');
 
-test('hostnameMode: exact first-label prefixes', () => {
-  assert.equal(NL.hostnameMode('py.openstat.app'), 'python');
-  assert.equal(NL.hostnameMode('r.safestat.app'), 'r');
-  assert.equal(NL.hostnameMode('duck.openstat.app'), 'duckdb');
-});
-test('hostnameMode: micro substring', () => {
-  assert.equal(NL.hostnameMode('micro.safestat.app'), 'microdata');
-  assert.equal(NL.hostnameMode('microdata.run'), 'microdata');
-});
-test('hostnameMode: bare/dev hosts default to python', () => {
-  assert.equal(NL.hostnameMode('openstat.app'), 'python');
-  assert.equal(NL.hostnameMode('safestat.app'), 'python');
-  assert.equal(NL.hostnameMode('localhost'), 'python');
-  assert.equal(NL.hostnameMode('deploy-preview-1--safestat.netlify.app'), 'python');
-});
-test('hostnameMode: no false prefix hit (spy != py)', () => {
-  assert.equal(NL.hostnameMode('spy.openstat.app'), 'python'); // falls through to default, still python
-  assert.equal(NL.hostnameMode('rstudio.example.com'), 'python'); // 'rstudio' != 'r'
+// Persona er låst på i denne repoen (microdata.no-emulatoren): alle hosts
+// gir microdata som default-modus, uansett subdomene.
+test('hostnameMode: locked to microdata for every host', () => {
+  assert.equal(NL.hostnameMode('py.openstat.app'), 'microdata');
+  assert.equal(NL.hostnameMode('r.safestat.app'), 'microdata');
+  assert.equal(NL.hostnameMode('localhost'), 'microdata');
+  assert.equal(NL.hostnameMode('deploy-preview-1--microdata.netlify.app'), 'microdata');
+  assert.equal(NL.hostnameMode(''), 'microdata');
 });
 
 test('classifyHash: dotted open → main+master candidates', () => {
@@ -70,10 +60,10 @@ test('welcomeVariant: micro host → microdata framing (either app)', () => {
   assert.equal(NL.welcomeVariant('microdata.run', 'openstat', false), 'microdata');
   assert.equal(NL.welcomeVariant('micro.safestat.app', 'safestat', false), 'microdata');
 });
-test('welcomeVariant: general framing per app', () => {
-  assert.equal(NL.welcomeVariant('py.openstat.app', 'openstat', false), 'openstat_general');
-  assert.equal(NL.welcomeVariant('safestat.app', 'safestat', false), 'safestat_general');
-  assert.equal(NL.welcomeVariant('r.safestat.app', 'safestat', false), 'safestat_general');
+test('welcomeVariant: microdata framing on every host (persona locked)', () => {
+  assert.equal(NL.welcomeVariant('py.openstat.app', 'openstat', false), 'microdata');
+  assert.equal(NL.welcomeVariant('safestat.app', 'safestat', false), 'microdata');
+  assert.equal(NL.welcomeVariant('r.safestat.app', 'safestat', false), 'microdata');
 });
 
 test('rProsePrep: contiguous #\' block becomes one markdown cat', () => {
@@ -103,17 +93,11 @@ test('autorunNeedsGate: openstat gates only when a secret is present', () => {
   assert.equal(NL.autorunNeedsGate('openstat', true), true);
 });
 
-test('urlHasMicro: host or path before # containing micro', () => {
+test('urlHasMicro: always on in this build (persona locked)', () => {
   assert.equal(NL.urlHasMicro('https://micro.safestat.app/'), true);
-  assert.equal(NL.urlHasMicro('https://microdata.run/app'), true);
-  assert.equal(NL.urlHasMicro('https://x.app/micro/y'), true);
-});
-test('urlHasMicro: false when micro only after the fragment, or absent', () => {
-  assert.equal(NL.urlHasMicro('https://openstat.app/#micro-anchor'), false);
-  assert.equal(NL.urlHasMicro('https://safestat.app/'), false);
-  assert.equal(NL.urlHasMicro('http://localhost:8080/'), false);
-  assert.equal(NL.urlHasMicro(''), false);
-  assert.equal(NL.urlHasMicro(null), false);
+  assert.equal(NL.urlHasMicro('http://localhost:8080/'), true);
+  assert.equal(NL.urlHasMicro(''), true);
+  assert.equal(NL.urlHasMicro(null), true);
 });
 
 test('classifyHash: single lowercase token → name lookup', () => {

@@ -1,22 +1,19 @@
 (function (global) {
   'use strict';
   var NL = {};
-  var LABEL_MODE = { py: 'python', r: 'r', duck: 'duckdb' }; // extensible: statx, jamovi
 
+  // Denne repoen ER microdata.no-emulatoren: personaen er låst på uansett
+  // hostname/URL. (I søsken-repoene openstat/safestat er disse to funksjonene
+  // hostname-/modus-styrt — ikke synk dem hit.)
   NL.hostnameMode = function (hostname) {
-    var host = String(hostname || '').toLowerCase();
-    var firstLabel = host.split('.')[0];
-    if (Object.prototype.hasOwnProperty.call(LABEL_MODE, firstLabel)) return LABEL_MODE[firstLabel];
-    if (host.indexOf('micro') !== -1) return 'microdata';
-    return 'python';
+    return 'microdata';
   };
 
-  // True iff "micro" appears in the URL before any fragment (#). Drives the
-  // microdata-specific UI gating (Oversett, Vurder personvern, Søk om data,
-  // offline Python, disclosure/data-source/label/import settings, AI routing).
+  // Drives the microdata-specific UI gating (Oversett, Vurder personvern,
+  // Søk om data, offline Python, disclosure/data-source/label/import
+  // settings, AI routing). Always on in this build.
   NL.urlHasMicro = function (href) {
-    var s = String(href == null ? '' : href).split('#')[0].toLowerCase();
-    return s.indexOf('micro') !== -1;
+    return true;
   };
 
   var RAW_BASE = 'https://raw.githubusercontent.com/';
