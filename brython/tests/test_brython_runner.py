@@ -87,6 +87,52 @@ def test_multiline_trailing_expression_with_earlier_lines():
     assert '7' in out
     assert br._get_last_error() == ''
 
+def test_black_style_call_closing_paren_at_column_0():
+    # Black-style formatting puts the lone closing ')' at column 0. The
+    # naive "last column-0 line" is just ')' — compiling that alone as
+    # 'eval' fails, so the scanner must walk further upward to the call's
+    # true start ('pe_bs.scatter(') and succeed there instead of giving up.
+    br._execute_code('import pandas_brython as pd\nimport plotly_express_brython as pe_bs\n'
+                      'df_bs = pd.DataFrame({"x": [1, 2], "y": [3, 4]})')
+    out = br._execute_code(
+        'pe_bs.scatter(\n'
+        '    df_bs, x="x", y="y"\n'
+        ')'
+    )
+    assert (ES + 'figure__') in out and EE in out
+    assert br._get_last_error() == ''
+
+def test_unindented_continuation_line_displays_value():
+    # `sum(nums,\n0)` — the second physical line ('0)') starts at column 0
+    # but is NOT itself a new top-level statement; it's an unindented
+    # continuation of the wrapped call on the previous line. The last
+    # column-0 candidate's tail ('0)') fails to compile as 'eval', so the
+    # scanner must walk upward to the real start ('sum(nums,') and succeed.
+    br._execute_code('nums_uc = [1, 2, 3]')
+    out = br._execute_code('sum(nums_uc,\n0)')
+    assert '6' in out
+    assert br._get_last_error() == ''
+
+def test_bare_trailing_multiline_string_displays():
+    # A bare multi-line triple-quoted string literal as the trailing
+    # top-level statement. Its own last column-0 line ('b"""') is not
+    # valid 'eval' source by itself; the scanner must walk up to the
+    # opening '"""a' line and eval the whole string.
+    out = br._execute_code('"""a\nb"""')
+    assert 'a\nb' in out
+    assert br._get_last_error() == ''
+
+def test_trailing_multiline_string_assignment_not_misdisplayed():
+    # A multi-line string literal used inside an assignment, followed by no
+    # further top-level statement. Every column-0 candidate's tail is a
+    # syntactically broken fragment (unterminated string literal, since the
+    # string's closing quotes are followed by more source), so none compile
+    # as 'eval' — must fall back to plain-exec with no display, and must
+    # NOT mis-evaluate a fragment like '1 + 1' out of context.
+    out = br._execute_code('s_ms = """hello\n1 + 1"""')
+    assert out == ''
+    assert br._get_last_error() == ''
+
 if __name__ == '__main__':
     # NOTE: iterate in declaration order (not sorted alphabetically) — several
     # tests share state via module globals (e.g. test_figure_embed_marker

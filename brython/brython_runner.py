@@ -44,46 +44,60 @@ def _execute_code(code):
         # under Brython 3.12 too). REPL semantics: if the code's final
         # top-level statement is itself an expression, display its value.
         # A top-level statement always starts at column 0 (no leading
-        # space/tab); continuation lines of a wrapped call/expression are
-        # indented (or at least never mistaken for a *new* top-level
-        # statement start under normal formatting). So: find the LAST
-        # physical line that starts at column 0 — that's where the final
-        # top-level statement begins — and take everything from there to
-        # the end as the "tail". If the tail compiles in 'eval' mode it's
-        # an expression: exec everything before it, then eval+display the
-        # tail (this also covers multi-line trailing expressions, e.g. a
-        # call whose arguments wrap across lines). If the tail is a
-        # statement (for/if/def/assignment/...), compiling it as 'eval'
-        # raises SyntaxError and we fall back to plain-exec of the whole
-        # code with no display — identical to today's behavior. This also
-        # keeps indented-last-line-inside-a-block safe: the nearest
-        # column-0 line is the block header, whose tail (header + body)
-        # cannot compile as 'eval' either, so it plain-execs instead of
-        # evaling the inner line out of context.
+        # space/tab). But column-0 is only *necessary*, not *sufficient*,
+        # evidence of "this is where the final top-level statement begins":
+        # - Black-style wrapping puts a lone closing ')' at column 0
+        #   (`pe.scatter(\n    df, ...\n)`), so the LAST column-0 line can be
+        #   a continuation fragment, not the statement start.
+        # - Unindented continuations (`sum(nums,\n0)`) put a fragment like
+        #   '0)' at column 0 too.
+        # - A bare multi-line triple-quoted string's last physical line
+        #   ('b"""') is not valid source on its own.
+        # So: collect column-0 candidate line indices from the END upward
+        # (capped, to bound pathological inputs) and try each one as a
+        # prospective statement start, taking tail = lines[i:] joined. The
+        # first candidate whose tail compiles in 'eval' mode AND whose head
+        # (lines[:i], or 'pass' if empty) compiles in 'exec' mode wins: exec
+        # the head, eval+display the tail. If the head fails to compile for
+        # that candidate, keep scanning upward rather than giving up. If no
+        # candidate ever produces a compilable (head, tail) pair, fall back
+        # to plain-exec of the whole code with no display — identical to
+        # today's behavior. This still keeps indented-last-line-inside-a-
+        # block safe: the only column-0 candidate is the block header,
+        # whose tail (header + body) cannot compile as 'eval' (a for/if/def
+        # is not a valid expression), so it plain-execs instead of evaling
+        # the inner line out of context.
         lines = code.split(chr(10))
         while lines and lines[-1].strip() == '':
             lines.pop()
         result = None
         displayed = False
         if lines:
-            last_idx = None
+            candidates = []
             for i in range(len(lines) - 1, -1, -1):
                 line = lines[i]
                 if line and line[:1] not in (' ', chr(9)):
-                    last_idx = i
-                    break
-            if last_idx is not None:
-                tail_src = chr(10).join(lines[last_idx:])
+                    candidates.append(i)
+                    if len(candidates) >= 50:
+                        break
+            for i in candidates:
+                tail_src = chr(10).join(lines[i:])
                 tail_stripped = tail_src.strip()
-                if tail_stripped and not tail_stripped.startswith('#'):
-                    try:
-                        tail_code = compile(tail_src, '<brython>', 'eval')
-                        head_src = chr(10).join(lines[:last_idx]) or 'pass'
-                        exec(compile(head_src, '<brython>', 'exec'), _shared_vars)
-                        result = eval(tail_code, _shared_vars)
-                        displayed = True
-                    except SyntaxError:
-                        pass
+                if not tail_stripped or tail_stripped.startswith('#'):
+                    continue
+                try:
+                    tail_code = compile(tail_src, '<brython>', 'eval')
+                except SyntaxError:
+                    continue
+                head_src = chr(10).join(lines[:i]) or 'pass'
+                try:
+                    head_code = compile(head_src, '<brython>', 'exec')
+                except SyntaxError:
+                    continue
+                exec(head_code, _shared_vars)
+                result = eval(tail_code, _shared_vars)
+                displayed = True
+                break
         if not displayed:
             exec(compile(code, '<brython>', 'exec'), _shared_vars)
         out = buf.getvalue()
