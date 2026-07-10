@@ -8469,7 +8469,8 @@ options(width = 200)
     // renderOutput gjenbruker appens output-byggere så kortene ser
     // identiske ut med vanlig visning.
     function buildDashboardCtx() {
-      var mode = (activeEditorMode === 'r') ? 'r' : 'python';
+      var mode = (activeEditorMode === 'r') ? 'r'
+        : (activeEditorMode === 'brython') ? 'brython' : 'python';
       async function runPy(code) {
         var py = await loadPyodideAndM2py();
         var buf = '';
@@ -8510,6 +8511,16 @@ options(width = 200)
           return { kind: 'r', parts: [], error: (e && e.message) || String(e) };
         }
       }
+      async function runBry(code) {
+        try {
+          var res = await window.BrythonEngine.run(code, {});
+          // kind 'py' med ren tekst — renderInto ruter den til buildOutputNodes,
+          // som forstår Brython-runnerens embed-markører direkte.
+          return { kind: 'py', text: res.text || '', error: res.error || null };
+        } catch (e) {
+          return { kind: 'py', text: '', error: (e && e.message) || String(e) };
+        }
+      }
       function renderInto(result, node) {
         purgePlots(node);
         node.innerHTML = '';
@@ -8528,7 +8539,8 @@ options(width = 200)
           node.appendChild(pre);
         }
       }
-      return { mode: mode, run: (mode === 'r') ? runR : runPy, renderOutput: renderInto, t: t };
+      return { mode: mode, run: (mode === 'r') ? runR : (mode === 'brython') ? runBry : runPy,
+               renderOutput: renderInto, t: t };
     }
 
     btnRun.addEventListener('click', async () => {
@@ -8552,7 +8564,7 @@ options(width = 200)
       // over. Cellene kjøres inkrementelt via buildDashboardCtx() når denne
       // kjøringen har satt seg (se hooken i finally-blokken).
       dashboardPendingParsed = null;
-      if (window.Dashboard && (activeEditorMode === 'python' || activeEditorMode === 'r')) {
+      if (window.Dashboard && (activeEditorMode === 'python' || activeEditorMode === 'r' || activeEditorMode === 'brython')) {
         var _dOpts = extractScriptOptions(effectiveScript);
         var _dashForced = !!window.__dashViewOverride;
         window.__dashViewOverride = false;      // engangsvalg fra visnings-dropdownen
