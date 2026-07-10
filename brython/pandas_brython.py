@@ -3093,15 +3093,40 @@ class GroupBy:
         return Series(counts, names, name=self.by)
 
 import io
-try:
-    import csv
-except:
-    print("no csv")
 
 def read_csv(filepath, sep=",", header=0, names=None, index_col=None):
     """
     Reads CSV data into a dataframe from a file path or StringIO object.
     """
+    # Unconditional, local import: the module-level `try: import csv except:
+    # print("no csv")` above (and the identical one near the top of this
+    # file) silently swallowed a real ImportError under Brython, leaving
+    # `csv` unbound and causing `NameError: name 'csv' is not defined` at
+    # `csv.reader(...)` below. CPython's stdlib always has csv, so the try
+    # always succeeded there and the bug never showed up in the CPython test
+    # suite. Importing here, unconditionally, surfaces any real failure
+    # immediately instead of masking it.
+    #
+    # Fixing the NameError uncovered a second, separate bug in Brython
+    # 3.12.0's own vendored stdlib (confirmed by inspecting brython_stdlib.js
+    # from jsdelivr): its csv.py does `from _csv import ...,QUOTE_STRINGS,
+    # QUOTE_NOTNULL,...`, but its _csv.py shim only defines
+    # `QUOTE_MINIMAL,QUOTE_ALL,QUOTE_NONNUMERIC,QUOTE_NONE=range(4)` — the
+    # newer two constants are missing, so `import csv` itself raises
+    # ImportError under Brython even though it works fine under CPython.
+    # Patch them onto _csv before importing csv; harmless no-op under
+    # CPython, where _csv already defines everything. Values match CPython's
+    # real csv.QUOTE_STRINGS/csv.QUOTE_NOTNULL (4 and 5) in case user code
+    # references them.
+    try:
+        import _csv
+        if not hasattr(_csv, 'QUOTE_STRINGS'):
+            _csv.QUOTE_STRINGS = 4
+        if not hasattr(_csv, 'QUOTE_NOTNULL'):
+            _csv.QUOTE_NOTNULL = 5
+    except ImportError:
+        pass
+    import csv
     index = []
     columns = []
     data = []

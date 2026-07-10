@@ -48,12 +48,25 @@
 //   - runPythonSource=function(src,script_id){if(script_id===undefined){...
 //   - brython=function(options){...} only reads debug/args/breakpoint/
 //     indexedDB/python_extension from options — no `ids` key exists.
-//   - python_scripts is built by querySelectorAll('script[type="text/python"]')
-//     AT CALL TIME, so any matching tags already in the DOM when brython()
-//     runs are picked up regardless of when they were appended — confirming
-//     tags-before-brython() is sufficient (no need for a MutationObserver).
 //   - script.id is the value used to key registered/defined modules —
 //     confirming the id-must-equal-module-name import contract.
+//
+// CORRECTION (found via real-browser testing, not just source reading): the
+// earlier claim here — that Brython scans script[type="text/python"] tags
+// "at call time" via a synchronous querySelectorAll with no MutationObserver
+// dependency — is WRONG. Brython's script-tag registry is actually populated
+// through a MutationObserver callback, which Chrome/Firefox schedule as a
+// microtask fired only once the current task yields. Appending our
+// <script id="pandas_brython"> tag synchronously and then calling
+// global.brython() in the very next line does NOT give that observer
+// callback a chance to run first, so brython() starts its module scan before
+// our tags are registered — `import pandas_brython` then fails with
+// ModuleNotFoundError in a real browser (this never showed up in
+// `node --check`, which only parses the file). The fix is to yield a real
+// macrotask (a `setTimeout(0)`, not just a microtask like `Promise.resolve()`
+// — those run before the observer's microtask too) between registering the
+// tags and calling brython(), so the MutationObserver has run by the time
+// the scan starts. See the `await new Promise(setTimeout(...))` below.
 (function (global) {
   'use strict';
 
@@ -97,6 +110,15 @@
       var sources = await Promise.all(
         PY_LIBS.concat(['brython_runner']).map(function (m) { return fetchText('brython/' + m + '.py'); }));
       PY_LIBS.forEach(function (m, i) { addPyModule(m, sources[i]); });
+      // Race fix (see file-header comment above): Brython's script-tag
+      // registry is filled in by a MutationObserver callback, which the
+      // browser schedules asynchronously. Without this yield, brython() can
+      // run its module scan before the observer has registered the tags we
+      // just appended, and `import pandas_brython` fails with
+      // ModuleNotFoundError. A macrotask yield (setTimeout, not a
+      // microtask/Promise.resolve — those still run before the observer's
+      // callback) reliably lets that callback run first.
+      await new Promise(function (r) { setTimeout(r, 0); });
       global.brython();                // no-args, matching code2web's proven invocation
       var mod = global.__BRYTHON__.runPythonSource(sources[PY_LIBS.length], 'brython_runner');
       return mod;
@@ -137,15 +159,26 @@
   }
 
   async function run(script, opts) {
-    var mod = await load();
-    var spec = await buildDatasetSpec(opts && opts.loads);
-    if (Object.keys(spec).length) {
-      var bindErr = mod._bind_datasets(JSON.stringify(spec));
-      if (bindErr) return { text: '', error: String(bindErr) };
+    // Contract: run() ALWAYS resolves {text, error} — never rejects. Callers
+    // (index.html's mode dispatch) only handle a resolved promise; load()
+    // failures (script/fetch errors) and buildDatasetSpec() throws
+    // (unsupported format, missing DuckDB parquet helper) previously
+    // rejected here, which would surface as an unhandled rejection instead
+    // of the Norwegian error text meant for the user. Catch everything and
+    // fold it into the same {text, error} shape.
+    try {
+      var mod = await load();
+      var spec = await buildDatasetSpec(opts && opts.loads);
+      if (Object.keys(spec).length) {
+        var bindErr = mod._bind_datasets(JSON.stringify(spec));
+        if (bindErr) return { text: '', error: String(bindErr) };
+      }
+      var text = mod._execute_code(script);
+      var err = mod._get_last_error();
+      return { text: String(text == null ? '' : text), error: err ? String(err) : null };
+    } catch (e) {
+      return { text: '', error: (e && e.message) || String(e) };
     }
-    var text = mod._execute_code(script);
-    var err = mod._get_last_error();
-    return { text: String(text == null ? '' : text), error: err ? String(err) : null };
   }
 
   global.BrythonEngine = { load: load, run: run };
