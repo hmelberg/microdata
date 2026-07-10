@@ -674,6 +674,7 @@
   <script src="js/i18n.js"></script>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <script src="js/brython-engine.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.1/dist/js/tabulator.min.js" defer></script>
   <script src="widgets/forklar-widgets.js"></script>
@@ -2918,12 +2919,14 @@
     };
     // Brython-modus: konverter vilkårlige parquet-bytes til kolonne-arrays via
     // DuckDB-WASM (lastes lat — kun når en brython-kjøring faktisk laster parquet).
+    let __brythonParquetSeq = 0;
     window.__brythonParquetColumns = async function (bytes) {
       const db = await __ensureDuckDB();
-      await db.registerFileBuffer('_brython_tmp.parquet', bytes);
+      const fname = '_brython_tmp_' + (++__brythonParquetSeq) + '.parquet';
+      await db.registerFileBuffer(fname, bytes);
       const conn = await db.connect();
-      try { return __arrowToColumns(await conn.query("SELECT * FROM read_parquet('_brython_tmp.parquet')")); }
-      finally { await conn.close(); try { await db.dropFile('_brython_tmp.parquet'); } catch (e) {} }
+      try { return __arrowToColumns(await conn.query("SELECT * FROM read_parquet('" + fname + "')")); }
+      finally { await conn.close(); try { await db.dropFile(fname); } catch (e) {} }
     };
     // Column lists per static table (so routing knows what's materialised).
     window.runStaticSchemas = async function (base) {
@@ -8439,7 +8442,7 @@ options(width = 200)
         if (webRReady) runtimeReadyBootstrap(null);
         // lastefeil: loadWebR har alt vist feilmelding; knappene står idle.
       });
-    } else if (runtimeForMode(activeEditorMode) === 'brython') {
+    } else if (runtimeForMode(activeEditorMode) === 'brython' && window.BrythonEngine) {
       window.BrythonEngine.load().then(function () {
         runtimeReadyBootstrap(null);
       }).catch(function (e) {
@@ -9381,7 +9384,6 @@ def _run_microdata_chunk(_code):
   <script src="js/data-loader.js"></script>
   <script src="js/ai-chat.js"></script>
   <script src="js/github-storage.js"></script>
-  <script src="js/brython-engine.js"></script>
 
   <div id="dmResultBackdrop" class="ai-modal-backdrop" style="display:none;">
     <div class="ai-modal" style="max-width: 780px; max-height: 80vh; display: flex; flex-direction: column;">
