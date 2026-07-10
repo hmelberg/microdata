@@ -44,6 +44,21 @@ def test_bind_datasets_csv_and_columns():
     out = br._execute_code('str(len(iris)) + "," + str(len(tall))')
     assert '2,3' in out
 
+def test_indented_last_line_not_evaled_out_of_context():
+    # Last physical line is indented (inside the if-block) but is itself a
+    # valid expression after .strip() ('y'). Must not be split into
+    # exec(body) + eval(tail) — that execs the block without the last line
+    # and then evals 'y' at top level, raising a spurious NameError.
+    out = br._execute_code('if False:\n    y = 99\n    y')
+    assert br._get_last_error() == ''
+    assert out == ''
+
+def test_indented_last_line_in_for_loop_not_displayed():
+    br._execute_code('nums_rt = {"a": 10, "b": 30}')
+    out = br._execute_code('for k_rt in nums_rt:\n    v_rt = nums_rt[k_rt]\n    v_rt')
+    assert br._get_last_error() == ''
+    assert '30' not in out
+
 if __name__ == '__main__':
     # NOTE: iterate in declaration order (not sorted alphabetically) — several
     # tests share state via module globals (e.g. test_figure_embed_marker

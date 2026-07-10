@@ -41,11 +41,15 @@ def _execute_code(code):
     sys.stdout = buf
     try:
         lines = code.rstrip().split(chr(10))
-        last = lines[-1].strip() if lines else ''
+        last_raw = lines[-1] if lines else ''
+        last = last_raw.strip()
         result = None
         # Try exec-all-but-last + eval-last so the final expression displays
-        # (REPL semantics). Fall back to plain exec for statements.
-        if last and not last.startswith('#'):
+        # (REPL semantics). Only safe when the last line is top-level (no
+        # leading whitespace) — an indented last line belongs to a block
+        # (if/for/while/with) and evaling it alone would run it out of
+        # context. Fall back to plain exec for statements and indented lines.
+        if last and not last.startswith('#') and last_raw[:1] not in (' ', chr(9)):
             try:
                 body = compile(chr(10).join(lines[:-1]) or 'pass', '<brython>', 'exec')
                 tail = compile(last, '<brython>', 'eval')
