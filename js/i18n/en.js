@@ -91,7 +91,7 @@ window.M2PY_I18N.en = {
   "Skjul/vis inndatapanel (bare output)": "Hide/show the input panel (output only)",
   "Skjul inndatapanel": "Hide input panel",
   "CSV omkodingsverktøy": "CSV recoding tool",
-  "Velg modus (Microdata, Python, R, Statx, Jamovi, Jamovi light, SQL - DuckDB, Brython)": "Select mode (Microdata, Python, R, Statx, Jamovi, Jamovi light, SQL - DuckDB, Brython)",
+  "Velg modus (Microdata, Python, R, Statx, Jamovi, SQL - DuckDB, Brython)": "Select mode (Microdata, Python, R, Statx, Jamovi, SQL - DuckDB, Brython)",
   "Kryptert": "Encrypted",
   "Åpen": "Open",
   "Ukjent": "Unknown",
