@@ -351,21 +351,26 @@
   </div>
   <footer class="bottombar">
     <div class="bottombar-left">
-      <!-- Visningsmodus samlet i én dropdown (før: tre ikonknapper) —
-           kolonner/stablet/kun output/skrittvis/dashboard. -->
-      <div class="mode-dropdown-wrap">
-        <button type="button" class="mode-dropdown-btn" id="viewModeBtn" data-i18n-title title="Velg visning (kolonner, stablet, kun output, skrittvis, dashboard)">
-          <span id="viewModeLabel" data-i18n>Kolonner</span>
-          <span class="chevron">▲</span>
-        </button>
-        <div class="mode-dropdown-menu" id="viewModeMenu">
-          <button type="button" data-view="columns" class="active" data-i18n>Kolonner</button>
-          <button type="button" data-view="stacked" data-i18n>Stablet</button>
-          <button type="button" data-view="output" data-i18n>Kun output</button>
-          <button type="button" data-view="forklar" data-i18n>Skrittvis</button>
-          <button type="button" data-view="dashboard" data-i18n>Dashboard</button>
-        </div>
-      </div>
+      <!-- Layout-ikonknapper (rad/kolonne/kun output) — microdata.no-stil.
+           Openstat/safestat bruker en visnings-dropdown her; i denne repoen
+           er ikonene bevisst gjenopprettet (2026-07-10). -->
+      <button type="button" class="bottombar-icon-btn" id="layoutStackedBtn" data-i18n-title data-i18n-aria title="Stablevisning (kode over, output under)" aria-label="Stablevisning" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect class="icon-solid" x="4" y="4" width="16" height="7" rx="1"/>
+          <rect class="icon-outline" x="4" y="13" width="16" height="7" rx="1"/>
+        </svg>
+      </button>
+      <button type="button" class="bottombar-icon-btn" id="layoutColumnsBtn" data-i18n-title data-i18n-aria title="Kolonnevisning (kode og output side ved side)" aria-label="Kolonnevisning" aria-pressed="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect class="icon-solid" x="3" y="4" width="8" height="16" rx="1"/>
+          <rect class="icon-outline" x="13" y="4" width="8" height="16" rx="1"/>
+        </svg>
+      </button>
+      <button type="button" class="bottombar-icon-btn" id="layoutOutputBtn" data-i18n-title data-i18n-aria title="Skjul/vis inndatapanel (bare output)" aria-label="Skjul inndatapanel" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect class="icon-solid" x="4" y="4" width="16" height="16" rx="1"/>
+        </svg>
+      </button>
       <button type="button" class="bottombar-icon-btn" id="csvToolBtn" data-i18n-title data-i18n-aria title="CSV omkodingsverktøy" aria-label="CSV omkodingsverktøy">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none">
           <path d="M4 8h12M13 5.5L16 8l-3 2.5"/>
@@ -3582,56 +3587,11 @@
       });
     })();
 
-    // ── Visningsmodus-dropdown i bunnmenyen (erstatter de tre layout-
-    //    ikonknappene): kolonner/stablet/kun output/skrittvis/dashboard.
-    (function initViewModeDropdown() {
-      var btn = document.getElementById('viewModeBtn');
-      var menu = document.getElementById('viewModeMenu');
-      var label = document.getElementById('viewModeLabel');
-      if (!btn || !menu) return;
-      var LABELS = { columns: t('Kolonner'), stacked: t('Stablet'), output: t('Kun output'),
-                     forklar: t('Skrittvis'), dashboard: t('Dashboard') };
-      function setActive(view) {
-        if (label) label.textContent = LABELS[view] || view;
-        menu.querySelectorAll('button[data-view]').forEach(function (b) {
-          b.classList.toggle('active', b.dataset.view === view);
-        });
-      }
-      window.mdSyncViewDropdown = setActive;
-      // Init-label fra lagret tilstand.
-      setActive(window.mdIsInputHidden && window.mdIsInputHidden() ? 'output'
-        : (window.mdIsStackedLayout && window.mdIsStackedLayout() ? 'stacked' : 'columns'));
-      btn.addEventListener('click', function (e) { e.stopPropagation(); menu.classList.toggle('open'); });
-      document.addEventListener('click', function () { menu.classList.remove('open'); });
-      menu.querySelectorAll('button[data-view]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          menu.classList.remove('open');
-          var v = b.dataset.view;
-          if (v === 'forklar') {
-            // Skrittvis er en KJØRING, ikke en tilstand — ikke endre label.
-            var fk = document.getElementById('btnForklar');
-            if (fk && !fk.disabled && !scriptRunInProgress) fk.click();
-            return;
-          }
-          if (v === 'dashboard') {
-            if (scriptRunInProgress) return;
-            setActive('dashboard');
-            window.__dashViewOverride = true;   // konsumeres av kjøre-grenen
-            document.getElementById('btnRun').click();
-            return;
-          }
-          if (window.Dashboard) window.Dashboard.unmount();
-          if (v === 'output') {
-            window.mdSetInputHidden(true);
-          } else {
-            window.mdSetInputHidden(false);
-            if (window.mdSetLayoutMode) window.mdSetLayoutMode(v);
-          }
-          if (window.mdOnInputToggle) window.mdOnInputToggle(v === 'output');
-          setActive(v);
-        });
-      });
-    })();
+    // Visnings-dropdownen fra openstat/safestat er fjernet i denne repoen —
+    // layout velges med de tre ikonknappene i bunnmenyen (microdata.no-stil).
+    // Dashboard-visning nås fortsatt via `#options.view = dashboard` i
+    // scriptet; alle mdSyncViewDropdown-kall andre steder er guarded og
+    // no-op'er uten dropdownen.
 
     (function initOversettBtn() {
       var btn = document.getElementById('oversettBtn');
