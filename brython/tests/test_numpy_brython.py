@@ -223,3 +223,24 @@ def test_random_statistical_sanity():
     xs = np.random.normal(10.0, 2.0, 4000)
     assert xs.mean() == pytest.approx(10.0, abs=0.15)
     assert xs.std() == pytest.approx(2.0, abs=0.15)
+
+def test_integration_matplotlib_scipy_statsmodels():
+    import matplotlib_brython as plt
+    import scipy_stats_brython as st
+    import statsmodels_brython as smb
+    np.random.seed(11)
+    x = np.linspace(0.0, 10.0, 20)
+    y = x * 2.0 + 1.0 + np.random.normal(0.0, 0.1, 20)
+    # matplotlib: ndarray rett inn i plot
+    plt.figure()
+    plt.plot(x, y)
+    trace = plt.gcf().data[0]
+    assert trace['x'] == pytest.approx(x.tolist())
+    # scipy: ndarray rett inn i ttest
+    res = st.ttest_ind(np.array([1.0, 2.0, 3.0, 4.0]),
+                       np.array([1.1, 2.1, 2.9, 4.2]))
+    assert res.pvalue > 0.5
+    # statsmodels: dict med ndarray-kolonner
+    ols = smb.ols('y ~ x', {'y': y, 'x': x}).fit()
+    assert ols.params['x'] == pytest.approx(2.0, abs=0.05)
+    assert ols.rsquared > 0.99
