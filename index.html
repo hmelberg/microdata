@@ -2951,6 +2951,48 @@
       try { return __arrowToColumns(await conn.query("SELECT * FROM read_parquet('" + fname + "')")); }
       finally { await conn.close(); try { await db.dropFile(fname); } catch (e) {} }
     };
+    // Brython duckdb-modul (js/brython-engine.js beginDuckBridge): registrer
+    // et # load-datasett som view + kjør én spørring mot den delte databasen.
+    window.__brythonDuck = {
+      async register(name, kind, payload) {
+        // kind 'csv' → payload er CSV-tekst; 'columns' → {kol: [verdier]}
+        const db = await __ensureDuckDB();
+        const ident = String(name).replace(/"/g, '""');
+        const conn = await db.connect();
+        try {
+          let fname, reader;
+          if (kind === 'csv') {
+            fname = String(name) + '.csv';
+            reader = 'read_csv_auto';
+            await db.registerFileBuffer(fname, new TextEncoder().encode(payload));
+          } else {
+            const cols = Object.keys(payload);
+            const n = cols.length ? payload[cols[0]].length : 0;
+            if (!n) return;   // read_json_auto takler ikke tomme datasett
+            const rows = new Array(n);
+            for (let i = 0; i < n; i++) {
+              const r = {};
+              for (const c of cols) r[c] = payload[c][i];
+              rows[i] = r;
+            }
+            fname = String(name) + '.json';
+            reader = 'read_json_auto';
+            await db.registerFileBuffer(fname, new TextEncoder().encode(JSON.stringify(rows)));
+          }
+          // en TABELL med samme navn fra en tidligere SQL-kjøring blokkerer
+          // CREATE OR REPLACE VIEW — rydd den eksplisitt først
+          await conn.query('DROP TABLE IF EXISTS "' + ident + '"');
+          await conn.query('CREATE OR REPLACE VIEW "' + ident + '" AS SELECT * FROM ' +
+                           reader + "('" + fname.replace(/'/g, "''") + "')");
+        } finally { await conn.close(); }
+      },
+      async query(sql) {
+        const db = await __ensureDuckDB();
+        const conn = await db.connect();
+        try { return __arrowToColumns(await conn.query(sql)); }
+        finally { await conn.close(); }
+      }
+    };
     // Column lists per static table (so routing knows what's materialised).
     window.runStaticSchemas = async function (base) {
       const db = await __ensureDuckDB();
