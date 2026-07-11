@@ -437,6 +437,9 @@ class LogitModel:
 
     def fit(self, **kwargs):                       # disp o.l. aksepteres og ignoreres
         y, names, X, spec = _build_design(self._formula, self._data)
+        if len(X) <= len(names):
+            raise ValueError('logit: for få observasjoner (%d) til %d '
+                             'koeffisienter' % (len(X), len(names)))
         for v in y:
             if v not in (0.0, 1.0):
                 raise ValueError('logit: y må være binær (0/1), fant %r' % v)

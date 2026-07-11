@@ -170,3 +170,9 @@ def test_logit_predict_probabilities():
     probs = res.predict()
     assert all(0.0 < p < 1.0 for p in probs)
     assert res.predict({'x': [6.0]})[0] > res.predict({'x': [1.0]})[0]
+
+def test_logit_empty_or_tiny_data_raises_norwegian():
+    with pytest.raises(ValueError, match='for få observasjoner'):
+        smb.logit('y ~ x', {'y': [], 'x': []}).fit()
+    with pytest.raises(ValueError, match='for få observasjoner'):
+        smb.logit('y ~ x', {'y': [1.0], 'x': [2.0]}).fit()
