@@ -113,3 +113,58 @@ def test_bool_of_array_is_guarded():
     with pytest.raises(ValueError, match='tvetydig'):
         if np.array([1, 2, 3]) > 2:
             pass
+
+def test_aggregation_methods_and_functions():
+    a = np.array([1.0, 2.0, 3.0, 4.0])
+    assert a.mean() == 2.5 and np.mean(a) == 2.5
+    assert np.mean([1, 2, 3]) == 2.0                 # liste rett inn
+    assert a.sum() == 10.0 and np.sum(a) == 10.0
+    assert a.min() == 1.0 and np.max(a) == 4.0
+    assert a.var() == pytest.approx(1.25)            # ddof=0 (numpy-default!)
+    assert a.std() == pytest.approx(math.sqrt(1.25))
+    assert a.var(ddof=1) == pytest.approx(5.0 / 3.0)
+    assert np.median([3, 1, 2]) == 2
+    assert np.median([4, 1, 3, 2]) == 2.5
+    m = np.array([[1, 2], [3, 4]])
+    assert m.mean() == 2.5 and m.sum() == 10          # aggregering over alt
+
+def test_percentile_linear_interpolation():
+    a = [1.0, 2.0, 3.0, 4.0]
+    assert np.percentile(a, 50) == 2.5
+    assert np.percentile(a, 25) == 1.75
+    assert np.percentile(a, 0) == 1.0 and np.percentile(a, 100) == 4.0
+    assert np.quantile(a, 0.5) == 2.5
+    assert np.percentile(a, [25, 75]).tolist() == [1.75, 3.25]
+
+def test_sort_argsort_argmax_unique_cumsum():
+    a = np.array([3, 1, 2, 1])
+    assert np.sort(a).tolist() == [1, 1, 2, 3]
+    assert np.argsort(a).tolist() == [1, 3, 2, 0]
+    assert a.argmax() == 0 and np.argmin(a) == 1
+    assert np.unique(a).tolist() == [1, 2, 3]
+    assert a.cumsum().tolist() == [3, 4, 6, 7]
+
+def test_where_both_forms():
+    c = np.array([True, False, True])
+    assert np.where(c, 1, 0).tolist() == [1, 0, 1]
+    x = np.array([10, 20, 30])
+    y = np.array([-1, -2, -3])
+    assert np.where(c, x, y).tolist() == [10, -2, 30]
+    idx = np.where(np.array([0, 5, 0, 7]) > 0)
+    assert isinstance(idx, tuple) and idx[0].tolist() == [1, 3]
+
+def test_concatenate_and_dot():
+    assert np.concatenate([np.array([1, 2]), [3], np.array([4])]).tolist() == [1, 2, 3, 4]
+    assert np.dot([1, 2, 3], [4, 5, 6]) == 32
+    m = np.array([[1, 2], [3, 4]])
+    v = np.array([5, 6])
+    assert np.dot(m, v).tolist() == [17, 39]
+    assert np.dot(m, m).tolist() == [[7, 10], [15, 22]]
+    assert (m @ v).tolist() == [17, 39]
+    with pytest.raises(ValueError):
+        np.dot([1, 2], [1, 2, 3])
+
+def test_astype_and_round_method():
+    a = np.array([1.7, 2.2])
+    assert a.astype(int).tolist() == [1, 2]
+    assert a.round().tolist() == [2.0, 2.0]

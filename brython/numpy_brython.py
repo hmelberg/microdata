@@ -162,6 +162,54 @@ class ndarray:
     def __matmul__(self, o):
         return dot(self, o)             # dot defineres i Task 3 — oppslag ved kall
 
+    # NB: metodene bruker KUN _sum/_min/_max (skygge-/Brython-fellene)
+    def mean(self):
+        flat = self._flat()
+        return _sum(flat) / len(flat)
+
+    def sum(self):
+        return _sum(self._flat())
+
+    def min(self):
+        return _min(self._flat())
+
+    def max(self):
+        return _max(self._flat())
+
+    def var(self, ddof=0):
+        flat = self._flat()
+        n = len(flat) - ddof
+        if n <= 0:
+            return nan
+        m = _sum(flat) / len(flat)
+        return _sum((v - m) ** 2 for v in flat) / n
+
+    def std(self, ddof=0):
+        v = self.var(ddof)
+        return math.sqrt(v) if v == v else nan
+
+    def argmax(self):
+        flat = self._flat()
+        return flat.index(_max(flat))
+
+    def argmin(self):
+        flat = self._flat()
+        return flat.index(_min(flat))
+
+    def cumsum(self):
+        out = []
+        acc = 0
+        for v in self._flat():
+            acc += v
+            out.append(acc)
+        return ndarray(out)
+
+    def round(self, decimals=0):
+        return _unary(self, lambda v: _round(v, decimals))
+
+    def astype(self, typ):
+        return _unary(self, typ)
+
     def __repr__(self):
         return 'array(%r)' % (self.tolist(),)
 
@@ -258,3 +306,146 @@ def round(a, decimals=0):               # skygger builtin — intern kode bruker
 
 def isnan(a):
     return _unary(a, lambda v: isinstance(v, float) and v != v)
+
+
+def mean(a):
+    return asarray(a).mean()
+
+
+def median(a):
+    flat = sorted(asarray(a)._flat())
+    n = len(flat)
+    mid = n // 2
+    if n % 2:
+        return flat[mid]
+    return (flat[mid - 1] + flat[mid]) / 2.0
+
+
+def std(a, ddof=0):
+    return asarray(a).std(ddof)
+
+
+def var(a, ddof=0):
+    return asarray(a).var(ddof)
+
+
+def sum(a):                             # skygger builtin — intern kode bruker _sum
+    return asarray(a).sum()
+
+
+def min(a):                             # skygger builtin — intern kode bruker _min
+    return asarray(a).min()
+
+
+def max(a):                             # skygger builtin — intern kode bruker _max
+    return asarray(a).max()
+
+
+def percentile(a, q):
+    if isinstance(q, (list, tuple)):
+        return ndarray([percentile(a, x) for x in q])
+    flat = sorted(asarray(a)._flat())
+    if not flat:
+        raise ValueError('percentile: tomt array')
+    pos = (len(flat) - 1) * q / 100.0
+    lo = int(math.floor(pos))
+    hi = int(math.ceil(pos))
+    if lo == hi:
+        return float(flat[lo])
+    frac = pos - lo
+    return flat[lo] * (1.0 - frac) + flat[hi] * frac
+
+
+def quantile(a, q):
+    if isinstance(q, (list, tuple)):
+        return ndarray([percentile(a, x * 100.0) for x in q])
+    return percentile(a, q * 100.0)
+
+
+def cumsum(a):
+    return asarray(a).cumsum()
+
+
+def unique(a):
+    seen = []
+    for v in asarray(a)._flat():
+        if v not in seen:
+            seen.append(v)
+    return ndarray(sorted(seen))
+
+
+def sort(a):
+    return ndarray(sorted(asarray(a)._flat()))
+
+
+def argsort(a):
+    flat = asarray(a)._flat()
+    return ndarray(sorted(range(len(flat)), key=lambda i: flat[i]))
+
+
+def argmax(a):
+    return asarray(a).argmax()
+
+
+def argmin(a):
+    return asarray(a).argmin()
+
+
+def where(cond, x=None, y=None):
+    c = asarray(cond)
+    if x is None and y is None:
+        if c.ndim != 1:
+            raise ValueError('where(cond) uten verdier støtter kun 1D')
+        return (ndarray([i for i, v in enumerate(c._d) if v]),)
+    if (x is None) != (y is None):
+        raise ValueError('where: oppgi enten bare cond, eller cond, x OG y')
+
+    def _pick(src, i, j=None):
+        if isinstance(src, ndarray):
+            return src._d[i] if j is None else src._d[i][j]
+        return src
+
+    xa = asarray(x) if isinstance(x, (list, tuple, ndarray)) else x
+    ya = asarray(y) if isinstance(y, (list, tuple, ndarray)) else y
+    for arr in (xa, ya):
+        if isinstance(arr, ndarray) and arr.shape != c.shape:
+            raise ValueError('where: x/y må ha samme form som cond')
+    if c.ndim == 1:
+        return ndarray([_pick(xa, i) if v else _pick(ya, i)
+                        for i, v in enumerate(c._d)])
+    return ndarray([[_pick(xa, i, j) if v else _pick(ya, i, j)
+                     for j, v in enumerate(row)]
+                    for i, row in enumerate(c._d)])
+
+
+def concatenate(arrays):
+    out = []
+    for a in arrays:
+        arr = asarray(a)
+        if arr.ndim != 1:
+            raise ValueError('concatenate: kun 1D-arrays støttes')
+        out.extend(arr._d)
+    return ndarray(out)
+
+
+def dot(a, b):
+    A, B = asarray(a), asarray(b)
+    if A.ndim == 1 and B.ndim == 1:
+        if A.shape != B.shape:
+            raise ValueError('dot: lengdene passer ikke')
+        return _sum(x * y for x, y in zip(A._d, B._d))
+    if A.ndim == 1:
+        A = ndarray([A._d])                      # radvektor
+        return dot(A, B)[0]
+    if B.ndim == 1:
+        if A.shape[1] != B.shape[0]:
+            raise ValueError('dot: formene passer ikke: %r mot %r'
+                             % (A.shape, B.shape))
+        return ndarray([_sum(x * y for x, y in zip(row, B._d))
+                        for row in A._d])
+    if A.shape[1] != B.shape[0]:
+        raise ValueError('dot: formene passer ikke: %r mot %r'
+                         % (A.shape, B.shape))
+    Bt = B.T
+    return ndarray([[_sum(x * y for x, y in zip(row, col))
+                     for col in Bt._d] for row in A._d])
