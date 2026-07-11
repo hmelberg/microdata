@@ -181,7 +181,7 @@ def _xtx_xty(X, y):
 # ── OLS ─────────────────────────────────────────────────────────────────────
 
 class OLSResults:
-    def __init__(self, names, beta, cov, y, X, intercept, spec):
+    def __init__(self, names, beta, cov, y, X, intercept, spec, has_const):
         self._names = names
         self._spec = spec
         self._intercept = intercept
@@ -190,17 +190,17 @@ class OLSResults:
         k = len(names)
         self.nobs = n
         self.df_resid = n - k
-        self.df_model = k - 1 if intercept else k
+        self.df_model = k - 1 if has_const else k
         self.params = {nm: b for nm, b in zip(names, beta)}
         self.fittedvalues = [sum(b * xv for b, xv in zip(beta, row))
                              for row in X]
         self.resid = [yv - fv for yv, fv in zip(y, self.fittedvalues)]
         ssr = sum(r * r for r in self.resid)
         ymean = sum(y) / n
-        sst = (sum((v - ymean) ** 2 for v in y) if intercept
+        sst = (sum((v - ymean) ** 2 for v in y) if has_const
                else sum(v * v for v in y))
         self.rsquared = 1.0 - ssr / sst if sst > 0.0 else float('nan')
-        self.rsquared_adj = (1.0 - (1.0 - self.rsquared) * (n - (1 if intercept else 0))
+        self.rsquared_adj = (1.0 - (1.0 - self.rsquared) * (n - (1 if has_const else 0))
                              / self.df_resid) if self.df_resid > 0 else float('nan')
         self.bse = {}
         self.tvalues = {}
@@ -307,6 +307,10 @@ class OLSModel:
         self._data = data
 
     def fit(self, **kwargs):
+        for key in kwargs:
+            if key not in ('disp', 'maxiter'):
+                raise ValueError("fit: argumentet '%s' støttes ikke i "
+                                 'Brython-utgaven' % key)
         y, names, X, spec = _build_design(self._formula, self._data)
         n, k = len(X), len(names)
         if n <= k:
@@ -321,7 +325,8 @@ class OLSModel:
         xtx_inv = _solve(xtx, identity)
         cov = [[sigma2 * xtx_inv[i][j] for j in range(k)] for i in range(k)]
         _, _, intercept = _parse_formula(self._formula)
-        return OLSResults(names, beta, cov, y, X, intercept, spec)
+        has_const = intercept or any(e[0] == 'cat' for e in spec)
+        return OLSResults(names, beta, cov, y, X, intercept, spec, has_const)
 
 
 def ols(formula, data):
@@ -436,6 +441,10 @@ class LogitModel:
         self._data = data
 
     def fit(self, **kwargs):                       # disp o.l. aksepteres og ignoreres
+        for key in kwargs:
+            if key not in ('disp', 'maxiter'):
+                raise ValueError("fit: argumentet '%s' støttes ikke i "
+                                 'Brython-utgaven' % key)
         y, names, X, spec = _build_design(self._formula, self._data)
         if len(X) <= len(names):
             raise ValueError('logit: for få observasjoner (%d) til %d '

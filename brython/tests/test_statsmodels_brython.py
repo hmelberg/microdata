@@ -176,3 +176,10 @@ def test_logit_empty_or_tiny_data_raises_norwegian():
         smb.logit('y ~ x', {'y': [], 'x': []}).fit()
     with pytest.raises(ValueError, match='for få observasjoner'):
         smb.logit('y ~ x', {'y': [1.0], 'x': [2.0]}).fit()
+
+def test_fit_rejects_unsupported_kwargs():
+    d = {'y': [1.0, 2.0, 3.0, 4.0], 'x': [1.0, 2.0, 3.0, 4.0]}
+    with pytest.raises(ValueError, match='støttes ikke'):
+        smb.ols('y ~ x', d).fit(cov_type='HC1')
+    d['b'] = [0.0, 0.0, 1.0, 1.0]
+    smb.logit('b ~ x', d).fit(disp=0)          # hvitelistet — skal gå fint

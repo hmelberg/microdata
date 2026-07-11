@@ -75,3 +75,14 @@ def test_logit_diff():
     rp = ref.predict(pd.DataFrame({'pris': [4.0, 8.0], 'by': ['O', 'B']}))
     for a, b in zip(mp, list(rp)):
         assert a == pytest.approx(float(b), rel=1e-5)
+
+def test_ols_diff_no_intercept_categorical_rsquared():
+    # full-rang-dummyer spenner konstanten -> statsmodels bruker sentrert TSS
+    for formula in ('y ~ region - 1', 'y ~ region + alder - 1'):
+        mine = smb.ols(formula, RAW).fit()
+        ref = smf.ols(formula, pd.DataFrame(RAW)).fit()
+        assert mine.rsquared == pytest.approx(ref.rsquared, rel=1e-8)
+        assert mine.rsquared_adj == pytest.approx(ref.rsquared_adj, rel=1e-8)
+        assert mine.fvalue == pytest.approx(ref.fvalue, rel=1e-6)
+        assert mine.f_pvalue == pytest.approx(ref.f_pvalue, rel=1e-6)
+        assert mine.df_model == ref.df_model
