@@ -81,3 +81,29 @@ def test_ppf_cdf_roundtrips():
         assert abs(st.t.cdf(st.t.ppf(p, 7), 7) - p) < 1e-9
         assert abs(st.chi2.cdf(st.chi2.ppf(p, 5), 5) - p) < 1e-9
         assert abs(st.f.cdf(st.f.ppf(p, 4, 9), 4, 9) - p) < 1e-9
+
+# ── t-tester og korrelasjon ─────────────────────────────────────────────────
+
+def test_ttest_1samp_symmetric_data():
+    res = st.ttest_1samp([-1.0, 0.0, 1.0], 0.0)
+    assert abs(res.statistic) < 1e-12
+    assert abs(res.pvalue - 1.0) < 1e-12
+    stat, p = res                       # tuple-utpakking som i scipy
+    assert stat == res.statistic and p == res.pvalue
+    assert res[0] == stat and res[1] == p
+
+def test_ttest_ind_identical_groups():
+    res = st.ttest_ind([1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
+    assert abs(res.statistic) < 1e-12 and abs(res.pvalue - 1.0) < 1e-12
+
+def test_ttest_rel_zero_diff_no_crash():
+    # identiske par gir 0/0 — nan aksepteres, poenget er ingen krasj
+    res = st.ttest_rel([5.0, 6.0, 7.0], [5.0, 6.0, 7.0])
+    assert res.statistic != res.statistic     # nan
+    assert res.pvalue != res.pvalue           # nan
+
+def test_pearsonr_perfect_and_zero():
+    r = st.pearsonr([1, 2, 3, 4], [2, 4, 6, 8])
+    assert abs(r.statistic - 1.0) < 1e-12
+    r2 = st.pearsonr([1, 2, 3, 4], [1, -1, 1, -1])
+    assert abs(r2.statistic) < 0.5      # nær null, ikke eksakt

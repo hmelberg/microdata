@@ -39,3 +39,32 @@ def test_f_diff():
             assert st.f.cdf(x, dfn, dfd) == pytest.approx(scipy_stats.f.cdf(x, dfn, dfd), abs=1e-9)
         for p in PS:
             assert st.f.ppf(p, dfn, dfd) == pytest.approx(scipy_stats.f.ppf(p, dfn, dfd), rel=1e-6)
+
+A = [12.9, 13.5, 12.8, 15.6, 17.2, 19.2, 12.6, 15.3, 14.4, 11.3]
+B = [12.7, 13.6, 12.0, 15.2, 16.8, 20.0, 12.0, 15.9, 16.0, 11.1]
+C = [14.2, 12.1, 13.8, 16.1, 15.5, 18.0, 13.1]
+
+def test_ttest_1samp_diff():
+    mine = st.ttest_1samp(A, 14.0)
+    ref = scipy_stats.ttest_1samp(A, 14.0)
+    assert mine.statistic == pytest.approx(ref.statistic, rel=1e-8)
+    assert mine.pvalue == pytest.approx(ref.pvalue, rel=1e-8)
+
+def test_ttest_ind_pooled_and_welch_diff():
+    for ev in (True, False):
+        mine = st.ttest_ind(A, C, equal_var=ev)
+        ref = scipy_stats.ttest_ind(A, C, equal_var=ev)
+        assert mine.statistic == pytest.approx(ref.statistic, rel=1e-8)
+        assert mine.pvalue == pytest.approx(ref.pvalue, rel=1e-8)
+
+def test_ttest_rel_diff():
+    mine = st.ttest_rel(A, B)
+    ref = scipy_stats.ttest_rel(A, B)
+    assert mine.statistic == pytest.approx(ref.statistic, rel=1e-8)
+    assert mine.pvalue == pytest.approx(ref.pvalue, rel=1e-8)
+
+def test_pearsonr_diff():
+    mine = st.pearsonr(A, B)
+    ref = scipy_stats.pearsonr(A, B)
+    assert mine.statistic == pytest.approx(ref.statistic, rel=1e-8)
+    assert mine.pvalue == pytest.approx(ref.pvalue, rel=1e-8)

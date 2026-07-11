@@ -271,3 +271,87 @@ norm = _Norm()
 t = _T()
 chi2 = _Chi2()
 f = _F()
+
+
+# ── hypotesetester ──────────────────────────────────────────────────────────
+
+class TestResult:
+    """(statistic, pvalue) — oppfører seg som scipy sitt resultatobjekt:
+    attributter + utpakking/indeksering som 2-tuple."""
+
+    def __init__(self, statistic, pvalue):
+        self.statistic = statistic
+        self.pvalue = pvalue
+
+    def __iter__(self):
+        return iter((self.statistic, self.pvalue))
+
+    def __getitem__(self, i):
+        return (self.statistic, self.pvalue)[i]
+
+    def __len__(self):
+        return 2
+
+    def __repr__(self):
+        return 'TestResult(statistic=%r, pvalue=%r)' % (self.statistic, self.pvalue)
+
+
+def _mean(v):
+    return sum(v) / len(v)
+
+
+def _var(v, ddof=1):
+    m = _mean(v)
+    return sum((x - m) ** 2 for x in v) / (len(v) - ddof)
+
+
+def ttest_1samp(a, popmean):
+    a = _tolist(a)
+    n = len(a)
+    se = math.sqrt(_var(a) / n)
+    stat = (_mean(a) - popmean) / se if se > 0.0 else float('nan')
+    p = 2.0 * t.sf(abs(stat), n - 1) if stat == stat else float('nan')
+    return TestResult(stat, p)
+
+
+def ttest_ind(a, b, equal_var=True):
+    a, b = _tolist(a), _tolist(b)
+    na, nb = len(a), len(b)
+    va, vb = _var(a), _var(b)
+    if equal_var:
+        sp = ((na - 1) * va + (nb - 1) * vb) / (na + nb - 2)
+        se = math.sqrt(sp * (1.0 / na + 1.0 / nb))
+        dof = na + nb - 2
+    else:                                # Welch
+        se = math.sqrt(va / na + vb / nb)
+        dof = ((va / na + vb / nb) ** 2
+               / ((va / na) ** 2 / (na - 1) + (vb / nb) ** 2 / (nb - 1)))
+    stat = (_mean(a) - _mean(b)) / se if se > 0.0 else float('nan')
+    p = 2.0 * t.sf(abs(stat), dof) if stat == stat else float('nan')
+    return TestResult(stat, p)
+
+
+def ttest_rel(a, b):
+    a, b = _tolist(a), _tolist(b)
+    if len(a) != len(b):
+        raise ValueError('ttest_rel: like lange utvalg kreves')
+    return ttest_1samp([x - y for x, y in zip(a, b)], 0.0)
+
+
+def pearsonr(x, y):
+    x, y = _tolist(x), _tolist(y)
+    if len(x) != len(y):
+        raise ValueError('pearsonr: like lange utvalg kreves')
+    n = len(x)
+    mx, my = _mean(x), _mean(y)
+    num = sum((a - mx) * (b - my) for a, b in zip(x, y))
+    den = math.sqrt(sum((a - mx) ** 2 for a in x)
+                    * sum((b - my) ** 2 for b in y))
+    r = num / den if den > 0.0 else float('nan')
+    r = max(-1.0, min(1.0, r)) if r == r else r
+    if n <= 2 or r != r or abs(r) == 1.0:
+        p = 0.0 if r == r and abs(r) == 1.0 else float('nan')
+    else:
+        stat = r * math.sqrt((n - 2) / (1.0 - r * r))
+        p = 2.0 * t.sf(abs(stat), n - 2)
+    return TestResult(r, p)
