@@ -706,7 +706,7 @@
     window.t = window.t || function (s) { return s; };
     window.i18nField = window.i18nField || function (obj, field) { return obj && obj[field]; };
 
-    window.M2PY_VERSION = '2026-05-25g';
+    window.M2PY_VERSION = '2026-07-11a';
 
     // One-time migration: remove obsolete localStorage keys from previous milestones
     // Safe to delete this snippet after a few months when most users have re-loaded
@@ -2954,7 +2954,7 @@
       try {
         for (const t of STATIC_TABLES) {
           try {
-            const r = await conn.query("SELECT * FROM read_parquet('" + base + "static_data/" + t + ".parquet') LIMIT 0");
+            const r = await conn.query("SELECT * FROM read_parquet('" + base + "static_data/" + t + ".parquet?v=" + (window.M2PY_VERSION || '1') + "') LIMIT 0");
             out[t] = r.schema.fields.map(f => f.name);
           } catch (e) { /* table absent */ }
         }
@@ -8855,12 +8855,12 @@ if getattr(_m2py_mod, 'M2PY_DATA_SOURCE', 'dynamic') == 'static' and getattr(e, 
         # Manifest gir limit-planen levende/døde-fordelingen (unit_id-splitten);
         # uten den faller planen tilbake til kun-levende-grensen.
         try:
-            _mresp = await _js.fetch(${JSON.stringify(pageBase)} + 'static_data/manifest.json')
+            _mresp = await _js.fetch(${JSON.stringify(pageBase)} + 'static_data/manifest.json?v=' + ${JSON.stringify(String(window.M2PY_VERSION || '1'))})
             if _mresp.ok:
                 e.static_source.manifest = json.loads(await _mresp.text())
         except Exception:
             pass
-        _plan = e.static_source.plan_sql(${JSON.stringify(effectiveScript)}, ${JSON.stringify(pageBase)}, ${getImportLimit()})
+        _plan = e.static_source.plan_sql(${JSON.stringify(effectiveScript)}, ${JSON.stringify(pageBase)}, ${getImportLimit()}, version=${JSON.stringify(String(window.M2PY_VERSION || '1'))})
         _cache = {}
         for _q in _plan:
             try:
