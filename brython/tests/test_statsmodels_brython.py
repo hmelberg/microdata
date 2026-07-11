@@ -67,3 +67,32 @@ def test_c_numeric_levels_sorted_numerically():
 def test_mismatched_column_lengths_raise():
     with pytest.raises(ValueError):
         smb._build_design('y ~ x', {'y': [1.0, 2.0], 'x': [1.0, 2.0, 3.0]})
+
+def test_solve_known_system():
+    # 2a + b = 5 ; a + 3b = 10  =>  a = 1, b = 3
+    X = smb._solve([[2.0, 1.0], [1.0, 3.0]], [[5.0], [10.0]])
+    assert abs(X[0][0] - 1.0) < 1e-12 and abs(X[1][0] - 3.0) < 1e-12
+
+def test_solve_singular_raises():
+    with pytest.raises(ValueError):
+        smb._solve([[1.0, 2.0], [2.0, 4.0]], [[1.0], [2.0]])
+
+def test_ols_perfect_line():
+    d = {'y': [3.0, 5.0, 7.0, 9.0], 'x': [1.0, 2.0, 3.0, 4.0]}
+    res = smb.ols('y ~ x', d).fit()
+    assert res.params['Intercept'] == pytest.approx(1.0, abs=1e-10)
+    assert res.params['x'] == pytest.approx(2.0, abs=1e-10)
+    assert res.rsquared == pytest.approx(1.0, abs=1e-12)
+    assert res.nobs == 4 and res.df_resid == 2
+
+def test_ols_collinear_raises_norwegian():
+    d = {'y': [1.0, 2.0, 3.0], 'a': [1.0, 2.0, 3.0], 'b': [2.0, 4.0, 6.0]}
+    with pytest.raises(ValueError):
+        smb.ols('y ~ a + b', d).fit()
+
+def test_ols_fittedvalues_and_resid():
+    d = {'y': [1.0, 2.0, 2.0, 3.0], 'x': [1.0, 2.0, 3.0, 4.0]}
+    res = smb.ols('y ~ x', d).fit()
+    assert len(res.fittedvalues) == 4
+    for f_, r_, yv in zip(res.fittedvalues, res.resid, d['y']):
+        assert f_ + r_ == pytest.approx(yv, abs=1e-12)

@@ -130,3 +130,104 @@ def _build_design(formula, data):
     if not names:
         raise ValueError('formelen har ingen forklaringsvariabler')
     return y, names, X, spec
+
+
+# ── lineær algebra ──────────────────────────────────────────────────────────
+
+def _solve(A, B):
+    """Løs A·X = B (A n×n, B n×m) med Gauss-Jordan og delvis pivotering.
+    Muterer ikke input. Norsk feil ved singulær matrise."""
+    n = len(A)
+    M = [list(Arow) + list(Brow) for Arow, Brow in zip(A, B)]
+    width = len(M[0])
+    for colidx in range(n):
+        piv = max(range(colidx, n), key=lambda r: abs(M[r][colidx]))
+        if abs(M[piv][colidx]) < 1e-12:
+            raise ValueError('designmatrisen er singulær — perfekt '
+                             'kolineære kolonner i formelen?')
+        M[colidx], M[piv] = M[piv], M[colidx]
+        pv = M[colidx][colidx]
+        M[colidx] = [v / pv for v in M[colidx]]
+        for r in range(n):
+            if r != colidx and M[r][colidx] != 0.0:
+                factor = M[r][colidx]
+                Mc = M[colidx]
+                M[r] = [a - factor * b for a, b in zip(M[r], Mc)]
+    return [row[n:width] for row in M]
+
+
+def _xtx_xty(X, y):
+    k = len(X[0])
+    xtx = [[sum(row[i] * row[j] for row in X) for j in range(k)]
+           for i in range(k)]
+    xty = [[sum(row[i] * yv for row, yv in zip(X, y))] for i in range(k)]
+    return xtx, xty
+
+
+# ── OLS ─────────────────────────────────────────────────────────────────────
+
+class OLSResults:
+    def __init__(self, names, beta, cov, y, X, intercept, spec):
+        self._names = names
+        self._spec = spec
+        self._intercept = intercept
+        self._cov = cov
+        n = len(y)
+        k = len(names)
+        self.nobs = n
+        self.df_resid = n - k
+        self.df_model = k - 1 if intercept else k
+        self.params = {nm: b for nm, b in zip(names, beta)}
+        self.fittedvalues = [sum(b * xv for b, xv in zip(beta, row))
+                             for row in X]
+        self.resid = [yv - fv for yv, fv in zip(y, self.fittedvalues)]
+        ssr = sum(r * r for r in self.resid)
+        ymean = sum(y) / n
+        sst = (sum((v - ymean) ** 2 for v in y) if intercept
+               else sum(v * v for v in y))
+        self.rsquared = 1.0 - ssr / sst if sst > 0.0 else float('nan')
+        self.rsquared_adj = (1.0 - (1.0 - self.rsquared) * (n - (1 if intercept else 0))
+                             / self.df_resid) if self.df_resid > 0 else float('nan')
+        self.bse = {}
+        self.tvalues = {}
+        self.pvalues = {}
+        for i, nm in enumerate(names):
+            se = math.sqrt(cov[i][i]) if cov[i][i] > 0.0 else float('nan')
+            self.bse[nm] = se
+            tv = self.params[nm] / se if se and se > 0.0 else float('nan')
+            self.tvalues[nm] = tv
+            self.pvalues[nm] = (2.0 * _stats.t.sf(abs(tv), self.df_resid)
+                                if tv == tv and self.df_resid > 0 else float('nan'))
+        if self.df_model > 0 and self.df_resid > 0 and ssr > 0.0 and sst > ssr:
+            self.fvalue = ((sst - ssr) / self.df_model) / (ssr / self.df_resid)
+            self.f_pvalue = _stats.f.sf(self.fvalue, self.df_model, self.df_resid)
+        else:
+            self.fvalue = float('nan')
+            self.f_pvalue = float('nan')
+
+
+class OLSModel:
+    def __init__(self, formula, data):
+        self._formula = formula
+        self._data = data
+
+    def fit(self, **kwargs):
+        y, names, X, spec = _build_design(self._formula, self._data)
+        n, k = len(X), len(names)
+        if n <= k:
+            raise ValueError('ols: for få observasjoner (%d) til %d '
+                             'koeffisienter' % (n, k))
+        xtx, xty = _xtx_xty(X, y)
+        beta = [row[0] for row in _solve(xtx, xty)]
+        fitted = [sum(b * xv for b, xv in zip(beta, row)) for row in X]
+        ssr = sum((yv - fv) ** 2 for yv, fv in zip(y, fitted))
+        sigma2 = ssr / (n - k)
+        identity = [[1.0 if i == j else 0.0 for j in range(k)] for i in range(k)]
+        xtx_inv = _solve(xtx, identity)
+        cov = [[sigma2 * xtx_inv[i][j] for j in range(k)] for i in range(k)]
+        _, _, intercept = _parse_formula(self._formula)
+        return OLSResults(names, beta, cov, y, X, intercept, spec)
+
+
+def ols(formula, data):
+    return OLSModel(formula, data)
