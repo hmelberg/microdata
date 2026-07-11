@@ -50,3 +50,20 @@ def test_design_from_spec_unseen_level_raises():
     _, _, _, spec = smb._build_design('y ~ region', DATA)
     with pytest.raises(ValueError):
         smb._design_from_spec(spec, True, {'region': ['N', 'UKJENT']})
+
+def test_no_intercept_categorical_full_rank():
+    # patsy: uten konstantledd får første kategoriske term ALLE nivåer, uten T.
+    _, names, X, _ = smb._build_design('y ~ region - 1', DATA)
+    assert names == ['region[N]', 'region[O]', 'region[S]']
+    assert X[0] == [1.0, 0.0, 0.0]     # rad 1: N
+    assert X[4] == [0.0, 1.0, 0.0]     # rad 5: O
+
+def test_c_numeric_levels_sorted_numerically():
+    d = {'y': [1.0, 1.0, 1.0, 1.0, 1.0], 'code': [1, 2, 10, 11, 3]}
+    _, names, _, _ = smb._build_design('y ~ C(code)', d)
+    assert names == ['Intercept', 'C(code)[T.2]', 'C(code)[T.3]',
+                     'C(code)[T.10]', 'C(code)[T.11]']
+
+def test_mismatched_column_lengths_raise():
+    with pytest.raises(ValueError):
+        smb._build_design('y ~ x', {'y': [1.0, 2.0], 'x': [1.0, 2.0, 3.0]})

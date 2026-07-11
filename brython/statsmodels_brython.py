@@ -57,7 +57,10 @@ def _levels_sorted(values):
     for v in values:
         if v not in seen:
             seen.append(v)
-    return sorted(seen, key=str)
+    try:
+        return sorted(seen)
+    except TypeError:                      # blandede typer — fall tilbake til str
+        return sorted(seen, key=str)
 
 
 def _term_spec(term, data):
@@ -83,6 +86,7 @@ def _design_from_spec(spec, intercept, data, n=None):
         n = len(_col(data, _spec_col(spec[0])))
     names = ['Intercept'] if intercept else []
     columns = [[1.0] * n] if intercept else []
+    reduced_rank = intercept
     for entry in spec:
         if entry[0] == 'num':
             vals = _col(data, entry[1])
@@ -95,10 +99,20 @@ def _design_from_spec(spec, intercept, data, n=None):
                 if v not in levels:
                     raise ValueError('ukjent kategorinivå %r i kolonnen %s'
                                      % (v, col))
-            for lev in levels[1:]:
-                names.append('%s[T.%s]' % (prefix, lev))
-                columns.append([1.0 if v == lev else 0.0 for v in vals])
-    n = len(columns[0]) if columns else 0
+            if not reduced_rank:
+                # patsy: uten konstantledd får FØRSTE kategoriske term full
+                # rang — alle nivåer, navn uten 'T.'
+                for lev in levels:
+                    names.append('%s[%s]' % (prefix, lev))
+                    columns.append([1.0 if v == lev else 0.0 for v in vals])
+                reduced_rank = True
+            else:
+                for lev in levels[1:]:
+                    names.append('%s[T.%s]' % (prefix, lev))
+                    columns.append([1.0 if v == lev else 0.0 for v in vals])
+    for c in columns:
+        if len(c) != n:
+            raise ValueError('kolonnene i formelen har ulik lengde')
     X = [[c[i] for c in columns] for i in range(n)]
     return names, X
 
