@@ -119,15 +119,16 @@ def ylabel(s, **kwargs):
 
 
 def gcf():
-    """Gjeldende figur som PlotlyFigure (uten å nullstille staten)."""
-    layout = dict(_state['layout'])
-    if 'showlegend' not in layout:
+    """Gjeldende figur som PlotlyFigure — LEVENDE, som i matplotlib: mutasjoner
+    på den returnerte figuren (f.eks. update_layout) gjelder gjeldende figur
+    frem til neste figure()/show()."""
+    if 'showlegend' not in _state['layout']:
         # matplotlib viser ikke legend uten legend() — unntak: pie har
         # etiketter i legenden i plotly, så den beholdes synlig.
-        layout['showlegend'] = any(
+        _state['layout']['showlegend'] = any(
             t.get('type') == 'pie' for t in _state['traces'])
-    return PlotlyFigure({'data': list(_state['traces']),
-                         'layout': layout, 'config': {}})
+    return PlotlyFigure({'data': _state['traces'],
+                         'layout': _state['layout'], 'config': {}})
 
 
 def show():

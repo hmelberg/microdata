@@ -73,3 +73,9 @@ def test_values_accepts_range_and_duck_typed_series():
     plt.plot(range(2), FakeSeries())
     t = plt.gcf().data[0]
     assert t['x'] == [0, 1] and t['y'] == [7, 8]
+
+def test_gcf_returns_live_current_figure():
+    plt.plot([1], [1])
+    fig = plt.gcf()
+    fig.update_layout(xaxis_title='Levende')   # PlotlyFigure-mutatorer virker på gjeldende figur
+    assert plt.gcf().layout['xaxis']['title'] == 'Levende'
