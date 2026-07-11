@@ -123,3 +123,52 @@ def test_pie_values_labels_and_legend_default():
     assert f.data[0]['type'] == 'pie'
     assert f.data[0]['values'] == [30, 70] and f.data[0]['labels'] == ['a', 'b']
     assert f.layout['showlegend'] is True    # pie-unntaket fra Task 2
+
+def test_xlim_ylim_scalar_and_tuple():
+    plt.plot([1], [1])
+    plt.xlim(0, 10)
+    plt.ylim((2, 8))
+    lay = plt.gcf().layout
+    assert lay['xaxis']['range'] == [0, 10]
+    assert lay['yaxis']['range'] == [2, 8]
+
+def test_legend_and_grid():
+    plt.plot([1], [1], label='serie')
+    plt.legend()
+    plt.grid(False)
+    lay = plt.gcf().layout
+    assert lay['showlegend'] is True
+    assert lay['xaxis']['showgrid'] is False and lay['yaxis']['showgrid'] is False
+
+def test_xticks_rotation_and_labels():
+    plt.bar(['a', 'b'], [1, 2])
+    plt.xticks([0, 1], ['Alfa', 'Beta'], rotation=45)
+    ax = plt.gcf().layout['xaxis']
+    assert ax['tickvals'] == [0, 1]
+    assert ax['ticktext'] == ['Alfa', 'Beta']
+    assert ax['tickangle'] == -45
+
+def test_savefig_renders_like_show(capsys):
+    plt.plot([1, 2], [3, 4])
+    plt.savefig('fig.png')
+    out = capsys.readouterr().out
+    assert (ES + 'figure__') in out
+
+def test_subplots_1x1_delegates(capsys):
+    fig, ax = plt.subplots(figsize=(6, 3))
+    ax.plot([1, 2], [3, 4])
+    ax.set_title('Aksetittel')
+    ax.set_xlabel('x')
+    ax.legend()
+    f = plt.gcf()
+    assert f.layout['width'] == 600
+    assert f.layout['title'] == {'text': 'Aksetittel'}
+    assert f.layout['xaxis']['title'] == {'text': 'x'}
+    assert f.layout['showlegend'] is True
+    fig.show()
+    assert (ES + 'figure__') in capsys.readouterr().out
+
+def test_subplots_grid_raises():
+    import pytest
+    with pytest.raises(NotImplementedError):
+        plt.subplots(2, 2)

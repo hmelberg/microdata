@@ -183,6 +183,91 @@ def ylabel(s, **kwargs):
     _state['layout'].setdefault('yaxis', {})['title'] = {'text': s}
 
 
+def xlim(a=None, b=None):
+    if isinstance(a, (list, tuple)):
+        a, b = a
+    _state['layout'].setdefault('xaxis', {})['range'] = [a, b]
+
+
+def ylim(a=None, b=None):
+    if isinstance(a, (list, tuple)):
+        a, b = a
+    _state['layout'].setdefault('yaxis', {})['range'] = [a, b]
+
+
+def legend(**kwargs):
+    _state['layout']['showlegend'] = True
+
+
+def grid(visible=True, **kwargs):
+    _state['layout'].setdefault('xaxis', {})['showgrid'] = bool(visible)
+    _state['layout'].setdefault('yaxis', {})['showgrid'] = bool(visible)
+
+
+def xticks(ticks=None, labels=None, rotation=None, **kwargs):
+    ax = _state['layout'].setdefault('xaxis', {})
+    if ticks is not None:
+        ax['tickvals'] = _values(ticks)
+    if labels is not None:
+        ax['ticktext'] = _values(labels)
+    if rotation is not None:
+        ax['tickangle'] = -rotation      # mpl roterer mot klokka, plotly med
+
+
+def yticks(ticks=None, labels=None, rotation=None, **kwargs):
+    ax = _state['layout'].setdefault('yaxis', {})
+    if ticks is not None:
+        ax['tickvals'] = _values(ticks)
+    if labels is not None:
+        ax['ticktext'] = _values(labels)
+    if rotation is not None:
+        ax['tickangle'] = -rotation
+
+
+def tight_layout(**kwargs):
+    pass
+
+
+def savefig(*args, **kwargs):
+    """Filskriving finnes ikke i nettleseren — render figuren i stedet, så
+    undervisningskode som slutter med savefig() ikke mister figuren."""
+    show()
+
+
+class _Axes:
+    """Tynn delegering til modulfunksjonene — nok til fig, ax = plt.subplots()."""
+    def plot(self, *a, **kw): plot(*a, **kw)
+    def scatter(self, *a, **kw): scatter(*a, **kw)
+    def bar(self, *a, **kw): bar(*a, **kw)
+    def barh(self, *a, **kw): barh(*a, **kw)
+    def hist(self, *a, **kw): hist(*a, **kw)
+    def boxplot(self, *a, **kw): boxplot(*a, **kw)
+    def pie(self, *a, **kw): pie(*a, **kw)
+    def set_title(self, s, **kw): title(s)
+    def set_xlabel(self, s, **kw): xlabel(s)
+    def set_ylabel(self, s, **kw): ylabel(s)
+    def set_xlim(self, *a): xlim(*a)
+    def set_ylim(self, *a): ylim(*a)
+    def legend(self, **kw): legend()
+    def grid(self, visible=True, **kw): grid(visible)
+
+
+class _FigureHandle:
+    def show(self): show()
+    def savefig(self, *a, **kw): savefig(*a, **kw)
+    def tight_layout(self, **kw): pass
+
+
+def subplots(nrows=1, ncols=1, figsize=None, **kwargs):
+    """Kun 1x1 — flerpanel: bruk plotly_express_brython-facets i stedet."""
+    if nrows != 1 or ncols != 1:
+        raise NotImplementedError(
+            'subplots med flere paneler støttes ikke — '
+            'bruk facet_row/facet_col i plotly_express_brython')
+    figure(figsize=figsize)
+    return _FigureHandle(), _Axes()
+
+
 def gcf():
     """Gjeldende figur som PlotlyFigure — LEVENDE, som i matplotlib: mutasjoner
     på den returnerte figuren (f.eks. update_layout) gjelder gjeldende figur
