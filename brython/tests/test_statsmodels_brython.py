@@ -151,3 +151,22 @@ def test_predict_intercept_only_model():
     res = smb.ols('y ~ 1', {'y': [2.0, 4.0, 6.0]}).fit()
     out = res.predict({'hva_som_helst': [0, 0]})
     assert out == pytest.approx([4.0, 4.0])
+
+def test_logit_intercept_only_exact():
+    # ren-intercept-logit: koef = log(p/(1-p)), p = 3/4
+    d = {'y': [1.0, 1.0, 1.0, 0.0], 'x': [1.0, 2.0, 3.0, 4.0]}
+    res = smb.logit('y ~ 1', d).fit()
+    assert res.params['Intercept'] == pytest.approx(math.log(3.0), rel=1e-6)
+    assert res.converged is True
+
+def test_logit_requires_binary_y():
+    with pytest.raises(ValueError):
+        smb.logit('y ~ x', {'y': [0.0, 2.0], 'x': [1.0, 2.0]}).fit()
+
+def test_logit_predict_probabilities():
+    d = {'y': [0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0],
+         'x': [1.0, 2.0, 3.0, 4.0, 2.0, 5.0, 6.0, 5.0]}
+    res = smb.logit('y ~ x', d).fit()
+    probs = res.predict()
+    assert all(0.0 < p < 1.0 for p in probs)
+    assert res.predict({'x': [6.0]})[0] > res.predict({'x': [1.0]})[0]

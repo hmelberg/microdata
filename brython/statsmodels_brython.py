@@ -326,3 +326,125 @@ class OLSModel:
 
 def ols(formula, data):
     return OLSModel(formula, data)
+
+
+# ── Logit ───────────────────────────────────────────────────────────────────
+
+def _logit_newton(X, y, max_iter=50, tol=1e-8):
+    """Newton–Raphson for logistisk regresjon. Returnerer (beta, cov,
+    llf, converged). mu klippes mot [1e-10, 1-1e-10] for stabilitet."""
+    n = len(X)
+    k = len(X[0])
+    beta = [0.0] * k
+    converged = False
+    cov = None
+    for _ in range(max_iter):
+        eta = [sum(b * xv for b, xv in zip(beta, row)) for row in X]
+        mu = [1.0 / (1.0 + math.exp(-min(35.0, max(-35.0, e)))) for e in eta]
+        mu = [min(1.0 - 1e-10, max(1e-10, m)) for m in mu]
+        grad = [[sum(row[i] * (yv - m) for row, yv, m in zip(X, y, mu))]
+                for i in range(k)]
+        W = [m * (1.0 - m) for m in mu]
+        H = [[sum(row[i] * row[j] * w for row, w in zip(X, W))
+              for j in range(k)] for i in range(k)]
+        delta = [row[0] for row in _solve(H, grad)]
+        beta = [b + d for b, d in zip(beta, delta)]
+        if max(abs(d) for d in delta) < tol:
+            converged = True
+            identity = [[1.0 if i == j else 0.0 for j in range(k)]
+                        for i in range(k)]
+            cov = _solve(H, identity)
+            break
+    if cov is None:
+        identity = [[1.0 if i == j else 0.0 for j in range(k)]
+                    for i in range(k)]
+        cov = _solve(H, identity)
+    eta = [sum(b * xv for b, xv in zip(beta, row)) for row in X]
+    mu = [1.0 / (1.0 + math.exp(-min(35.0, max(-35.0, e)))) for e in eta]
+    mu = [min(1.0 - 1e-10, max(1e-10, m)) for m in mu]
+    llf = sum(yv * math.log(m) + (1.0 - yv) * math.log(1.0 - m)
+              for yv, m in zip(y, mu))
+    return beta, cov, llf, converged
+
+
+class LogitResults:
+    def __init__(self, names, beta, cov, y, X, intercept, spec, llf,
+                 converged):
+        self._names = names
+        self._spec = spec
+        self._intercept = intercept
+        self.nobs = len(y)
+        self.converged = converged
+        self.llf = llf
+        self.params = {nm: b for nm, b in zip(names, beta)}
+        self.bse = {}
+        self.tvalues = {}
+        self.pvalues = {}
+        for i, nm in enumerate(names):
+            se = math.sqrt(cov[i][i]) if cov[i][i] > 0.0 else float('nan')
+            self.bse[nm] = se
+            z = self.params[nm] / se if se and se > 0.0 else float('nan')
+            self.tvalues[nm] = z
+            self.pvalues[nm] = (2.0 * _stats.norm.sf(abs(z))
+                                if z == z else float('nan'))
+        # null-modell (kun intercept) for McFaddens pseudo-R²
+        ybar = sum(y) / len(y)
+        ybar = min(1.0 - 1e-10, max(1e-10, ybar))
+        self.llnull = sum(yv * math.log(ybar) + (1.0 - yv) * math.log(1.0 - ybar)
+                          for yv in y)
+        self.prsquared = (1.0 - self.llf / self.llnull
+                          if self.llnull != 0.0 else float('nan'))
+        self.fittedvalues = [
+            1.0 / (1.0 + math.exp(-min(35.0, max(-35.0,
+                sum(b * xv for b, xv in zip(beta, row))))))
+            for row in X]
+
+    def predict(self, data=None):
+        if data is None:
+            return list(self.fittedvalues)
+        names, X = _design_from_spec(self._spec, self._intercept, data,
+                                     n=None if self._spec else _data_nrows(data))
+        beta = [self.params[nm] for nm in names]
+        return [1.0 / (1.0 + math.exp(-min(35.0, max(-35.0,
+                    sum(b * xv for b, xv in zip(beta, row))))))
+                for row in X]
+
+    def conf_int(self, alpha=0.05):
+        q = _stats.norm.ppf(1.0 - alpha / 2.0)
+        out = {}
+        for nm in self._names:
+            b, se = self.params[nm], self.bse[nm]
+            out[nm] = ([b - q * se, b + q * se] if se == se
+                       else [float('nan'), float('nan')])
+        return out
+
+    def summary(self):
+        stats_rows = [
+            ('Observasjoner', '%d' % self.nobs),
+            ('Log-likelihood', '%.4f' % self.llf),
+            ('Pseudo-R² (McFadden)', '%.4f' % self.prsquared),
+            ('Konvergert', 'ja' if self.converged else 'NEI'),
+        ]
+        return Summary('Logistisk regresjon', stats_rows, self._names,
+                       self.params, self.bse, self.tvalues, self.pvalues,
+                       self.conf_int(), stat_label='z')
+
+
+class LogitModel:
+    def __init__(self, formula, data):
+        self._formula = formula
+        self._data = data
+
+    def fit(self, **kwargs):                       # disp o.l. aksepteres og ignoreres
+        y, names, X, spec = _build_design(self._formula, self._data)
+        for v in y:
+            if v not in (0.0, 1.0):
+                raise ValueError('logit: y må være binær (0/1), fant %r' % v)
+        beta, cov, llf, converged = _logit_newton(X, y)
+        _, _, intercept = _parse_formula(self._formula)
+        return LogitResults(names, beta, cov, y, X, intercept, spec, llf,
+                            converged)
+
+
+def logit(formula, data):
+    return LogitModel(formula, data)

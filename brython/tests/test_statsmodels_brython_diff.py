@@ -52,3 +52,26 @@ def test_predict_and_conf_int_diff():
     for name in ref.params.index:
         assert mci[name][0] == pytest.approx(float(rci.loc[name][0]), rel=1e-6)
         assert mci[name][1] == pytest.approx(float(rci.loc[name][1]), rel=1e-6)
+
+LOGIT_RAW = {
+    'kjopt': [0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0,
+              0.0, 1.0, 0.0, 1.0],
+    'pris':  [9.5, 8.7, 3.2, 4.1, 7.8, 2.5, 3.9, 8.1, 4.4, 9.0, 2.8, 5.0,
+              6.9, 3.5, 7.2, 4.8],
+    'by':    ['O', 'B', 'O', 'B', 'O', 'B', 'O', 'B', 'O', 'B', 'O', 'B',
+              'O', 'B', 'O', 'B'],
+}
+
+def test_logit_diff():
+    mine = smb.logit('kjopt ~ pris + by', LOGIT_RAW).fit()
+    ref = smf.logit('kjopt ~ pris + by', pd.DataFrame(LOGIT_RAW)).fit(disp=0)
+    for name in ref.params.index:
+        assert mine.params[name] == pytest.approx(ref.params[name], rel=1e-5)
+        assert mine.bse[name] == pytest.approx(ref.bse[name], rel=1e-5)
+        assert mine.pvalues[name] == pytest.approx(ref.pvalues[name], rel=1e-5)
+    assert mine.llf == pytest.approx(ref.llf, rel=1e-8)
+    assert mine.prsquared == pytest.approx(ref.prsquared, rel=1e-6)
+    mp = mine.predict({'pris': [4.0, 8.0], 'by': ['O', 'B']})
+    rp = ref.predict(pd.DataFrame({'pris': [4.0, 8.0], 'by': ['O', 'B']}))
+    for a, b in zip(mp, list(rp)):
+        assert a == pytest.approx(float(b), rel=1e-5)
