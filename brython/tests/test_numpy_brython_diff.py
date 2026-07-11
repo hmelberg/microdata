@@ -49,3 +49,7 @@ def test_dot_1d_2d_and_unique_nan_diff():
     ref = realnp.unique([2.0, float('nan'), 1.0, float('nan')]).tolist()
     assert len(mine) == len(ref) == 3
     assert mine[:2] == pytest.approx(ref[:2])
+
+def test_arange_float_diff():
+    assert np.arange(0, 1, 0.1).tolist() == pytest.approx(
+        realnp.arange(0, 1, 0.1).tolist())

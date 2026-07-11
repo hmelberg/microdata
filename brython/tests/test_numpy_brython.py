@@ -244,3 +244,39 @@ def test_integration_matplotlib_scipy_statsmodels():
     ols = smb.ols('y ~ x', {'y': y, 'x': x}).fit()
     assert ols.params['x'] == pytest.approx(2.0, abs=0.05)
     assert ols.rsquared > 0.99
+
+def test_setitem_guards():
+    a = np.array([1.0, 2.0, 3.0, 4.0])
+    with pytest.raises(ValueError, match='feil lengde'):
+        a[1:3] = [7, 8, 9]
+    with pytest.raises(IndexError, match='feil lengde'):
+        a[[True, False]] = 0
+    with pytest.raises(ValueError, match='1D'):
+        a[0] = [7, 8]
+    m = np.array([[1, 2], [3, 4]])
+    with pytest.raises(ValueError, match='maske'):
+        m[[True, False]] = 0
+    m[0] = [9, 9]
+    assert m.tolist() == [[9, 9], [3, 4]]
+    with pytest.raises(ValueError):
+        m[0] = [9]
+
+def test_arange_float_step_no_drift():
+    assert len(np.arange(0, 1, 0.1)) == 10
+    assert np.arange(0, 1, 0.1).tolist()[0] == 0.0
+
+def test_percentile_range_and_2d_sort_guards():
+    with pytest.raises(ValueError, match='0, 100'):
+        np.percentile([1, 2, 3], -10)
+    with pytest.raises(ValueError, match='1D'):
+        np.sort(np.array([[3, 1], [2, 0]]))
+
+def test_pandas_integration_ndarray():
+    import pandas_brython as pd
+    df = pd.DataFrame({'x': [1.0, 2.0, 3.0]})
+    df['c'] = np.array([10.0, 20.0, 30.0])
+    assert list(df['c'].values) == [10.0, 20.0, 30.0]       # IKKE kringkastet
+    s = pd.Series(np.array([1.0, 2.0]))
+    assert list(s.values) == [1.0, 2.0]
+    df2 = pd.DataFrame({'a': np.array([1, 2]), 'b': [3, 4]})
+    assert df2['a'].values[1] == 2

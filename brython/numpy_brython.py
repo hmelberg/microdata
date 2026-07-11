@@ -104,6 +104,10 @@ class ndarray:
         if isinstance(value, ndarray):
             value = value.tolist()
         if isinstance(key, list) and key and isinstance(key[0], bool):
+            if self.ndim != 1:
+                raise ValueError('maske-tilordning støttes kun for 1D-arrays')
+            if len(key) != len(self._d):
+                raise IndexError('boolsk maske har feil lengde')
             if not isinstance(value, (int, float)):
                 raise ValueError('maske-tilordning støtter kun skalar verdi')
             for i, k in enumerate(key):
@@ -111,10 +115,27 @@ class ndarray:
                     self._d[i] = value
         elif isinstance(key, slice):
             n = len(range(*key.indices(len(self._d))))
-            self._d[key] = (list(value) if isinstance(value, (list, tuple))
-                            else [value] * n)
+            if isinstance(value, (list, tuple)):
+                if len(value) != n:
+                    raise ValueError('tilordning med feil lengde: %d verdier '
+                                     'til %d posisjoner' % (len(value), n))
+                self._d[key] = list(value)
+            else:
+                self._d[key] = [value] * n
         else:
-            self._d[key] = value
+            if self.ndim == 1:
+                if isinstance(value, (list, tuple)):
+                    raise ValueError('kan ikke legge en liste inn i et '
+                                     '1D-array')
+                self._d[key] = value
+            elif self.ndim == 2 and isinstance(key, int):
+                if (not isinstance(value, (list, tuple))
+                        or len(value) != self.shape[1]):
+                    raise ValueError('rad-tilordning krever liste med '
+                                     'lengde %d' % self.shape[1])
+                self._d[key] = list(value)
+            else:
+                self._d[key] = value
 
     def _binop(self, other, fn):
         if isinstance(other, (list, tuple)):
@@ -233,12 +254,10 @@ def arange(start, stop=None, step=1):
         start, stop = 0, start
     if step == 0:
         raise ValueError('arange: step kan ikke være 0')
-    out = []
-    v = start
-    while (step > 0 and v < stop) or (step < 0 and v > stop):
-        out.append(v)
-        v += step
-    return ndarray(out)
+    n = int(math.ceil((stop - start) / step))
+    if n < 0:
+        n = 0
+    return ndarray([start + i * step for i in range(n)])
 
 
 def linspace(start, stop, num=50):
@@ -344,6 +363,8 @@ def max(a):                             # skygger builtin — intern kode bruker
 def percentile(a, q):
     if isinstance(q, (list, tuple)):
         return ndarray([percentile(a, x) for x in q])
+    if not 0.0 <= q <= 100.0:
+        raise ValueError('percentile: q må ligge i [0, 100]')
     flat = sorted(asarray(a)._flat())
     if not flat:
         raise ValueError('percentile: tomt array')
@@ -382,11 +403,17 @@ def unique(a):
 
 
 def sort(a):
-    return ndarray(sorted(asarray(a)._flat()))
+    arr = asarray(a)
+    if arr.ndim != 1:
+        raise ValueError('sort støtter kun 1D-arrays')
+    return ndarray(sorted(arr._flat()))
 
 
 def argsort(a):
-    flat = asarray(a)._flat()
+    arr = asarray(a)
+    if arr.ndim != 1:
+        raise ValueError('argsort støtter kun 1D-arrays')
+    flat = arr._flat()
     return ndarray(sorted(range(len(flat)), key=lambda i: flat[i]))
 
 
