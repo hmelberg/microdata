@@ -176,10 +176,17 @@ def _rollback():
     """Spol brukerglobals tilbake til siste _snapshot(). Grunn kopi:
     objekter fra tidligere kjøringer som muteres in place spoles IKKE
     tilbake — akseptert replay-forbehold (motoren re-binder datasett per
-    pass, så # load-frames er alltid ferske)."""
-    if _snap is not None:
-        _shared_vars.clear()
-        _shared_vars.update(_snap)
+    pass, så # load-frames er alltid ferske).
+    NB: per-nøkkel-operasjoner med vilje — clear()+update() mistet
+    gjenopprettede nøkler i Brython 3.12 (browser-verifisert 2026-07-11);
+    d[k]=v / del d[k] / k in d oppfører seg riktig."""
+    if _snap is None:
+        return
+    for k in list(_shared_vars.keys()):
+        if k not in _snap:
+            del _shared_vars[k]
+    for k in list(_snap.keys()):
+        _shared_vars[k] = _snap[k]
 
 def _bind_datasets(spec_json):
     """Bind datasets from JS into user globals. spec: {name: {kind, payload}}.
@@ -193,7 +200,12 @@ def _bind_datasets(spec_json):
             else:
                 # JSON null (from JS) arrives as None; pandas_brython's
                 # isna()/dropna() only recognize its own nan sentinel.
-                cols = {k: [_pd.nan if v is None else v for v in vals]
+                # Float-str-rundturen: Brython 3.12s json.loads gir JS-backede
+                # floats som knekker format('g') nedstrøms (og aritmetikk
+                # vasker ikke taint) — verifisert i browser 2026-07-11.
+                cols = {k: [_pd.nan if v is None else
+                            (float(str(v)) if isinstance(v, float) else v)
+                            for v in vals]
                         for k, vals in d['payload'].items()}
                 _shared_vars[name] = _pd.DataFrame(cols)
         return ''

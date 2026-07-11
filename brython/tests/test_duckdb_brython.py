@@ -102,7 +102,8 @@ def _wire_fake_window(responses):
 
     def sync(q):
         w.calls.append(q)
-        return responses.get(q)
+        # protokollen er alltid en JSON-streng; miss = {"pending": true}
+        return responses.get(q, '{"pending": true}')
 
     setattr(w, '__brythonDuckSync', sync)
     return w

@@ -143,10 +143,12 @@
     var cache = {};      // sql -> JSON-streng {cols} | {error}
     var pending = [];    // sql-strenger i kø til neste flush
     var registered = false;
+    // Returnerer ALLTID en JSON-streng — JS null blir IKKE Python None i
+    // Brython 3.12, så miss signaliseres med {"pending":true} i stedet.
     global.__brythonDuckSync = function (sqlText) {
       if (cache.hasOwnProperty(sqlText)) return cache[sqlText];
       if (pending.indexOf(sqlText) === -1) pending.push(sqlText);
-      return null;
+      return '{"pending":true}';
     };
     return {
       hasPending: function () { return pending.length > 0; },

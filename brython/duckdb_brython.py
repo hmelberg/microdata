@@ -35,13 +35,19 @@ def _run_sql(q):
     if _window is None:
         raise RuntimeError('duckdb_brython kan ikke kjøre SQL utenfor '
                            'nettleseren (sett duckdb_brython._executor i tester)')
-    res = _window.__brythonDuckSync(q)
-    if res is None:            # ikke i cache — motoren har lagt den i kø
+    # Protokollen er ALLTID en JSON-streng ({pending}|{cols}|{error}) —
+    # JS null krysser IKKE til Python None i Brython 3.12 (verifisert),
+    # så et null-for-miss-design ville feilet stille.
+    d = _json.loads(_window.__brythonDuckSync(q))
+    if d.get('pending'):       # ikke i cache — motoren har lagt den i kø
         raise _PendingSQL(q)
-    d = _json.loads(res)
     if d.get('error') is not None:
         raise RuntimeError('duckdb-feil: ' + str(d['error']))
-    return d['cols']
+    # Brython-felle (verifisert 2026-07-11): json.loads gir JS-backede
+    # floats som knekker format('g') — og aritmetikk vasker IKKE taint.
+    # Kun str-rundtur gir en ekte float (tapsfritt: str(float) er repr).
+    return {k: [float(str(v)) if isinstance(v, float) else v for v in vals]
+            for k, vals in d['cols'].items()}
 
 
 class Relation:
