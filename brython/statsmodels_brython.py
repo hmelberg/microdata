@@ -10,6 +10,7 @@
 #
 # NB Brython-feller (AST-vakter i test_brython_scoping_trap.py): ingen
 # metode refererer global med metodens navn; setdefault kun streng-nøkler.
+import html
 import math
 import scipy_stats_brython as _stats
 
@@ -121,6 +122,19 @@ def _spec_col(entry):
     return entry[1]
 
 
+def _data_nrows(data):
+    """Antall rader i et data-objekt (DataFrame duck via len, ellers
+    lengden på første kolonne i en dict)."""
+    if isinstance(data, dict):
+        if not data:
+            raise ValueError('kan ikke bestemme antall rader i nye data')
+        return len(next(iter(data.values())))
+    try:
+        return len(data)
+    except Exception:
+        raise ValueError('kan ikke bestemme antall rader i nye data')
+
+
 def _build_design(formula, data):
     """Formel + data -> (y, names, X, spec)."""
     yname, terms, intercept = _parse_formula(formula)
@@ -208,7 +222,8 @@ class OLSResults:
     def predict(self, data=None):
         if data is None:
             return list(self.fittedvalues)
-        names, X = _design_from_spec(self._spec, self._intercept, data)
+        names, X = _design_from_spec(self._spec, self._intercept, data,
+                                     n=None if self._spec else _data_nrows(data))
         beta = [self.params[nm] for nm in names]
         return [sum(b * xv for b, xv in zip(beta, row)) for row in X]
 
@@ -250,7 +265,7 @@ class Summary:
 
     def to_html(self):
         parts = ['<table class="output-table" data-summary="1">']
-        parts.append('<caption>%s</caption>' % self._title)
+        parts.append('<caption>%s</caption>' % html.escape(str(self._title)))
         parts.append('<thead><tr><th></th><th>koef</th><th>std.feil</th>'
                      '<th>%s</th><th>P&gt;|%s|</th><th>[0.025</th>'
                      '<th>0.975]</th></tr></thead><tbody>'
@@ -260,10 +275,11 @@ class Summary:
             parts.append(
                 '<tr><th>%s</th><td>%.4f</td><td>%.4f</td><td>%.3f</td>'
                 '<td>%.4f</td><td>%.3f</td><td>%.3f</td></tr>'
-                % (nm, self._params[nm], self._bse[nm], self._tvalues[nm],
-                   self._pvalues[nm], lo, hi))
+                % (html.escape(str(nm)), self._params[nm], self._bse[nm],
+                   self._tvalues[nm], self._pvalues[nm], lo, hi))
         parts.append('</tbody></table>')
-        rows = ''.join('<tr><th>%s</th><td>%s</td></tr>' % (k, v)
+        rows = ''.join('<tr><th>%s</th><td>%s</td></tr>'
+                       % (html.escape(str(k)), html.escape(str(v)))
                        for k, v in self._stats_rows)
         parts.append('<table class="output-table"><tbody>%s</tbody></table>'
                      % rows)

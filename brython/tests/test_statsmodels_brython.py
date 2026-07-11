@@ -135,3 +135,19 @@ def test_summary_html_structure():
     assert 'R²' in html or 'R&#178;' in html
     assert 'koef' in html.lower()
     assert 'Intercept' in str(s)                        # tekst-fallback
+
+def test_summary_html_escapes_category_levels():
+    # '1' sorts before '<img...>' (ASCII '1' < '<'), so '1' is the dropped
+    # base level and '<img...>' survives into the coefficient name — this
+    # exercises the actual XSS path (category level in a coef name), not
+    # just the stats-row escaping.
+    d = {'y': [1.0, 2.0, 3.0, 4.0],
+         'g': ['<img src=x onerror=alert(1)>', '1', '<img src=x onerror=alert(1)>', '1']}
+    html = smb.ols('y ~ g', d).fit().summary().to_html()
+    assert '<img' not in html
+    assert '&lt;img' in html
+
+def test_predict_intercept_only_model():
+    res = smb.ols('y ~ 1', {'y': [2.0, 4.0, 6.0]}).fit()
+    out = res.predict({'hva_som_helst': [0, 0]})
+    assert out == pytest.approx([4.0, 4.0])
