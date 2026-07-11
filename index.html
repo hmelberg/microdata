@@ -98,6 +98,7 @@
               <button type="button" data-example="bry15_regresjon.txt" data-mode="brython" data-i18n>Regresjon &mdash; smf.ols / smf.logit</button>
               <button type="button" data-example="bry16_numpy.txt" data-mode="brython" data-i18n>numpy &mdash; arrays og tilfeldige tall</button>
               <button type="button" data-example="bry17_seaborn.txt" data-mode="brython" data-i18n>seaborn &mdash; statistisk grafikk</button>
+              <button type="button" data-example="bry18_duckdb.txt" data-mode="brython" data-i18n>duckdb &mdash; SQL i Brython (.sql &rarr; .df)</button>
             </div>
             <button type="button" id="menuWebExamples" data-i18n>Flere eksempler p&#229; web</button>
           </div>
@@ -2979,10 +2980,19 @@
             reader = 'read_json_auto';
             await db.registerFileBuffer(fname, new TextEncoder().encode(JSON.stringify(rows)));
           }
-          // en TABELL med samme navn fra en tidligere SQL-kjøring blokkerer
-          // CREATE OR REPLACE VIEW — rydd den eksplisitt først
-          await conn.query('DROP TABLE IF EXISTS "' + ident + '"');
-          await conn.query('CREATE OR REPLACE VIEW "' + ident + '" AS SELECT * FROM ' +
+          // Et objekt med samme navn (tabell fra SQL-modus, view fra forrige
+          // brython-kjøring) blokkerer CREATE — DROP må matche typen: DuckDBs
+          // «DROP TABLE IF EXISTS» kaster katalogfeil hvis objektet er et view
+          // (og omvendt), så slå opp typen først (som i __duck.begin()).
+          const chk = __arrowToColumns(await conn.query(
+            "SELECT table_type FROM information_schema.tables WHERE table_schema = 'main' AND table_name = '" +
+            String(name).replace(/'/g, "''") + "'"));
+          const typ = (chk.table_type || [])[0];
+          if (typ) {
+            await conn.query('DROP ' + (/VIEW/i.test(typ) ? 'VIEW' : 'TABLE') +
+                             ' IF EXISTS "' + ident + '"');
+          }
+          await conn.query('CREATE VIEW "' + ident + '" AS SELECT * FROM ' +
                            reader + "('" + fname.replace(/'/g, "''") + "')");
         } finally { await conn.close(); }
       },
