@@ -438,6 +438,8 @@ def mannwhitneyu(x, y, alternative='two-sided'):
     rx = sum(r for r, (v, g) in zip(ranks, merged) if g == 0)
     u1 = rx - nx * (nx + 1) / 2.0
     n = nx + ny
+    if nx == 0 or ny == 0:
+        return TestResult(float('nan'), float('nan'))   # tomt utvalg — som øvrige degenererte tilfeller
     mu = nx * ny / 2.0
     sigma2 = nx * ny / 12.0 * ((n + 1) - tie_term / (n * (n - 1.0)))
     sigma = math.sqrt(sigma2)

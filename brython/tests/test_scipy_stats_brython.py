@@ -141,3 +141,7 @@ def test_chi2_contingency_yates_reduces_statistic():
 def test_mannwhitneyu_identical_groups():
     res = st.mannwhitneyu([1, 2, 3, 4, 5, 6], [1, 2, 3, 4, 5, 6])
     assert res.pvalue > 0.9
+
+def test_mannwhitneyu_empty_input_returns_nan():
+    res = st.mannwhitneyu([], [1.0, 2.0])
+    assert res.statistic != res.statistic and res.pvalue != res.pvalue
