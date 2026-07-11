@@ -3198,7 +3198,9 @@ class DataFrame:
                              % sorted(str(c) for c in overlap))
         rmap = {}
         for j, lbl in enumerate(other.index):
-            rmap.setdefault(lbl, []).append(j)
+            if lbl not in rmap:        # ikke setdefault — Brython-felle:
+                rmap[lbl] = []          # setdefault stringifiserer ikke-streng-nøkler
+            rmap[lbl].append(j)
         lrows, rrows = self.values, other.values
         pairs = []                                   # (venstre rad, høyre rad|None, etikett)
         for i, lbl in enumerate(self.index):
@@ -3698,7 +3700,10 @@ def merge(left, right, how='inner', on=None, left_on=None, right_on=None,
         # Følger høyre-radenes rekkefølge (pandas-semantikk).
         lmap = {}
         for i, row in enumerate(lrows):
-            lmap.setdefault(keytup(row, lpos, lkeys), []).append(i)
+            key = keytup(row, lpos, lkeys)
+            if key not in lmap:        # ikke setdefault — Brython-felle:
+                lmap[key] = []          # setdefault stringifiserer ikke-streng-nøkler
+            lmap[key].append(i)
         for j, row in enumerate(rrows):
             matches = lmap.get(keytup(row, rpos, rkeys))
             if matches:
@@ -3709,7 +3714,10 @@ def merge(left, right, how='inner', on=None, left_on=None, right_on=None,
     else:
         rmap = {}
         for j, row in enumerate(rrows):
-            rmap.setdefault(keytup(row, rpos, rkeys), []).append(j)
+            key = keytup(row, rpos, rkeys)
+            if key not in rmap:
+                rmap[key] = []
+            rmap[key].append(j)
         matched_r = set()
         for i, row in enumerate(lrows):
             matches = rmap.get(keytup(row, lpos, lkeys))
@@ -3786,7 +3794,10 @@ def pivot_table(data, values=None, index=None, columns=None, aggfunc='mean',
     col_keys = _sorted_unique(cvals)
     buckets = {}
     for rk, ck, v in zip(ivals, cvals, vvals):
-        buckets.setdefault((rk, ck), []).append(v)
+        key = (rk, ck)
+        if key not in buckets:      # ikke setdefault — Brython-felle:
+            buckets[key] = []        # setdefault stringifiserer ikke-streng-nøkler
+        buckets[key].append(v)
     out = {}
     for ck in col_keys:
         col = []
