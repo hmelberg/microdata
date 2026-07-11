@@ -79,3 +79,47 @@ def test_gcf_returns_live_current_figure():
     fig = plt.gcf()
     fig.update_layout(xaxis_title='Levende')   # PlotlyFigure-mutatorer virker på gjeldende figur
     assert plt.gcf().layout['xaxis']['title'] == 'Levende'
+
+def test_scatter_markers_color_size_alpha():
+    plt.scatter([1, 2], [3, 4], s=12, c='green', alpha=0.5, label='pts')
+    t = plt.gcf().data[0]
+    assert t['type'] == 'scatter' and t['mode'] == 'markers'
+    assert t['marker']['color'] == 'green'
+    assert t['marker']['size'] == 12
+    assert t['marker']['opacity'] == 0.5
+    assert t['name'] == 'pts'
+
+def test_scatter_numeric_c_becomes_colorscale():
+    plt.scatter([1, 2], [3, 4], c=[0.1, 0.9])
+    m = plt.gcf().data[0]['marker']
+    assert m['color'] == [0.1, 0.9]
+    assert m['colorscale'] == 'Viridis' and m['showscale'] is True
+
+def test_bar_and_barh():
+    plt.bar(['a', 'b'], [3, 4])
+    plt.barh(['c', 'd'], [5, 6])
+    f = plt.gcf()
+    assert f.data[0]['type'] == 'bar' and f.data[0]['y'] == [3, 4]
+    assert f.data[1]['orientation'] == 'h' and f.data[1]['x'] == [5, 6]
+
+def test_hist_bins_and_density():
+    plt.hist([1, 1, 2, 3], bins=3, density=True)
+    t = plt.gcf().data[0]
+    assert t['type'] == 'histogram' and t['nbinsx'] == 3
+    assert t['histnorm'] == 'probability density'
+
+def test_boxplot_single_and_multiple():
+    plt.boxplot([1, 2, 3])
+    assert plt.gcf().data[0]['type'] == 'box'
+    plt.figure()
+    plt.boxplot([[1, 2], [3, 4]], labels=['A', 'B'])
+    f = plt.gcf()
+    assert len(f.data) == 2
+    assert f.data[0]['name'] == 'A' and f.data[1]['y'] == [3, 4]
+
+def test_pie_values_labels_and_legend_default():
+    plt.pie([30, 70], labels=['a', 'b'])
+    f = plt.gcf()
+    assert f.data[0]['type'] == 'pie'
+    assert f.data[0]['values'] == [30, 70] and f.data[0]['labels'] == ['a', 'b']
+    assert f.layout['showlegend'] is True    # pie-unntaket fra Task 2

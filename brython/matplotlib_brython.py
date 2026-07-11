@@ -106,6 +106,71 @@ def plot(*args, **kwargs):
         _state['traces'].append(_clean(trace))
 
 
+def scatter(x, y, s=None, c=None, alpha=None, label=None, **kwargs):
+    marker = {}
+    if isinstance(c, str):
+        marker['color'] = c
+    elif c is not None:
+        # tallverdier -> kontinuerlig fargeskala (som plt gjør med cmap)
+        marker['color'] = _values(c)
+        marker['colorscale'] = 'Viridis'
+        marker['showscale'] = True
+    else:
+        marker['color'] = _next_color()
+    if s is not None:
+        # NB: matplotlib-s er areal i pt^2, plotly-size er diameter i px —
+        # verdien sendes videre som-den-er (godt nok for undervisningsbruk)
+        marker['size'] = s if isinstance(s, (int, float)) else _values(s)
+    if alpha is not None:
+        marker['opacity'] = alpha
+    _state['traces'].append(_clean({'type': 'scatter', 'x': _values(x),
+                                    'y': _values(y), 'mode': 'markers',
+                                    'marker': marker, 'name': label}))
+
+
+def bar(x, height, color=None, label=None, **kwargs):
+    _state['traces'].append(_clean({'type': 'bar', 'x': _values(x),
+                                    'y': _values(height),
+                                    'marker': {'color': color or _next_color()},
+                                    'name': label}))
+
+
+def barh(y, width, color=None, label=None, **kwargs):
+    _state['traces'].append(_clean({'type': 'bar', 'x': _values(width),
+                                    'y': _values(y), 'orientation': 'h',
+                                    'marker': {'color': color or _next_color()},
+                                    'name': label}))
+
+
+def hist(x, bins=None, color=None, label=None, density=False, **kwargs):
+    t = {'type': 'histogram', 'x': _values(x),
+         'marker': {'color': color or _next_color()}, 'name': label}
+    if isinstance(bins, int):
+        t['nbinsx'] = bins
+    if density:
+        t['histnorm'] = 'probability density'
+    _state['traces'].append(_clean(t))
+
+
+def _is_listlike(v):
+    return hasattr(v, '__len__') and not isinstance(v, str) or hasattr(v, 'tolist')
+
+
+def boxplot(x, labels=None, **kwargs):
+    series_list = list(x) if _is_listlike(x) and len(x) and _is_listlike(list(x)[0]) else [x]
+    for i, series in enumerate(series_list):
+        name = labels[i] if labels is not None and i < len(labels) else None
+        _state['traces'].append(_clean({'type': 'box', 'y': _values(series),
+                                        'name': name}))
+
+
+def pie(x, labels=None, colors=None, autopct=None, **kwargs):
+    # autopct ignoreres — plotly viser prosent i hover/tekst selv
+    _state['traces'].append(_clean({'type': 'pie', 'values': _values(x),
+                                    'labels': _values(labels) if labels is not None else None,
+                                    'marker': {'colors': list(colors)} if colors else None}))
+
+
 def title(s, **kwargs):
     _state['layout']['title'] = {'text': s}
 
