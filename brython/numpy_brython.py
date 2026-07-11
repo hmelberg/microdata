@@ -160,8 +160,12 @@ def linspace(start, stop, num=50):
 
 def _filled(shape, value):
     if isinstance(shape, tuple):
-        r, c = shape
-        return ndarray([[value] * c for _ in range(r)])
+        if len(shape) == 1:
+            return ndarray([value] * shape[0])
+        if len(shape) == 2:
+            r, c = shape
+            return ndarray([[value] * c for _ in range(r)])
+        raise ValueError('kun 1D- og 2D-former støttes: %r' % (shape,))
     return ndarray([value] * shape)
 
 

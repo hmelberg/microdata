@@ -60,3 +60,9 @@ def test_asarray_and_copy_semantics():
 def test_constants():
     assert np.nan != np.nan
     assert abs(np.pi - math.pi) < 1e-15
+
+def test_filled_one_tuple_shape():
+    assert np.zeros((3,)).tolist() == [0.0, 0.0, 0.0]
+    assert np.full((2,), 5).tolist() == [5, 5]
+    with pytest.raises(ValueError, match='støttes'):
+        np.ones((2, 2, 2))
