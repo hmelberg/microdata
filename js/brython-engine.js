@@ -113,6 +113,34 @@
     return needed;
   }
 
+  var __registered = {};   // canonical name -> true once registered in the runner
+  var __jsLoaded = {};     // url -> load promise (shared across libs)
+
+  function loadJsDep(dep) {
+    if (global[dep.global]) return Promise.resolve();   // already on the page
+    if (!__jsLoaded[dep.url]) __jsLoaded[dep.url] = addScript(dep.url);
+    return __jsLoaded[dep.url];
+  }
+
+  async function ensureLibs(mod, names) {
+    for (var i = 0; i < names.length; i++) {
+      var name = names[i];
+      if (__registered[name]) continue;
+      var entry = LIB_REGISTRY[name];
+      if (!entry) continue;
+      await ensureLibs(mod, entry.deps);                 // deps first (module-level imports)
+      for (var j = 0; j < entry.js.length; j++) await loadJsDep(entry.js[j]);
+      var source = await fetchText('brython/' + name + '.py');
+      var err = mod._register_module(name, source);
+      if (err) throw new Error(String(err));
+      for (var a = 0; a < entry.aliases.length; a++) {
+        err = mod._alias_module(entry.aliases[a], name);
+        if (err) throw new Error(String(err));
+      }
+      __registered[name] = true;
+    }
+  }
+
   var __enginePromise = null;
 
   function addScript(src) {
