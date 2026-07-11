@@ -144,7 +144,7 @@ def _register_module(name, source):
 def _alias_module(alias, canonical):
     """Make `import alias` resolve to already-registered module `canonical`."""
     if canonical not in sys.modules:
-        return 'ukjent modul: ' + canonical
+        return 'Ukjent modul: ' + canonical
     sys.modules[alias] = sys.modules[canonical]
     return ''
 
