@@ -301,8 +301,11 @@ def _mean(v):
 
 
 def _var(v, ddof=1):
+    n = len(v)
+    if n - ddof <= 0:
+        return float('nan')     # degenerert utvalg — scipy gir nan, ikke krasj
     m = _mean(v)
-    return sum((x - m) ** 2 for x in v) / (len(v) - ddof)
+    return sum((x - m) ** 2 for x in v) / (n - ddof)
 
 
 def ttest_1samp(a, popmean):
@@ -318,6 +321,8 @@ def ttest_ind(a, b, equal_var=True):
     a, b = _tolist(a), _tolist(b)
     na, nb = len(a), len(b)
     va, vb = _var(a), _var(b)
+    if va != va or vb != vb or (equal_var and na + nb - 2 <= 0):
+        return TestResult(float('nan'), float('nan'))
     if equal_var:
         sp = ((na - 1) * va + (nb - 1) * vb) / (na + nb - 2)
         se = math.sqrt(sp * (1.0 / na + 1.0 / nb))
@@ -349,8 +354,11 @@ def pearsonr(x, y):
                     * sum((b - my) ** 2 for b in y))
     r = num / den if den > 0.0 else float('nan')
     r = max(-1.0, min(1.0, r)) if r == r else r
-    if n <= 2 or r != r or abs(r) == 1.0:
-        p = 0.0 if r == r and abs(r) == 1.0 else float('nan')
+    if n <= 2:
+        # scipy: p er udefinert ved dof=0 og settes til 1.0
+        p = 1.0 if r == r else float('nan')
+    elif r != r or abs(r) == 1.0:
+        p = 0.0 if r == r else float('nan')
     else:
         stat = r * math.sqrt((n - 2) / (1.0 - r * r))
         p = 2.0 * t.sf(abs(stat), n - 2)

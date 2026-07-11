@@ -68,3 +68,9 @@ def test_pearsonr_diff():
     ref = scipy_stats.pearsonr(A, B)
     assert mine.statistic == pytest.approx(ref.statistic, rel=1e-8)
     assert mine.pvalue == pytest.approx(ref.pvalue, rel=1e-8)
+
+def test_pearsonr_n2_diff():
+    mine = st.pearsonr([1.0, 2.0], [3.0, 5.0])
+    ref = scipy_stats.pearsonr([1.0, 2.0], [3.0, 5.0])
+    assert mine.statistic == pytest.approx(float(ref.statistic))
+    assert mine.pvalue == pytest.approx(float(ref.pvalue))

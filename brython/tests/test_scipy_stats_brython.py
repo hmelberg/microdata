@@ -107,3 +107,16 @@ def test_pearsonr_perfect_and_zero():
     assert abs(r.statistic - 1.0) < 1e-12
     r2 = st.pearsonr([1, 2, 3, 4], [1, -1, 1, -1])
     assert abs(r2.statistic) < 0.5      # nær null, ikke eksakt
+
+def test_pearsonr_n2_pvalue_is_one():
+    res = st.pearsonr([1, 2], [3, 5])
+    assert abs(res.statistic - 1.0) < 1e-12
+    assert res.pvalue == 1.0
+
+def test_ttest_degenerate_n1_returns_nan():
+    r1 = st.ttest_1samp([5.0], 3.0)
+    assert r1.statistic != r1.statistic and r1.pvalue != r1.pvalue
+    r2 = st.ttest_ind([5.0], [1.0, 2.0])
+    assert r2.statistic != r2.statistic
+    r3 = st.ttest_ind([5.0], [1.0])
+    assert r3.statistic != r3.statistic
