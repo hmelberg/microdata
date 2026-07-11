@@ -363,3 +363,96 @@ def pearsonr(x, y):
         stat = r * math.sqrt((n - 2) / (1.0 - r * r))
         p = 2.0 * t.sf(abs(stat), n - 2)
     return TestResult(r, p)
+
+
+class Chi2ContingencyResult:
+    """Som scipy: attributter + utpakking som (statistic, pvalue, dof,
+    expected_freq)."""
+
+    def __init__(self, statistic, pvalue, dof, expected_freq):
+        self.statistic = statistic
+        self.pvalue = pvalue
+        self.dof = dof
+        self.expected_freq = expected_freq
+
+    def __iter__(self):
+        return iter((self.statistic, self.pvalue, self.dof, self.expected_freq))
+
+    def __getitem__(self, i):
+        return (self.statistic, self.pvalue, self.dof, self.expected_freq)[i]
+
+    def __repr__(self):
+        return ('Chi2ContingencyResult(statistic=%r, pvalue=%r, dof=%r)'
+                % (self.statistic, self.pvalue, self.dof))
+
+
+def chi2_contingency(observed, correction=True):
+    """Kjikvadrat-test for uavhengighet i en krysstabell.
+    observed: liste av rader (eller DataFrame — duck-typet på .values).
+    correction=True gir Yates-korreksjon for 2x2-tabeller (som scipy)."""
+    if hasattr(observed, 'values') and not isinstance(observed, dict):
+        vals = observed.values
+        observed = vals() if callable(vals) else vals
+    rows = [_tolist(r) for r in observed]
+    rsums = [sum(r) for r in rows]
+    csums = [sum(c) for c in zip(*rows)]
+    total = float(sum(rsums))
+    if total <= 0.0:
+        raise ValueError('chi2_contingency: tom tabell')
+    expected = [[rs * cs / total for cs in csums] for rs in rsums]
+    dof = (len(rows) - 1) * (len(csums) - 1)
+    use_yates = correction and len(rows) == 2 and len(csums) == 2
+    stat = 0.0
+    for ro, re_ in zip(rows, expected):
+        for o, e in zip(ro, re_):
+            d = abs(o - e)
+            if use_yates:
+                d = max(0.0, d - 0.5)
+            stat += d * d / e
+    p = chi2.sf(stat, dof) if dof > 0 else 1.0
+    return Chi2ContingencyResult(stat, p, dof, expected)
+
+
+def mannwhitneyu(x, y, alternative='two-sided'):
+    """Mann-Whitney U (asymptotisk normaltilnærming med midtrang for
+    uavgjorte, tie-korrigert varians og kontinuitetskorreksjon — som scipy
+    med method='asymptotic'). Statistikken er U1 (for x)."""
+    x, y = _tolist(x), _tolist(y)
+    nx, ny = len(x), len(y)
+    merged = [(v, 0) for v in x] + [(v, 1) for v in y]
+    merged.sort(key=lambda pair: pair[0])
+    ranks = [0.0] * len(merged)
+    tie_term = 0.0
+    i = 0
+    while i < len(merged):
+        j = i
+        while j + 1 < len(merged) and merged[j + 1][0] == merged[i][0]:
+            j += 1
+        avg = (i + j) / 2.0 + 1.0
+        for k in range(i, j + 1):
+            ranks[k] = avg
+        cnt = j - i + 1
+        if cnt > 1:
+            tie_term += cnt ** 3 - cnt
+        i = j + 1
+    rx = sum(r for r, (v, g) in zip(ranks, merged) if g == 0)
+    u1 = rx - nx * (nx + 1) / 2.0
+    n = nx + ny
+    mu = nx * ny / 2.0
+    sigma2 = nx * ny / 12.0 * ((n + 1) - tie_term / (n * (n - 1.0)))
+    sigma = math.sqrt(sigma2)
+    if sigma == 0.0:
+        return TestResult(u1, float('nan'))
+    if alternative == 'two-sided':
+        z = (abs(u1 - mu) - 0.5) / sigma
+        p = min(1.0, 2.0 * norm.sf(z))
+    elif alternative == 'greater':
+        z = (u1 - mu - 0.5) / sigma
+        p = norm.sf(z)
+    elif alternative == 'less':
+        z = (u1 - mu + 0.5) / sigma
+        p = norm.cdf(z)
+    else:
+        raise ValueError("mannwhitneyu: alternative må være "
+                         "'two-sided', 'less' eller 'greater'")
+    return TestResult(u1, p)

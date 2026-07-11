@@ -1,5 +1,6 @@
 import sys, os, math
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import pytest
 import scipy_stats_brython as st
 
 # ── spesialfunksjoner: eksakte identiteter (scipy-frie) ────────────────────
@@ -120,3 +121,23 @@ def test_ttest_degenerate_n1_returns_nan():
     assert r2.statistic != r2.statistic
     r3 = st.ttest_ind([5.0], [1.0])
     assert r3.statistic != r3.statistic
+
+# ── chi2_contingency og mannwhitneyu ───────────────────────────────────────
+
+def test_chi2_contingency_independent_table():
+    # perfekt uavhengighet: forventet == observert => stat 0, p 1
+    res = st.chi2_contingency([[10, 20], [20, 40]], correction=False)
+    assert abs(res.statistic) < 1e-12
+    assert abs(res.pvalue - 1.0) < 1e-12
+    assert res.dof == 1
+    stat, p, dof, exp = res             # 4-tuple-utpakking som i scipy
+    assert exp[0][0] == pytest.approx(10.0)
+
+def test_chi2_contingency_yates_reduces_statistic():
+    raw = st.chi2_contingency([[12, 5], [6, 14]], correction=False)
+    yates = st.chi2_contingency([[12, 5], [6, 14]], correction=True)
+    assert yates.statistic < raw.statistic
+
+def test_mannwhitneyu_identical_groups():
+    res = st.mannwhitneyu([1, 2, 3, 4, 5, 6], [1, 2, 3, 4, 5, 6])
+    assert res.pvalue > 0.9

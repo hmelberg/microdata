@@ -74,3 +74,39 @@ def test_pearsonr_n2_diff():
     ref = scipy_stats.pearsonr([1.0, 2.0], [3.0, 5.0])
     assert mine.statistic == pytest.approx(float(ref.statistic))
     assert mine.pvalue == pytest.approx(float(ref.pvalue))
+
+TABLE = [[23, 11, 8], [14, 19, 12]]
+
+def test_chi2_contingency_diff():
+    for corr in (True, False):
+        mine = st.chi2_contingency(TABLE, correction=corr)
+        ref = scipy_stats.chi2_contingency(TABLE, correction=corr)
+        assert mine.statistic == pytest.approx(ref.statistic, rel=1e-8)
+        assert mine.pvalue == pytest.approx(ref.pvalue, rel=1e-8)
+        assert mine.dof == ref.dof
+        for i, row in enumerate(mine.expected_freq):
+            for j, v in enumerate(row):
+                assert v == pytest.approx(float(ref.expected_freq[i][j]), rel=1e-10)
+
+def test_chi2_contingency_2x2_yates_diff():
+    mine = st.chi2_contingency([[12, 5], [6, 14]])           # correction=True default
+    ref = scipy_stats.chi2_contingency([[12, 5], [6, 14]])
+    assert mine.statistic == pytest.approx(ref.statistic, rel=1e-8)
+    assert mine.pvalue == pytest.approx(ref.pvalue, rel=1e-8)
+
+def test_mannwhitneyu_diff_asymptotic():
+    x = [3.1, 4.5, 2.8, 5.9, 4.4, 3.3, 5.1, 2.9]
+    y = [4.9, 5.5, 6.1, 4.2, 6.8, 5.0, 5.7]
+    for alt in ('two-sided', 'less', 'greater'):
+        mine = st.mannwhitneyu(x, y, alternative=alt)
+        ref = scipy_stats.mannwhitneyu(x, y, alternative=alt, method='asymptotic')
+        assert mine.statistic == pytest.approx(float(ref.statistic), rel=1e-10)
+        assert mine.pvalue == pytest.approx(float(ref.pvalue), rel=1e-6)
+
+def test_mannwhitneyu_ties_diff():
+    x = [1, 2, 2, 3, 3, 3, 4]
+    y = [2, 3, 3, 4, 4, 5, 5, 6]
+    mine = st.mannwhitneyu(x, y)
+    ref = scipy_stats.mannwhitneyu(x, y, method='asymptotic')
+    assert mine.statistic == pytest.approx(float(ref.statistic), rel=1e-10)
+    assert mine.pvalue == pytest.approx(float(ref.pvalue), rel=1e-6)
