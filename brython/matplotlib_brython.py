@@ -253,26 +253,27 @@ def savefig(*args, **kwargs):
 
 
 class _Axes:
-    """Tynn delegering til modulfunksjonene — nok til fig, ax = plt.subplots()."""
-    def plot(self, *a, **kw): plot(*a, **kw)
-    def scatter(self, *a, **kw): scatter(*a, **kw)
-    def bar(self, *a, **kw): bar(*a, **kw)
-    def barh(self, *a, **kw): barh(*a, **kw)
-    def hist(self, *a, **kw): hist(*a, **kw)
-    def boxplot(self, *a, **kw): boxplot(*a, **kw)
-    def pie(self, *a, **kw): pie(*a, **kw)
-    def set_title(self, s, **kw): title(s)
-    def set_xlabel(self, s, **kw): xlabel(s)
-    def set_ylabel(self, s, **kw): ylabel(s)
-    def set_xlim(self, *a, **kw): xlim(*a, **kw)
-    def set_ylim(self, *a, **kw): ylim(*a, **kw)
-    def legend(self, **kw): legend()
-    def grid(self, visible=True, **kw): grid(visible)
+    """Tynn delegering til modulfunksjonene — nok til fig, ax = plt.subplots().
+    NB: kaller _-aliasene, ikke globalene direkte — se Brython-fellen nederst."""
+    def plot(self, *a, **kw): _plot(*a, **kw)
+    def scatter(self, *a, **kw): _scatter(*a, **kw)
+    def bar(self, *a, **kw): _bar(*a, **kw)
+    def barh(self, *a, **kw): _barh(*a, **kw)
+    def hist(self, *a, **kw): _hist(*a, **kw)
+    def boxplot(self, *a, **kw): _boxplot(*a, **kw)
+    def pie(self, *a, **kw): _pie(*a, **kw)
+    def set_title(self, s, **kw): _title(s)
+    def set_xlabel(self, s, **kw): _xlabel(s)
+    def set_ylabel(self, s, **kw): _ylabel(s)
+    def set_xlim(self, *a, **kw): _xlim(*a, **kw)
+    def set_ylim(self, *a, **kw): _ylim(*a, **kw)
+    def legend(self, **kw): _legend()
+    def grid(self, visible=True, **kw): _grid(visible)
 
 
 class _FigureHandle:
-    def show(self): show()
-    def savefig(self, *a, **kw): savefig(*a, **kw)
+    def show(self): _show()
+    def savefig(self, *a, **kw): _savefig(*a, **kw)
     def tight_layout(self, **kw): pass
 
 
@@ -306,3 +307,15 @@ def show():
     fig = gcf()
     print(_EMBED_S + 'figure__' + '\n' + fig.to_plotly_json_str() + '\n' + _EMBED_E)
     _reset()
+
+
+# Brython-felle (verifisert i nettleser 2026-07-11): når et metodenavn er likt
+# navnet på en global funksjon, løser Brython navnet FEIL inne i metodekroppen
+# og kallet blir stille en no-op (CPython er korrekt). Delegerende metoder i
+# _Axes/_FigureHandle kaller derfor globalene via disse ikke-kolliderende
+# aliasene. Aliasene ligger sist i fila så alle funksjonene finnes.
+_plot, _scatter, _bar, _barh = plot, scatter, bar, barh
+_hist, _boxplot, _pie = hist, boxplot, pie
+_title, _xlabel, _ylabel = title, xlabel, ylabel
+_xlim, _ylim, _legend, _grid = xlim, ylim, legend, grid
+_figure, _show, _savefig = figure, show, savefig
