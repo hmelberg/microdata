@@ -100,3 +100,54 @@ def regplot(data=None, x=None, y=None, **kwargs):
         _merge_into_current(_pe.scatter(d, x=xn, y=yn, trendline='ols'))
         return
     _merge_into_current(_pe.scatter(data, x=x, y=y, trendline='ols'))
+
+
+def histplot(data=None, x=None, hue=None, bins=None, **kwargs):
+    if data is None:
+        d, (xn,) = _as_pe_data(None, [x])
+        _merge_into_current(_pe.histogram(d, x=xn, nbins=bins))
+        return
+    _merge_into_current(_pe.histogram(data, x=x, color=hue, nbins=bins))
+
+
+def boxplot(data=None, x=None, y=None, hue=None, **kwargs):
+    _merge_into_current(_pe.box(data, x=x, y=y, color=hue))
+
+
+def violinplot(data=None, x=None, y=None, hue=None, **kwargs):
+    _merge_into_current(_pe.violin(data, x=x, y=y, color=hue))
+
+
+def heatmap(data, **kwargs):
+    """Varmekart av en matrise (liste av rader, ndarray eller DataFrame)."""
+    _merge_into_current(_pe.imshow(data))
+
+
+def set_theme(*args, **kwargs):
+    """Akseptert no-op — Plotly-temaet styres av appen."""
+    pass
+
+
+def despine(*args, **kwargs):
+    pass
+
+
+def kdeplot(*args, **kwargs):
+    raise NotImplementedError('kdeplot støttes ikke i Brython-utgaven — '
+                              'bruk sns.histplot i stedet')
+
+
+def pairplot(*args, **kwargs):
+    raise NotImplementedError('pairplot støttes ikke i Brython-utgaven — '
+                              'lag enkeltplott med sns.scatterplot')
+
+
+def jointplot(*args, **kwargs):
+    raise NotImplementedError('jointplot støttes ikke i Brython-utgaven — '
+                              'bruk sns.regplot i stedet')
+
+
+# NB: seaborn-API-et krever sns.set(...) — dette aliaset SKYGGER innebygde
+# set() for all kode under denne linja. Derfor ligger det sist i fila, og
+# ingen intern kode bruker bare set().
+set = set_theme

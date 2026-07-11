@@ -53,3 +53,35 @@ def test_regplot_adds_trend_trace():
 def test_vectors_directly_without_data():
     sns.scatterplot(x=[1.0, 2.0, 3.0], y=[2.0, 4.0, 6.0])
     assert plt.gcf().data[0]['y'] == [2.0, 4.0, 6.0]
+
+def test_histplot_bins_and_hue():
+    sns.histplot(data=DF, x='inntekt', bins=5)
+    t = plt.gcf().data[0]
+    assert t['type'] == 'histogram'
+    assert t.get('nbinsx') == 5
+    plt.figure()
+    sns.histplot(data=DF, x='inntekt', hue='region')
+    assert len(plt.gcf().data) == 2
+
+def test_boxplot_and_violinplot():
+    sns.boxplot(data=DF, x='region', y='inntekt')
+    assert plt.gcf().data[0]['type'] == 'box'
+    plt.figure()
+    sns.violinplot(data=DF, x='region', y='inntekt')
+    assert plt.gcf().data[0]['type'] == 'violin'
+
+def test_heatmap():
+    sns.heatmap([[1.0, 0.5], [0.5, 1.0]])
+    types = [t.get('type') for t in plt.gcf().data]
+    assert 'heatmap' in types
+
+def test_noops_and_stubs():
+    sns.set_theme(style='whitegrid')
+    sns.set(style='darkgrid')                     # aliaset
+    sns.despine()
+    with pytest.raises(NotImplementedError, match='støttes ikke'):
+        sns.kdeplot(data=DF, x='inntekt')
+    with pytest.raises(NotImplementedError):
+        sns.pairplot(DF)
+    with pytest.raises(NotImplementedError):
+        sns.jointplot(data=DF, x='alder', y='inntekt')
