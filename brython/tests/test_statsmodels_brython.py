@@ -104,3 +104,34 @@ def test_ols_fittedvalues_and_resid():
     assert len(res.fittedvalues) == 4
     for f_, r_, yv in zip(res.fittedvalues, res.resid, d['y']):
         assert f_ + r_ == pytest.approx(yv, abs=1e-12)
+
+def test_predict_none_and_new_data():
+    d = {'y': [3.0, 5.0, 7.0, 9.0], 'x': [1.0, 2.0, 3.0, 4.0]}
+    res = smb.ols('y ~ x', d).fit()
+    assert res.predict() == pytest.approx(res.fittedvalues)
+    nye = res.predict({'x': [10.0]})
+    assert nye[0] == pytest.approx(21.0, abs=1e-9)     # 1 + 2*10
+
+def test_predict_unseen_level_raises():
+    res = smb.ols('y ~ region', {'y': [1.0, 2.0, 3.0],
+                                 'region': ['N', 'S', 'N']}).fit()
+    with pytest.raises(ValueError):
+        res.predict({'region': ['UKJENT']})
+
+def test_conf_int_contains_params():
+    d = {'y': [1.0, 2.4, 2.9, 4.1, 5.2], 'x': [1.0, 2.0, 3.0, 4.0, 5.0]}
+    res = smb.ols('y ~ x', d).fit()
+    ci = res.conf_int()
+    for nm in res.params:
+        lo, hi = ci[nm]
+        assert lo < res.params[nm] < hi
+
+def test_summary_html_structure():
+    d = {'y': [1.0, 2.4, 2.9, 4.1, 5.2], 'x': [1.0, 2.0, 3.0, 4.0, 5.0]}
+    s = smb.ols('y ~ x', d).fit().summary()
+    html = s.to_html()
+    assert '<table class="output-table"' in html
+    assert 'Intercept' in html and 'x' in html
+    assert 'R²' in html or 'R&#178;' in html
+    assert 'koef' in html.lower()
+    assert 'Intercept' in str(s)                        # tekst-fallback

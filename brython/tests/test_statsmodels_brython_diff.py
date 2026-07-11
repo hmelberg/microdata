@@ -38,3 +38,17 @@ def test_ols_diff_c_notation_and_no_intercept():
     mine0, ref0 = _both('y ~ alder - 1')
     assert mine0.params['alder'] == pytest.approx(ref0.params['alder'], rel=1e-6)
     assert mine0.bse['alder'] == pytest.approx(ref0.bse['alder'], rel=1e-6)
+
+def test_predict_and_conf_int_diff():
+    mine = smb.ols('y ~ alder + region', RAW).fit()
+    ref = smf.ols('y ~ alder + region', pd.DataFrame(RAW)).fit()
+    nydata = {'alder': [30.0, 48.0], 'region': ['N', 'S']}
+    mp = mine.predict(nydata)
+    rp = ref.predict(pd.DataFrame(nydata))
+    for a, b in zip(mp, list(rp)):
+        assert a == pytest.approx(float(b), rel=1e-6)
+    rci = ref.conf_int()
+    mci = mine.conf_int()
+    for name in ref.params.index:
+        assert mci[name][0] == pytest.approx(float(rci.loc[name][0]), rel=1e-6)
+        assert mci[name][1] == pytest.approx(float(rci.loc[name][1]), rel=1e-6)

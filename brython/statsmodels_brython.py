@@ -205,6 +205,85 @@ class OLSResults:
             self.fvalue = float('nan')
             self.f_pvalue = float('nan')
 
+    def predict(self, data=None):
+        if data is None:
+            return list(self.fittedvalues)
+        names, X = _design_from_spec(self._spec, self._intercept, data)
+        beta = [self.params[nm] for nm in names]
+        return [sum(b * xv for b, xv in zip(beta, row)) for row in X]
+
+    def conf_int(self, alpha=0.05):
+        q = _stats.t.ppf(1.0 - alpha / 2.0, self.df_resid)
+        out = {}
+        for nm in self._names:
+            b, se = self.params[nm], self.bse[nm]
+            out[nm] = ([b - q * se, b + q * se] if se == se
+                       else [float('nan'), float('nan')])
+        return out
+
+    def summary(self):
+        stats_rows = [
+            ('Observasjoner', '%d' % self.nobs),
+            ('R²', '%.4f' % self.rsquared),
+            ('Justert R²', '%.4f' % self.rsquared_adj),
+            ('F-statistikk', '%.4g (p=%.4g)' % (self.fvalue, self.f_pvalue)),
+        ]
+        return Summary('OLS-regresjon', stats_rows, self._names, self.params,
+                       self.bse, self.tvalues, self.pvalues, self.conf_int())
+
+
+class Summary:
+    """summary()-objekt: to_html() rendres av appens tabell-embed;
+    str() gir tekst-fallback."""
+
+    def __init__(self, title, stats_rows, names, params, bse, tvalues,
+                 pvalues, ci, stat_label='t'):
+        self._title = title
+        self._stats_rows = stats_rows
+        self._names = names
+        self._params = params
+        self._bse = bse
+        self._tvalues = tvalues
+        self._pvalues = pvalues
+        self._ci = ci
+        self._stat_label = stat_label
+
+    def to_html(self):
+        parts = ['<table class="output-table" data-summary="1">']
+        parts.append('<caption>%s</caption>' % self._title)
+        parts.append('<thead><tr><th></th><th>koef</th><th>std.feil</th>'
+                     '<th>%s</th><th>P&gt;|%s|</th><th>[0.025</th>'
+                     '<th>0.975]</th></tr></thead><tbody>'
+                     % (self._stat_label, self._stat_label))
+        for nm in self._names:
+            lo, hi = self._ci[nm]
+            parts.append(
+                '<tr><th>%s</th><td>%.4f</td><td>%.4f</td><td>%.3f</td>'
+                '<td>%.4f</td><td>%.3f</td><td>%.3f</td></tr>'
+                % (nm, self._params[nm], self._bse[nm], self._tvalues[nm],
+                   self._pvalues[nm], lo, hi))
+        parts.append('</tbody></table>')
+        rows = ''.join('<tr><th>%s</th><td>%s</td></tr>' % (k, v)
+                       for k, v in self._stats_rows)
+        parts.append('<table class="output-table"><tbody>%s</tbody></table>'
+                     % rows)
+        return ''.join(parts)
+
+    def __str__(self):
+        lines = [self._title]
+        for k, v in self._stats_rows:
+            lines.append('%s: %s' % (k, v))
+        lines.append('%-24s %10s %10s %8s %8s' % ('', 'koef', 'std.feil',
+                                                  self._stat_label, 'p'))
+        for nm in self._names:
+            lines.append('%-24s %10.4f %10.4f %8.3f %8.4f'
+                         % (nm, self._params[nm], self._bse[nm],
+                            self._tvalues[nm], self._pvalues[nm]))
+        return '\n'.join(lines)
+
+    def __repr__(self):
+        return self.__str__()
+
 
 class OLSModel:
     def __init__(self, formula, data):
