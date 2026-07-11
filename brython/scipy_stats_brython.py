@@ -178,3 +178,96 @@ def _invert_cdf(cdf, p, lo, hi):
         if hi - lo < 1e-13 * max(1.0, abs(hi)):
             break
     return 0.5 * (lo + hi)
+
+
+# ── fordelinger (skalar inn/ut; instanser som i scipy) ──────────────────────
+
+_SQRT2 = math.sqrt(2.0)
+_SQRT2PI = math.sqrt(2.0 * math.pi)
+
+
+class _Norm:
+    def pdf(self, x, loc=0.0, scale=1.0):
+        z = (x - loc) / scale
+        return math.exp(-0.5 * z * z) / (scale * _SQRT2PI)
+
+    def cdf(self, x, loc=0.0, scale=1.0):
+        z = (x - loc) / scale
+        return 0.5 * math.erfc(-z / _SQRT2)
+
+    def sf(self, x, loc=0.0, scale=1.0):
+        z = (x - loc) / scale
+        return 0.5 * math.erfc(z / _SQRT2)
+
+    def ppf(self, p, loc=0.0, scale=1.0):
+        return loc + scale * _norm_ppf_std(p)
+
+
+class _T:
+    def pdf(self, x, df):
+        return math.exp(math.lgamma((df + 1.0) / 2.0) - math.lgamma(df / 2.0)
+                        - 0.5 * math.log(df * math.pi)
+                        - ((df + 1.0) / 2.0) * math.log(1.0 + x * x / df))
+
+    def cdf(self, x, df):
+        if x == 0.0:
+            return 0.5
+        ib = _betainc(df / 2.0, 0.5, df / (df + x * x))
+        return 1.0 - 0.5 * ib if x > 0.0 else 0.5 * ib
+
+    def sf(self, x, df):
+        return self.cdf(-x, df)          # symmetri
+
+    def ppf(self, p, df):
+        if p == 0.5:
+            return 0.0
+        if p < 0.5:
+            return -self.ppf(1.0 - p, df)
+        return _invert_cdf(lambda x: self.cdf(x, df), p, 0.0, 10.0)
+
+
+class _Chi2:
+    def pdf(self, x, df):
+        if x <= 0.0:
+            return 0.0
+        return math.exp((df / 2.0 - 1.0) * math.log(x) - x / 2.0
+                        - math.lgamma(df / 2.0) - (df / 2.0) * math.log(2.0))
+
+    def cdf(self, x, df):
+        if x <= 0.0:
+            return 0.0
+        return _gammainc_p(df / 2.0, x / 2.0)
+
+    def sf(self, x, df):
+        return 1.0 - self.cdf(x, df)
+
+    def ppf(self, p, df):
+        return _invert_cdf(lambda x: self.cdf(x, df), p, 0.0, df + 10.0)
+
+
+class _F:
+    def pdf(self, x, dfn, dfd):
+        if x <= 0.0:
+            return 0.0
+        ln_b = (math.lgamma(dfn / 2.0) + math.lgamma(dfd / 2.0)
+                - math.lgamma((dfn + dfd) / 2.0))
+        return math.exp(0.5 * (dfn * math.log(dfn * x) + dfd * math.log(dfd)
+                               - (dfn + dfd) * math.log(dfn * x + dfd))
+                        - math.log(x) - ln_b)
+
+    def cdf(self, x, dfn, dfd):
+        if x <= 0.0:
+            return 0.0
+        return _betainc(dfn / 2.0, dfd / 2.0, dfn * x / (dfn * x + dfd))
+
+    def sf(self, x, dfn, dfd):
+        return 1.0 - self.cdf(x, dfn, dfd)
+
+    def ppf(self, p, dfn, dfd):
+        return _invert_cdf(lambda x: self.cdf(x, dfn, dfd), p, 0.0, 10.0)
+
+
+norm = _Norm()
+t = _T()
+chi2 = _Chi2()
+f = _F()
