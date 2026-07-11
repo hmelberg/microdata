@@ -66,3 +66,41 @@ def test_filled_one_tuple_shape():
     assert np.full((2,), 5).tolist() == [5, 5]
     with pytest.raises(ValueError, match='støttes'):
         np.ones((2, 2, 2))
+
+def test_arithmetic_scalar_and_array():
+    a = np.array([1.0, 2.0, 3.0])
+    assert (a + 1).tolist() == [2.0, 3.0, 4.0]
+    assert (1 + a).tolist() == [2.0, 3.0, 4.0]
+    assert (a * 2).tolist() == [2.0, 4.0, 6.0]
+    assert (10 - a).tolist() == [9.0, 8.0, 7.0]
+    assert (a / 2).tolist() == [0.5, 1.0, 1.5]
+    assert (2 / a).tolist() == [2.0, 1.0, 2.0 / 3.0]
+    assert (a ** 2).tolist() == [1.0, 4.0, 9.0]
+    assert (-a).tolist() == [-1.0, -2.0, -3.0]
+
+def test_arithmetic_array_array_and_shape_mismatch():
+    a = np.array([1.0, 2.0])
+    b = np.array([10.0, 20.0])
+    assert (a + b).tolist() == [11.0, 22.0]
+    assert (a * [3, 4]).tolist() == [3.0, 8.0]
+    m = np.array([[1, 2], [3, 4]])
+    assert (m + m).tolist() == [[2, 4], [6, 8]]
+    with pytest.raises(ValueError):
+        a + np.array([1.0, 2.0, 3.0])
+
+def test_comparisons_and_mask_flow():
+    a = np.array([1, 5, 3, 8])
+    assert (a > 3).tolist() == [False, True, False, True]
+    assert (a == 3).tolist() == [False, False, True, False]
+    assert a[(a > 3).tolist()].tolist() == [5, 8]
+    assert a[a > 3].tolist() == [5, 8]          # maske direkte som ndarray
+
+def test_unary_math():
+    assert np.sqrt(np.array([1.0, 4.0, 9.0])).tolist() == [1.0, 2.0, 3.0]
+    assert np.sqrt(16) == 4.0                    # skalar inn -> skalar ut
+    assert np.abs(np.array([-1, 2, -3])).tolist() == [1, 2, 3]
+    assert np.round(np.array([1.234, 5.678]), 1).tolist() == [1.2, 5.7]
+    assert np.exp(0) == 1.0
+    r = np.log(np.array([1.0, math.e]))
+    assert r[0] == pytest.approx(0.0) and r[1] == pytest.approx(1.0)
+    assert np.isnan(np.array([1.0, np.nan])).tolist() == [False, True]

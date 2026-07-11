@@ -116,6 +116,45 @@ class ndarray:
         else:
             self._d[key] = value
 
+    def _binop(self, other, fn):
+        if isinstance(other, (list, tuple)):
+            other = ndarray(other)
+        if isinstance(other, ndarray):
+            if other.shape != self.shape:
+                raise ValueError('array-former passer ikke: %r mot %r'
+                                 % (self.shape, other.shape))
+            if self.ndim == 1:
+                return ndarray([fn(a, b) for a, b in zip(self._d, other._d)])
+            return ndarray([[fn(a, b) for a, b in zip(r1, r2)]
+                            for r1, r2 in zip(self._d, other._d)])
+        if self.ndim == 1:
+            return ndarray([fn(a, other) for a in self._d])
+        return ndarray([[fn(a, other) for a in r] for r in self._d])
+
+    def __add__(self, o): return self._binop(o, lambda a, b: a + b)
+    def __radd__(self, o): return self._binop(o, lambda a, b: b + a)
+    def __sub__(self, o): return self._binop(o, lambda a, b: a - b)
+    def __rsub__(self, o): return self._binop(o, lambda a, b: b - a)
+    def __mul__(self, o): return self._binop(o, lambda a, b: a * b)
+    def __rmul__(self, o): return self._binop(o, lambda a, b: b * a)
+    def __truediv__(self, o): return self._binop(o, lambda a, b: a / b)
+    def __rtruediv__(self, o): return self._binop(o, lambda a, b: b / a)
+    def __pow__(self, o): return self._binop(o, lambda a, b: a ** b)
+    def __neg__(self): return self._binop(0, lambda a, b: -a)
+    def __abs__(self): return self._binop(0, lambda a, b: _abs(a))
+
+    def __lt__(self, o): return self._binop(o, lambda a, b: a < b)
+    def __le__(self, o): return self._binop(o, lambda a, b: a <= b)
+    def __gt__(self, o): return self._binop(o, lambda a, b: a > b)
+    def __ge__(self, o): return self._binop(o, lambda a, b: a >= b)
+    def __eq__(self, o): return self._binop(o, lambda a, b: a == b)
+    def __ne__(self, o): return self._binop(o, lambda a, b: a != b)
+
+    __hash__ = None                     # elementvis __eq__ -> uhashbar (som numpy)
+
+    def __matmul__(self, o):
+        return dot(self, o)             # dot defineres i Task 3 — oppslag ved kall
+
     def __repr__(self):
         return 'array(%r)' % (self.tolist(),)
 
@@ -179,3 +218,36 @@ def ones(shape):
 
 def full(shape, value):
     return _filled(shape, value)
+
+
+def _unary(a, fn):
+    if isinstance(a, (int, float)) and not isinstance(a, bool):
+        return fn(a)
+    arr = asarray(a)
+    if arr.ndim == 1:
+        return ndarray([fn(v) for v in arr._d])
+    return ndarray([[fn(v) for v in r] for r in arr._d])
+
+
+def sqrt(a):
+    return _unary(a, math.sqrt)
+
+
+def log(a):
+    return _unary(a, math.log)
+
+
+def exp(a):
+    return _unary(a, math.exp)
+
+
+def abs(a):                             # skygger builtin — intern kode bruker _abs
+    return _unary(a, _abs)
+
+
+def round(a, decimals=0):               # skygger builtin — intern kode bruker _round
+    return _unary(a, lambda v: _round(v, decimals))
+
+
+def isnan(a):
+    return _unary(a, lambda v: isinstance(v, float) and v != v)
