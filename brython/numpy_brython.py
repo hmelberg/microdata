@@ -152,6 +152,13 @@ class ndarray:
 
     __hash__ = None                     # elementvis __eq__ -> uhashbar (som numpy)
 
+    def __bool__(self):
+        if self.size == 1:
+            return bool(self._flat()[0])
+        raise ValueError('sannhetsverdien til et array med flere elementer '
+                         'er tvetydig — bruk .any()-logikk eller sammenlikn '
+                         'med .tolist()')
+
     def __matmul__(self, o):
         return dot(self, o)             # dot defineres i Task 3 — oppslag ved kall
 

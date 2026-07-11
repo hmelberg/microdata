@@ -104,3 +104,12 @@ def test_unary_math():
     r = np.log(np.array([1.0, math.e]))
     assert r[0] == pytest.approx(0.0) and r[1] == pytest.approx(1.0)
     assert np.isnan(np.array([1.0, np.nan])).tolist() == [False, True]
+
+def test_bool_of_array_is_guarded():
+    assert bool(np.array([1]))
+    assert not bool(np.array([0]))
+    with pytest.raises(ValueError, match='tvetydig'):
+        bool(np.array([1, 2]) == np.array([1, 2]))
+    with pytest.raises(ValueError, match='tvetydig'):
+        if np.array([1, 2, 3]) > 2:
+            pass
