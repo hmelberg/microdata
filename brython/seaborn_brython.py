@@ -147,6 +147,103 @@ def jointplot(*args, **kwargs):
                               'bruk sns.regplot i stedet')
 
 
+def _appearance_groups(keys, values=None):
+    """Grupper verdiene per nøkkel i OPPTREDENSREKKEFØLGE (som seaborn for
+    objekt-kolonner). Uten values telles forekomster. Ingen set()-bruk —
+    aliaset sns.set skygger innebygde set()."""
+    order = []
+    groups = {}
+    for i, k in enumerate(keys):
+        if k not in groups:
+            groups[k] = []
+            order.append(k)
+        groups[k].append(values[i] if values is not None else 1)
+    return order, groups
+
+
+def countplot(data=None, x=None, hue=None, **kwargs):
+    xs = _col(data, x)
+    if hue is None:
+        order, groups = _appearance_groups(xs)
+        trace = {'type': 'bar', 'x': order,
+                 'y': [len(groups[k]) for k in order]}
+        _plt._state['traces'].append(_plt._clean(trace))
+    else:
+        hs = _col(data, hue)
+        horder, _ = _appearance_groups(hs)
+        xorder, _ = _appearance_groups(xs)
+        for hv in horder:
+            counts = {}
+            for xv, h in zip(xs, hs):
+                if h == hv:
+                    counts[xv] = counts.get(xv, 0) + 1
+            trace = {'type': 'bar', 'x': xorder,
+                     'y': [counts.get(k, 0) for k in xorder], 'name': hv}
+            _plt._state['traces'].append(_plt._clean(trace))
+        if 'showlegend' not in _plt._state['layout']:
+            _plt._state['layout']['showlegend'] = True
+    _sns_axis_titles(x if isinstance(x, str) else None, 'count')
+
+
+def barplot(data=None, x=None, y=None, hue=None, errorbar='ci', **kwargs):
+    """Som seaborn: GJENNOMSNITT per kategori, feilstrek ~= 1.96*SE
+    (seaborn bruker bootstrap-CI — dette er en dokumentert tilnærming)."""
+    xs = _col(data, x)
+    ys = [float(v) for v in _col(data, y)]
+    if hue is None:
+        subsets = [(None, xs, ys)]
+    else:
+        hs = _col(data, hue)
+        horder, _ = _appearance_groups(hs)
+        subsets = []
+        for hv in horder:
+            fx = [a for a, h in zip(xs, hs) if h == hv]
+            fy = [b for b, h in zip(ys, hs) if h == hv]
+            subsets.append((hv, fx, fy))
+    xorder, _ = _appearance_groups(xs)
+    for name, fx, fy in subsets:
+        order, groups = _appearance_groups(fx, fy)
+        means = []
+        errs = []
+        for k in xorder:
+            vals = groups.get(k, [])
+            if not vals:
+                means.append(None)
+                errs.append(0.0)
+                continue
+            m = sum(vals) / len(vals)
+            means.append(m)
+            if len(vals) > 1:
+                sd = math.sqrt(sum((v - m) ** 2 for v in vals)
+                               / (len(vals) - 1))
+                errs.append(1.96 * sd / math.sqrt(len(vals)))
+            else:
+                errs.append(0.0)
+        trace = {'type': 'bar', 'x': xorder, 'y': means, 'name': name}
+        if errorbar is not None:
+            trace['error_y'] = {'type': 'data', 'array': errs}
+        _plt._state['traces'].append(_plt._clean(trace))
+    if hue is not None and 'showlegend' not in _plt._state['layout']:
+        _plt._state['layout']['showlegend'] = True
+    _sns_axis_titles(x if isinstance(x, str) else None,
+                     y if isinstance(y, str) else None)
+
+
+def _sns_axis_titles(xname, yname):
+    """Sett aksetitler fra kolonnenavn — bare når de ikke alt er satt."""
+    lay = _plt._state['layout']
+    if xname is not None:
+        if 'xaxis' not in lay:
+            lay['xaxis'] = {}
+        if 'title' not in lay['xaxis']:
+            lay['xaxis']['title'] = {'text': xname}
+    if yname is not None:
+        if 'yaxis' not in lay:
+            lay['yaxis'] = {}
+        if 'title' not in lay['yaxis']:
+            lay['yaxis']['title'] = {'text': yname}
+
+
 # NB: seaborn-API-et krever sns.set(...) — dette aliaset SKYGGER innebygde
 # set() for all kode under denne linja. Derfor ligger det sist i fila, og
 # ingen intern kode bruker bare set().

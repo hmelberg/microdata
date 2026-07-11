@@ -85,3 +85,37 @@ def test_noops_and_stubs():
         sns.pairplot(DF)
     with pytest.raises(NotImplementedError):
         sns.jointplot(data=DF, x='alder', y='inntekt')
+
+def test_countplot_frequencies_in_appearance_order():
+    sns.countplot(data=DF, x='region')
+    t = plt.gcf().data[0]
+    assert t['type'] == 'bar'
+    assert t['x'] == ['N', 'S']                    # opptredensrekkefølge
+    assert t['y'] == [3, 3]
+
+def test_barplot_group_means_and_ci():
+    d = {'g': ['a', 'a', 'b', 'b', 'b'], 'v': [1.0, 3.0, 10.0, 20.0, 30.0]}
+    sns.barplot(data=d, x='g', y='v')
+    t = plt.gcf().data[0]
+    assert t['type'] == 'bar'
+    assert t['x'] == ['a', 'b']
+    assert t['y'] == pytest.approx([2.0, 20.0])    # GJENNOMSNITT, ikke sum
+    # 1.96*SE: a: sd=sqrt(2), se=1 -> 1.96 ; b: sd=10, se=10/sqrt(3)
+    err = t['error_y']['array']
+    assert err[0] == pytest.approx(1.96, rel=1e-9)
+    assert err[1] == pytest.approx(1.96 * 10.0 / (3 ** 0.5), rel=1e-9)
+
+def test_barplot_no_errorbar_and_hue():
+    d = {'g': ['a', 'b', 'a', 'b'], 'h': ['x', 'x', 'y', 'y'],
+         'v': [1.0, 2.0, 3.0, 4.0]}
+    sns.barplot(data=d, x='g', y='v', errorbar=None)
+    assert 'error_y' not in plt.gcf().data[0]
+    plt.figure()
+    sns.barplot(data=d, x='g', y='v', hue='h')
+    fig = plt.gcf()
+    assert len(fig.data) == 2
+    assert {t['name'] for t in fig.data} == {'x', 'y'}
+    assert fig.layout['showlegend'] is True
+    byname = {t['name']: t for t in fig.data}
+    assert byname['x']['y'] == pytest.approx([1.0, 2.0])
+    assert byname['y']['y'] == pytest.approx([3.0, 4.0])
