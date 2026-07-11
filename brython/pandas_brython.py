@@ -3179,9 +3179,10 @@ class DataFrame:
 
     def merge(self, right, how='inner', on=None, left_on=None, right_on=None,
               suffixes=('_x', '_y')):
-        # Delegerer til modulfunksjonen merge() (definert nederst i filen;
-        # oppslaget skjer ved kall, så rekkefølgen er trygg).
-        return merge(self, right, how=how, on=on, left_on=left_on,
+        # Delegerer til modulfunksjonen merge() via alias — se Brython-fellen
+        # nederst i filen (metodenavn == globalt navn er en stille no-op i
+        # Brython 3.12).
+        return _merge_fn(self, right, how=how, on=on, left_on=left_on,
                      right_on=right_on, suffixes=suffixes)
 
     def join(self, other, how='left', lsuffix='', rsuffix=''):
@@ -3218,11 +3219,11 @@ class DataFrame:
 
     def pivot_table(self, values=None, index=None, columns=None, aggfunc='mean',
                     fill_value=None):
-        return pivot_table(self, values=values, index=index, columns=columns,
+        return _pivot_table_fn(self, values=values, index=index, columns=columns,
                            aggfunc=aggfunc, fill_value=fill_value)
 
     def melt(self, id_vars=None, value_vars=None, var_name='variable', value_name='value'):
-        return melt(self, id_vars=id_vars, value_vars=value_vars,
+        return _melt_fn(self, id_vars=id_vars, value_vars=value_vars,
                     var_name=var_name, value_name=value_name)
 
     def corr(self, method='pearson'):
@@ -3980,4 +3981,9 @@ def _brython_gap(name):
 for _name in ['pivot', 'rolling', 'resample']:
     if not hasattr(DataFrame, _name):
         setattr(DataFrame, _name, _brython_gap(_name))
+
+
+# Brython-felle (se matplotlib_brython.py nederst): metoder kan ikke referere
+# globale funksjoner med samme navn som metoden — kall via alias.
+_merge_fn, _pivot_table_fn, _melt_fn = merge, pivot_table, melt
 

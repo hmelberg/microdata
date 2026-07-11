@@ -195,7 +195,9 @@ def xlim(a=None, b=None, **kwargs):
     ax = _state['layout'].setdefault('xaxis', {})
     if a is None and b is None:
         return ax.get('range')
-    ax['range'] = [a, b]
+    prev = ax.get('range') or [None, None]
+    ax['range'] = [a if a is not None else prev[0],
+                   b if b is not None else prev[1]]
 
 
 def ylim(a=None, b=None, **kwargs):
@@ -210,7 +212,9 @@ def ylim(a=None, b=None, **kwargs):
     ax = _state['layout'].setdefault('yaxis', {})
     if a is None and b is None:
         return ax.get('range')
-    ax['range'] = [a, b]
+    prev = ax.get('range') or [None, None]
+    ax['range'] = [a if a is not None else prev[0],
+                   b if b is not None else prev[1]]
 
 
 def legend(**kwargs):
@@ -291,7 +295,7 @@ def gcf():
     """Gjeldende figur som PlotlyFigure — LEVENDE, som i matplotlib: mutasjoner
     på den returnerte figuren (f.eks. update_layout) gjelder gjeldende figur
     frem til neste figure()/show()."""
-    if 'showlegend' not in _state['layout']:
+    if _state['traces'] and 'showlegend' not in _state['layout']:
         # matplotlib viser ikke legend uten legend() — unntak: pie har
         # etiketter i legenden i plotly, så den beholdes synlig.
         _state['layout']['showlegend'] = any(

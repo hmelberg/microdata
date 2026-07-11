@@ -132,6 +132,12 @@ def test_xlim_ylim_scalar_and_tuple():
     assert lay['xaxis']['range'] == [0, 10]
     assert lay['yaxis']['range'] == [2, 8]
 
+def test_xlim_partial_preserves_other_limit():
+    plt.plot([1], [1])
+    plt.xlim(0, 10)
+    plt.xlim(2)                      # bare venstre — høyre beholdes
+    assert plt.gcf().layout['xaxis']['range'] == [2, 10]
+
 def test_legend_and_grid():
     plt.plot([1], [1], label='serie')
     plt.legend()
