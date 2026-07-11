@@ -368,10 +368,17 @@ def cumsum(a):
 
 def unique(a):
     seen = []
+    has_nan = False
     for v in asarray(a)._flat():
+        if isinstance(v, float) and v != v:
+            has_nan = True              # numpy dedupliserer nan (equal_nan=True)
+            continue
         if v not in seen:
             seen.append(v)
-    return ndarray(sorted(seen))
+    out = sorted(seen)
+    if has_nan:
+        out.append(nan)                 # numpy legger nan sist
+    return ndarray(out)
 
 
 def sort(a):

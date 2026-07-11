@@ -41,3 +41,11 @@ def test_sort_argsort_where_dot_diff():
         assert mine[i] == pytest.approx(ref[i], rel=1e-12)
     assert np.unique([3, 1, 2, 1, 3]).tolist() == \
         realnp.unique([3, 1, 2, 1, 3]).tolist()
+
+def test_dot_1d_2d_and_unique_nan_diff():
+    assert np.dot([1.5, 2.5], [[1, 2], [3, 4]]).tolist() == pytest.approx(
+        realnp.dot([1.5, 2.5], realnp.array([[1, 2], [3, 4]])).tolist())
+    mine = np.unique([2.0, float('nan'), 1.0, float('nan')]).tolist()
+    ref = realnp.unique([2.0, float('nan'), 1.0, float('nan')]).tolist()
+    assert len(mine) == len(ref) == 3
+    assert mine[:2] == pytest.approx(ref[:2])

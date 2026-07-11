@@ -168,3 +168,11 @@ def test_astype_and_round_method():
     a = np.array([1.7, 2.2])
     assert a.astype(int).tolist() == [1, 2]
     assert a.round().tolist() == [2.0, 2.0]
+
+def test_dot_1d_2d_and_unique_nan():
+    # 1D·2D: radvektor mot matrise
+    assert np.dot([1, 2], [[1, 2, 3], [4, 5, 6]]).tolist() == [9, 12, 15]
+    # nan dedupliseres og legges sist (som numpy equal_nan=True)
+    u = np.unique([2.0, np.nan, 1.0, np.nan, 2.0]).tolist()
+    assert u[0] == 1.0 and u[1] == 2.0
+    assert len(u) == 3 and u[2] != u[2]
