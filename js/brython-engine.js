@@ -36,7 +36,9 @@
   //   js:      external JS scripts loaded (once) before the module registers;
   //            skipped when window[<global>] already exists.
   var LIB_REGISTRY = {
-    pandas_brython:         { aliases: [], deps: [], js: [] },
+    // pandas_brython.py:15 har en modulnivå try-import av plotly (df.plot);
+    // uten deps-oppføringen feiler den stille ved lazy registrering.
+    pandas_brython:         { aliases: [], deps: ['plotly_express_brython'], js: [] },
     plotly_express_brython: { aliases: [], deps: [], js: [] }
   };
 
