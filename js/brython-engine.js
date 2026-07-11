@@ -56,7 +56,13 @@
                               deps: ['matplotlib_brython', 'plotly_express_brython'], js: [] },
     // async-bro med replay — se beginDuckBridge()/run(); pandas for .df()
     duckdb_brython:         { aliases: ['duckdb'],
-                              deps: ['pandas_brython'], js: [] }
+                              deps: ['pandas_brython'], js: [] },
+    // flat modul + namespace-objekter; dottede aliaser krever 'sklearn' først
+    sklearn_brython:        { aliases: ['sklearn', 'sklearn.model_selection',
+                                        'sklearn.preprocessing', 'sklearn.linear_model',
+                                        'sklearn.cluster', 'sklearn.decomposition',
+                                        'sklearn.neighbors', 'sklearn.metrics'],
+                              deps: ['numpy_brython'], js: [] }
   };
 
   function scanImports(code) {
