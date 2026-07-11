@@ -86,8 +86,16 @@ def test_ols_perfect_line():
     assert res.nobs == 4 and res.df_resid == 2
 
 def test_ols_collinear_raises_norwegian():
-    d = {'y': [1.0, 2.0, 3.0], 'a': [1.0, 2.0, 3.0], 'b': [2.0, 4.0, 6.0]}
-    with pytest.raises(ValueError):
+    # n=5 > k=3, så det er singularitetssjekken i _solve som skal slå til
+    d = {'y': [1.0, 2.0, 3.0, 4.0, 5.0],
+         'a': [1.0, 2.0, 3.0, 4.0, 5.0],
+         'b': [2.0, 4.0, 6.0, 8.0, 10.0]}
+    with pytest.raises(ValueError, match='singulær'):
+        smb.ols('y ~ a + b', d).fit()
+
+def test_ols_too_few_observations_raises():
+    d = {'y': [1.0, 2.0, 3.0], 'a': [1.0, 2.0, 3.0], 'b': [1.0, 3.0, 2.0]}
+    with pytest.raises(ValueError, match='for få observasjoner'):
         smb.ols('y ~ a + b', d).fit()
 
 def test_ols_fittedvalues_and_resid():
