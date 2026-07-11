@@ -183,16 +183,34 @@ def ylabel(s, **kwargs):
     _state['layout'].setdefault('yaxis', {})['title'] = {'text': s}
 
 
-def xlim(a=None, b=None):
+def xlim(a=None, b=None, **kwargs):
+    """xlim(min, max) | xlim((min, max)) | xlim(left=..., right=...).
+    Uten argumenter: getter som i matplotlib — returnerer gjeldende range."""
     if isinstance(a, (list, tuple)):
         a, b = a
-    _state['layout'].setdefault('xaxis', {})['range'] = [a, b]
+    if a is None:
+        a = kwargs.get('left')
+    if b is None:
+        b = kwargs.get('right')
+    ax = _state['layout'].setdefault('xaxis', {})
+    if a is None and b is None:
+        return ax.get('range')
+    ax['range'] = [a, b]
 
 
-def ylim(a=None, b=None):
+def ylim(a=None, b=None, **kwargs):
+    """ylim(min, max) | ylim((min, max)) | ylim(bottom=..., top=...).
+    Uten argumenter: getter som i matplotlib — returnerer gjeldende range."""
     if isinstance(a, (list, tuple)):
         a, b = a
-    _state['layout'].setdefault('yaxis', {})['range'] = [a, b]
+    if a is None:
+        a = kwargs.get('bottom')
+    if b is None:
+        b = kwargs.get('top')
+    ax = _state['layout'].setdefault('yaxis', {})
+    if a is None and b is None:
+        return ax.get('range')
+    ax['range'] = [a, b]
 
 
 def legend(**kwargs):
@@ -246,8 +264,8 @@ class _Axes:
     def set_title(self, s, **kw): title(s)
     def set_xlabel(self, s, **kw): xlabel(s)
     def set_ylabel(self, s, **kw): ylabel(s)
-    def set_xlim(self, *a): xlim(*a)
-    def set_ylim(self, *a): ylim(*a)
+    def set_xlim(self, *a, **kw): xlim(*a, **kw)
+    def set_ylim(self, *a, **kw): ylim(*a, **kw)
     def legend(self, **kw): legend()
     def grid(self, visible=True, **kw): grid(visible)
 

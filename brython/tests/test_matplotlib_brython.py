@@ -172,3 +172,17 @@ def test_subplots_grid_raises():
     import pytest
     with pytest.raises(NotImplementedError):
         plt.subplots(2, 2)
+
+def test_xlim_keyword_and_getter_forms():
+    plt.plot([1], [1])
+    plt.xlim(left=0, right=10)
+    assert plt.xlim() == [0, 10]            # getter — endrer ingenting
+    assert plt.gcf().layout['xaxis']['range'] == [0, 10]
+    plt.ylim(bottom=1, top=5)
+    assert plt.ylim() == [1, 5]
+
+def test_ax_set_xlim_keywords():
+    fig, ax = plt.subplots()
+    ax.plot([1, 2], [1, 2])
+    ax.set_xlim(left=0, right=3)
+    assert plt.gcf().layout['xaxis']['range'] == [0, 3]
