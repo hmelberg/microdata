@@ -122,13 +122,18 @@
     return __jsLoaded[dep.url];
   }
 
-  async function ensureLibs(mod, names) {
+  async function ensureLibs(mod, names, _visiting) {
+    _visiting = _visiting || {};                       // syklusvakt for deps-rekursjonen
     for (var i = 0; i < names.length; i++) {
       var name = names[i];
       if (__registered[name]) continue;
       var entry = LIB_REGISTRY[name];
       if (!entry) continue;
-      await ensureLibs(mod, entry.deps);                 // deps first (module-level imports)
+      if (_visiting[name]) {
+        throw new Error('Sirkulær avhengighet i LIB_REGISTRY: ' + name);
+      }
+      _visiting[name] = true;
+      await ensureLibs(mod, entry.deps, _visiting);     // deps first (module-level imports)
       for (var j = 0; j < entry.js.length; j++) await loadJsDep(entry.js[j]);
       var source = await fetchText('brython/' + name + '.py');
       var err = mod._register_module(name, source);
