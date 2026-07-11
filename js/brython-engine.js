@@ -46,6 +46,9 @@
     // Find registry libraries mentioned in import statements. Over-matching
     // (imports inside strings/docstrings) is harmless — it only registers a
     // library the code never uses. Dotted names count by their first segment.
+    // Under-matches: one-line compounds (`if x: import y`), semicolon-glued
+    // imports and dynamic imports (__import__) — failure mode is a loud
+    // ModuleNotFoundError, never silent wrong output.
     var needed = [];
     function add(rawName) {
       var name = rawName.split('.')[0];
@@ -75,7 +78,12 @@
 
   function loadJsDep(dep) {
     if (global[dep.global]) return Promise.resolve();   // already on the page
-    if (!__jsLoaded[dep.url]) __jsLoaded[dep.url] = addScript(dep.url);
+    if (!__jsLoaded[dep.url]) {
+      __jsLoaded[dep.url] = addScript(dep.url).catch(function (e) {
+        delete __jsLoaded[dep.url];                     // ikke cache feil — prøv igjen neste run
+        throw e;
+      });
+    }
     return __jsLoaded[dep.url];
   }
 
@@ -85,7 +93,9 @@
       var name = names[i];
       if (__registered[name]) continue;
       var entry = LIB_REGISTRY[name];
-      if (!entry) continue;
+      if (!entry) {
+        throw new Error('Ukjent bibliotek i LIB_REGISTRY: ' + name);   // typo i en deps-liste
+      }
       if (_visiting[name]) {
         throw new Error('Sirkulær avhengighet i LIB_REGISTRY: ' + name);
       }
