@@ -120,6 +120,12 @@ def violinplot(data=None, x=None, y=None, hue=None, **kwargs):
 
 def heatmap(data, **kwargs):
     """Varmekart av en matrise (liste av rader, ndarray eller DataFrame)."""
+    if hasattr(data, 'tolist'):
+        data = data.tolist()
+    elif hasattr(data, 'values') and not isinstance(data, (list, tuple, dict)):
+        vals = data.values
+        rows = vals() if callable(vals) else vals
+        data = [list(r) for r in rows]
     _merge_into_current(_pe.imshow(data))
 
 
@@ -186,8 +192,14 @@ def countplot(data=None, x=None, hue=None, **kwargs):
 
 
 def barplot(data=None, x=None, y=None, hue=None, errorbar='ci', **kwargs):
-    """Som seaborn: GJENNOMSNITT per kategori, feilstrek ~= 1.96*SE
-    (seaborn bruker bootstrap-CI — dette er en dokumentert tilnærming)."""
+    """Som seaborn: GJENNOMSNITT per kategori, feilstrek avhengig av
+    errorbar: 'ci'/('ci', 95) ~= 1.96*SE (seaborn bruker bootstrap-CI —
+    dette er en dokumentert tilnærming), 'sd' = standardavvik,
+    'se' = standardfeil, None = ingen feilstreker."""
+    kind = errorbar[0] if isinstance(errorbar, (list, tuple)) else errorbar
+    if kind not in ('ci', 'sd', 'se', None):
+        raise ValueError("barplot: errorbar=%r støttes ikke — bruk 'ci', "
+                          "'sd', 'se' eller None" % (errorbar,))
     xs = _col(data, x)
     ys = [float(v) for v in _col(data, y)]
     if hue is None:
@@ -216,11 +228,18 @@ def barplot(data=None, x=None, y=None, hue=None, errorbar='ci', **kwargs):
             if len(vals) > 1:
                 sd = math.sqrt(sum((v - m) ** 2 for v in vals)
                                / (len(vals) - 1))
-                errs.append(1.96 * sd / math.sqrt(len(vals)))
+                se = sd / math.sqrt(len(vals))
             else:
-                errs.append(0.0)
+                sd = 0.0
+                se = 0.0
+            if kind == 'sd':
+                errs.append(sd)
+            elif kind == 'se':
+                errs.append(se)
+            else:
+                errs.append(1.96 * se)
         trace = {'type': 'bar', 'x': xorder, 'y': means, 'name': name}
-        if errorbar is not None:
+        if kind is not None:
             trace['error_y'] = {'type': 'data', 'array': errs}
         _plt._state['traces'].append(_plt._clean(trace))
     if hue is not None and 'showlegend' not in _plt._state['layout']:

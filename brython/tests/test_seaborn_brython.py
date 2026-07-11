@@ -119,3 +119,24 @@ def test_barplot_no_errorbar_and_hue():
     byname = {t['name']: t for t in fig.data}
     assert byname['x']['y'] == pytest.approx([1.0, 2.0])
     assert byname['y']['y'] == pytest.approx([3.0, 4.0])
+
+def test_heatmap_accepts_dataframe():
+    import pandas_brython as pd
+    df = pd.DataFrame({'a': [1.0, 2.0, 3.0], 'b': [2.0, 4.0, 5.9]})
+    plt.figure()
+    sns.heatmap(df.corr())
+    types = [t.get('type') for t in plt.gcf().data]
+    assert 'heatmap' in types
+    import json
+    json.dumps(plt.gcf().to_plotly_json_str() and 1)   # serialiserbar (via str)
+
+def test_barplot_errorbar_variants():
+    d = {'g': ['a', 'a', 'a'], 'v': [1.0, 2.0, 3.0]}   # sd=1.0, se=1/sqrt(3)
+    plt.figure()
+    sns.barplot(data=d, x='g', y='v', errorbar='sd')
+    assert plt.gcf().data[0]['error_y']['array'][0] == pytest.approx(1.0)
+    plt.figure()
+    sns.barplot(data=d, x='g', y='v', errorbar='se')
+    assert plt.gcf().data[0]['error_y']['array'][0] == pytest.approx(1.0 / 3 ** 0.5)
+    with pytest.raises(ValueError, match='støttes ikke'):
+        sns.barplot(data=d, x='g', y='v', errorbar='pi')
