@@ -51,7 +51,9 @@
     statsmodels_brython:    { aliases: ['statsmodels', 'statsmodels.formula',
                                         'statsmodels.formula.api'],
                               deps: ['scipy_stats_brython'], js: [] },
-    numpy_brython:          { aliases: ['numpy'], deps: [], js: [] }
+    numpy_brython:          { aliases: ['numpy'], deps: [], js: [] },
+    seaborn_brython:        { aliases: ['seaborn'],
+                              deps: ['matplotlib_brython', 'plotly_express_brython'], js: [] }
   };
 
   function scanImports(code) {
