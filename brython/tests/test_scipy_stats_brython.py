@@ -145,3 +145,20 @@ def test_mannwhitneyu_identical_groups():
 def test_mannwhitneyu_empty_input_returns_nan():
     res = st.mannwhitneyu([], [1.0, 2.0])
     assert res.statistic != res.statistic and res.pvalue != res.pvalue
+
+
+def test_ttest_ind_welch_constant_groups_nan():
+    res = st.ttest_ind([5.0, 5.0, 5.0], [3.0, 3.0, 3.0], equal_var=False)
+    assert res.statistic != res.statistic and res.pvalue != res.pvalue
+
+
+def test_chi2_contingency_zero_expected_raises():
+    with pytest.raises(ValueError):
+        st.chi2_contingency([[0, 0], [1, 2]])
+
+
+def test_chi2_contingency_ragged_raises():
+    with pytest.raises(ValueError):
+        st.chi2_contingency([[1, 2, 3], [4, 5]])
+    with pytest.raises(ValueError):
+        st.chi2_contingency([[1, 2], []])

@@ -26,7 +26,9 @@ def _tolist(v):
 # ── spesialfunksjoner ───────────────────────────────────────────────────────
 
 def _gammainc_p(a, x):
-    """Regularisert nedre ufullstendig gamma P(a, x) (NR gammp)."""
+    """Regularisert nedre ufullstendig gamma P(a, x) (NR gammp).
+    Nøyaktig til df ~10 000 (chi2); ved ekstreme parametre kan serien
+    stoppe før full konvergens."""
     if a <= 0.0 or x < 0.0:
         raise ValueError('gammainc: krever a > 0 og x >= 0')
     if x == 0.0:
@@ -158,7 +160,8 @@ def _norm_ppf_std(p):
 
 def _invert_cdf(cdf, p, lo, hi):
     """Numerisk inversjon av en monotont stigende CDF ved halvering.
-    hi utvides til cdf(hi) >= p."""
+    hi utvides til cdf(hi) >= p. Nøyaktig for p opp til ~1-1e-9; lengre
+    ute i halen degraderer presisjonen (dobbel-presisjon nær 1)."""
     if p <= 0.0 or p >= 1.0:
         if p == 0.0:
             return lo
@@ -329,6 +332,8 @@ def ttest_ind(a, b, equal_var=True):
         dof = na + nb - 2
     else:                                # Welch
         se = math.sqrt(va / na + vb / nb)
+        if se == 0.0:
+            return TestResult(float('nan'), float('nan'))
         dof = ((va / na + vb / nb) ** 2
                / ((va / na) ** 2 / (na - 1) + (vb / nb) ** 2 / (nb - 1)))
     stat = (_mean(a) - _mean(b)) / se if se > 0.0 else float('nan')
@@ -394,12 +399,19 @@ def chi2_contingency(observed, correction=True):
         vals = observed.values
         observed = vals() if callable(vals) else vals
     rows = [_tolist(r) for r in observed]
+    if not rows or not rows[0] or any(len(r) != len(rows[0]) for r in rows):
+        raise ValueError('chi2_contingency: tabellen må være rektangulær og ikke tom')
     rsums = [sum(r) for r in rows]
     csums = [sum(c) for c in zip(*rows)]
     total = float(sum(rsums))
     if total <= 0.0:
         raise ValueError('chi2_contingency: tom tabell')
     expected = [[rs * cs / total for cs in csums] for rs in rsums]
+    for re_ in expected:
+        for e in re_:
+            if e == 0.0:
+                raise ValueError('chi2_contingency: forventet frekvens er 0 — '
+                                 'fjern tomme rader/kolonner fra tabellen')
     dof = (len(rows) - 1) * (len(csums) - 1)
     use_yates = correction and len(rows) == 2 and len(csums) == 2
     stat = 0.0
