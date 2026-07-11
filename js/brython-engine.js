@@ -74,6 +74,45 @@
   var BRYTHON_STDLIB = 'https://cdn.jsdelivr.net/npm/brython@3.12.0/brython_stdlib.js';
   var PY_LIBS = ['pandas_brython', 'plotly_express_brython'];
 
+  // Library registry — single source of truth for lazily loaded Python libs.
+  // Key = canonical module name (== brython/<key>.py).
+  //   aliases: extra import names resolving to the same module.
+  //   deps:    registry keys that must be registered first (module-level imports).
+  //   js:      external JS scripts loaded (once) before the module registers;
+  //            skipped when window[<global>] already exists.
+  var LIB_REGISTRY = {
+    pandas_brython:         { aliases: [], deps: [], js: [] },
+    plotly_express_brython: { aliases: [], deps: [], js: [] }
+  };
+
+  function scanImports(code) {
+    // Find registry libraries mentioned in import statements. Over-matching
+    // (imports inside strings/docstrings) is harmless — it only registers a
+    // library the code never uses. Dotted names count by their first segment.
+    var needed = [];
+    function add(rawName) {
+      var name = rawName.split('.')[0];
+      var canonical = LIB_REGISTRY.hasOwnProperty(name) ? name : null;
+      if (!canonical) {
+        for (var k in LIB_REGISTRY) {
+          if (LIB_REGISTRY[k].aliases.indexOf(name) !== -1) { canonical = k; break; }
+        }
+      }
+      if (canonical && needed.indexOf(canonical) === -1) needed.push(canonical);
+    }
+    var re = /^[ \t]*(?:from[ \t]+([A-Za-z_][A-Za-z0-9_.]*)|import[ \t]+([^#\r\n]+))/gm;
+    var m, parts, i, t;
+    while ((m = re.exec(code))) {
+      if (m[1]) { add(m[1]); continue; }
+      parts = m[2].split(',');
+      for (i = 0; i < parts.length; i++) {
+        t = parts[i].trim().split(/[ \t]/)[0];   // drop "as <alias>"
+        if (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(t)) add(t);
+      }
+    }
+    return needed;
+  }
+
   var __enginePromise = null;
 
   function addScript(src) {
@@ -181,5 +220,5 @@
     }
   }
 
-  global.BrythonEngine = { load: load, run: run };
+  global.BrythonEngine = { load: load, run: run, _scanImports: scanImports };
 })(typeof window !== 'undefined' ? window : globalThis);
