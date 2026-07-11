@@ -456,3 +456,71 @@ def dot(a, b):
     Bt = B.T
     return ndarray([[_sum(x * y for x, y in zip(row, col))
                      for col in Bt._d] for row in A._d])
+
+
+# ── np.random ───────────────────────────────────────────────────────────────
+# Samme seed -> samme tall på tvers av kjøringer og CPython/Brython, men
+# IKKE de samme tallene som ekte numpy (Mersenne-strømmene brukes ulikt).
+
+class _Generator:
+    """default_rng-stil generator."""
+
+    def __init__(self, seed=None):
+        self._rng = _pyrandom.Random(seed)
+
+    def _sized(self, size, gen):
+        if size is None:
+            return gen()
+        if isinstance(size, tuple):
+            r, c = size
+            return ndarray([[gen() for _ in range(c)] for _ in range(r)])
+        return ndarray([gen() for _ in range(size)])
+
+    def normal(self, loc=0.0, scale=1.0, size=None):
+        return self._sized(size, lambda: self._rng.gauss(loc, scale))
+
+    def uniform(self, low=0.0, high=1.0, size=None):
+        return self._sized(size, lambda: self._rng.uniform(low, high))
+
+    def integers(self, low, high=None, size=None):
+        if high is None:
+            low, high = 0, low
+        return self._sized(size, lambda: self._rng.randrange(low, high))
+
+    def choice(self, a, size=None, replace=True):
+        pool = (list(range(a)) if isinstance(a, int)
+                else asarray(a)._flat())
+        if size is None:
+            return self._rng.choice(pool)
+        if not replace:
+            return ndarray(self._rng.sample(pool, size))
+        return ndarray([self._rng.choice(pool) for _ in range(size)])
+
+    def shuffle(self, x):
+        if isinstance(x, ndarray):
+            self._rng.shuffle(x._d)
+        else:
+            self._rng.shuffle(x)
+
+
+class _RandomState(_Generator):
+    """np.random.* (legacy-API: seed/randint/rand/randn)."""
+
+    def seed(self, n=None):
+        self._rng = _pyrandom.Random(n)
+
+    def randint(self, low, high=None, size=None):
+        return self.integers(low, high, size)
+
+    def rand(self, n=None):
+        return self.uniform(0.0, 1.0, n)
+
+    def randn(self, n=None):
+        return self.normal(0.0, 1.0, n)
+
+
+random = _RandomState()
+
+
+def default_rng(seed=None):
+    return _Generator(seed)

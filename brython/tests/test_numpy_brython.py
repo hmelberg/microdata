@@ -176,3 +176,50 @@ def test_dot_1d_2d_and_unique_nan():
     u = np.unique([2.0, np.nan, 1.0, np.nan, 2.0]).tolist()
     assert u[0] == 1.0 and u[1] == 2.0
     assert len(u) == 3 and u[2] != u[2]
+
+def test_random_seed_reproducible():
+    np.random.seed(42)
+    a = np.random.normal(0, 1, 5)
+    np.random.seed(42)
+    b = np.random.normal(0, 1, 5)
+    assert a.tolist() == b.tolist()
+    assert len(a) == 5
+
+def test_random_shapes_and_scalar():
+    np.random.seed(1)
+    s = np.random.normal()
+    assert isinstance(s, float)
+    m = np.random.uniform(0, 1, (2, 3))
+    assert m.shape == (2, 3)
+    assert all(0.0 <= v <= 1.0 for v in m._flat())
+
+def test_randint_range_exclusive():
+    np.random.seed(2)
+    vals = np.random.randint(0, 10, 200).tolist()
+    assert all(0 <= v <= 9 for v in vals)
+    assert 9 in vals and 0 in vals               # med 200 trekk
+
+def test_choice_and_shuffle():
+    np.random.seed(3)
+    pool = [10, 20, 30, 40]
+    one = np.random.choice(pool)
+    assert one in pool
+    tre = np.random.choice(pool, 3, replace=False)
+    assert len(set(tre.tolist())) == 3
+    x = [1, 2, 3, 4, 5]
+    np.random.shuffle(x)
+    assert sorted(x) == [1, 2, 3, 4, 5]
+
+def test_default_rng():
+    rng = np.default_rng(7)
+    a = rng.normal(0, 1, 4)
+    b = np.default_rng(7).normal(0, 1, 4)
+    assert a.tolist() == b.tolist()
+    ints = np.default_rng(7).integers(0, 5, 100).tolist()
+    assert all(0 <= v <= 4 for v in ints)
+
+def test_random_statistical_sanity():
+    np.random.seed(1234)
+    xs = np.random.normal(10.0, 2.0, 4000)
+    assert xs.mean() == pytest.approx(10.0, abs=0.15)
+    assert xs.std() == pytest.approx(2.0, abs=0.15)
