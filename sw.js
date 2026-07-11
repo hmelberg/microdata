@@ -4,7 +4,7 @@
 // py2m/py2m_runner.html and export_data*.html — update all together when
 // upgrading Pyodide.
 const PYODIDE_VERSION = 'v314.0.2';
-const CACHE = 'm2py-v10';
+const CACHE = 'm2py-v11';
 const CDN_HOSTS = new Set([
   'cdn.jsdelivr.net',
   'cdn.plot.ly',
