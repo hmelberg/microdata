@@ -7151,27 +7151,32 @@ async def _run_duck_sql(_sql):
     // Speiler _run_duck_sql i interpreter-preamblet — endres semantikken der,
     // må den endres her. Tabeller opprettet her materialiseres IKKE inn i
     // e.datasets; senere python-kjøringer henter dem med «# use … from duckdb».
+    // Returnerer {handled: true} når kjøringen er håndtert her, ellers
+    // {handled: false, res: <resolve-resultat>|null} — res gjenbrukes av
+    // fallback-veien så resolve aldri kjøres dobbelt (review 2026-07-11).
     async function maybeRunDuckNative(script, ctx) {
       // Er Pyodide alt i gang i denne fanen, gjelder dagens semantikk
       // uendret: Pyodide-veien registrerer refererte datasett selv.
-      if (__pyodidePromise) return false;
+      if (__pyodidePromise) return { handled: false, res: null };
       var _segs = parseHybridScript(script, 'duckdb');
-      if (_segs.some(function (s) { return s.kind !== 'duckdb'; })) return false;
+      if (_segs.some(function (s) { return s.kind !== 'duckdb'; })) return { handled: false, res: null };
       if (window.DataDirectives) {
         var _up = window.DataDirectives.parseUse(script);
         if (_up.errors.length) throw new Error(_up.errors.join('; '));
-        if (_up.uses.length) return false;
+        if (_up.uses.length) return { handled: false, res: null };
       }
       var _res = await window.DataLoader.resolveAndFetchLoads(script,
         { anthropicKey: getAnthropicKey(), promptKey: mdPromptKey });
-      if ((_res.remote || []).length) return false;
+      if ((_res.remote || []).length) return { handled: false, res: _res };
       var _loads = _res.loads;
+      // Konvolutt-kilder (kryptert) må gjennom Pyodide-veiens dekryptering.
+      if (_loads.some(function (l) { return l.strict || l.envelope; })) return { handled: false, res: _res };
       var _html = _loads.find(function (l) { return l.format === 'html'; });
       if (_html) throw new Error(t('html-kilder støttes ikke i duckdb-modus ({alias}) — bruk python/r', { alias: _html.alias }));
       var _supported = _loads.every(function (l) {
         return (l.format === 'parquet' || l.format === 'csv') && l.bytes;
       });
-      if (!_supported) return false;
+      if (!_supported) return { handled: false, res: _res };
       setStatus(ctx.rightStatus, t('Kjører…'));
       // Direktivlinjene er metadata (og «# load» er ikke gyldig SQL) — fjern dem før exec.
       var _sql = script.replace(/^[ \t]*(?:#|--|\/\/)[ \t]*(?:connect|load|require|import|join|create-dataset)\b[^\n]*\n?/gim, '');
@@ -7213,10 +7218,14 @@ async def _run_duck_sql(_sql):
           await window.__duck.end();
         }
       }
-      renderOutput(_out.join('\n\n'), false, false);
+      // Speil legacy-veiens tilstand så outputMode-radioene re-rendrer
+      // ferske SQL-resultater, ikke forrige kjørings innhold.
+      lastOutput = _out.join('\n\n');
+      lastOutputMode = 'run';
+      renderOutput(lastOutput, false, false);
       refreshDatasetSidebarFromDuck();
       setStatus(ctx.rightStatus, t('Ferdig'));
-      return true;
+      return { handled: true };
     }
 
     // R-motstykket til refreshDatasetSidebarFromPy: sidepanelet var før et
@@ -8728,8 +8737,12 @@ options(width = 200)
         // i duckdb-modus kjører native mot duckdb-wasm, uten Pyodide. Hybride
         // segmenter, use-direktiver og pandas-formater faller igjennom hit —
         // da bootes Pyodide sent, og resten av veien under er uendret.
+        var _duckPreResolved = null;
         if (activeEditorMode === 'duckdb' && !py && !dashboardPendingParsed) {
-          if (await maybeRunDuckNative(effectiveScript, _ctx)) return;
+          var _dn = await maybeRunDuckNative(effectiveScript, _ctx);
+          if (_dn.handled) return;
+          // Gjenbruk native-veiens resolve i fallback (unngå dobbel henting).
+          _duckPreResolved = _dn.res;
           py = await loadPyodideAndM2py();
           _ctx.py = py;
           _wirePyIO(py);
@@ -8741,7 +8754,7 @@ options(width = 200)
         var _pyLoads = [];
         if (activeEditorMode === 'python' || activeEditorMode === 'duckdb') {
           var _dlDeps = { anthropicKey: getAnthropicKey(), promptKey: mdPromptKey };
-          var _dl = await window.DataLoader.resolveAndFetchLoads(effectiveScript, _dlDeps);
+          var _dl = _duckPreResolved || await window.DataLoader.resolveAndFetchLoads(effectiveScript, _dlDeps);
           var _rawLoads = _dl.loads;
           if (activeEditorMode === 'duckdb') {
             var _htmlLoad = _rawLoads.find(function (l) { return l.format === 'html'; });
