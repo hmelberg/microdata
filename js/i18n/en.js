@@ -706,4 +706,5 @@ window.M2PY_I18N.en = {
   "Krever admin.": "Requires admin.",
   "Kunne ikke hente kjøringslogg (status {status}).": "Could not fetch the run log (status {status}).",
   "Feil ved henting av kjøringslogg:\n{msg}": "Error fetching the run log:\n{msg}",
+  "Gjenopprettet ulagret utkast.": "Restored unsaved draft.",
 };
