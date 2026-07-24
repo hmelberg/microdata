@@ -4,7 +4,7 @@
 // py2m/py2m_runner.html and export_data*.html — update all together when
 // upgrading Pyodide.
 const PYODIDE_VERSION = 'v314.0.2';
-const CACHE = 'm2py-v15';
+const CACHE = 'm2py-v16';
 const CDN_HOSTS = new Set([
   'cdn.jsdelivr.net',
   'cdn.plot.ly',
@@ -13,16 +13,14 @@ const CDN_HOSTS = new Set([
   'webr.r-wasm.org',    // webR-runtime (jamovi-modus)
   'repo.r-wasm.org'     // wasm-R-pakker: jmv, scatr m.fl. (~170 MB, cache-first)
 ]);
-const LOCAL_SWR_SUFFIXES = [
-  '/m2py.py',
-  '/functions.py',
-  '/variable_metadata.json',
-  '/mockdata_core.py',
-  '/mockdata_realism.py',
-  '/brython/pandas_brython.py',
-  '/brython/plotly_express_brython.py',
-  '/brython/brython_runner.py'
-];
+// Cache-skew-fiksen (portet fra openstat 2026-07-23): den gamle ENUMERERTE
+// listen driftet — den manglet bl.a. m2py_runtime/*.py og m2py_translate.py,
+// som dermed falt til ren HTTP-cache med heuristisk TTL (observert
+// stale-krasj etter deploy tre ganger i openstat 2026-07-20..22). Nå dekkes
+// ALLE lokale .py-filer av én suffiks-regel, så nye filer aldri kan glemmes.
+function isLocalPySwr(pathname) {
+  return pathname.endsWith('.py') || pathname.endsWith('/variable_metadata.json');
+}
 
 const PRECACHE_URLS = [
   'https://cdn.jsdelivr.net/pyodide/' + PYODIDE_VERSION + '/full/pyodide.js',
@@ -65,8 +63,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  if (url.origin === self.location.origin &&
-      LOCAL_SWR_SUFFIXES.some(s => url.pathname.endsWith(s))) {
+  if (url.origin === self.location.origin && isLocalPySwr(url.pathname)) {
     e.respondWith(staleWhileRevalidate(e.request));
     return;
   }
@@ -89,8 +86,12 @@ async function cacheFirst(req) {
     // our CDN (jsdelivr) sends CORS, so res.ok is the right gate.
     if (res && res.ok) {
       cache.put(req, res.clone()).catch(() => {});
+      return res;
     }
-    return res;
+    // Transient 4xx/5xx (CDN-blipp): prøv cachet kopi før vi gir feilen videre —
+    // en resolved !ok-respons nådde aldri catch-fallbacken under.
+    const stale = await cache.match(req, { ignoreSearch: true });
+    return stale || res;
   } catch (err) {
     const fallback = await cache.match(req, { ignoreSearch: true });
     if (fallback) return fallback;
@@ -100,10 +101,17 @@ async function cacheFirst(req) {
 
 async function staleWhileRevalidate(req) {
   const cache = await caches.open(CACHE);
-  const keyUrl = new URL(req.url);
-  const key = new Request(keyUrl.origin + keyUrl.pathname);
+  // Cache-skew-fiksen (portet fra openstat 2026-07-23): nøkkelen inkluderer nå
+  // SØKESTRENGEN. Versjonerte fetcher (?v=M2PY_VERSION) gir dermed cache-MISS
+  // ved versjonsbump → ferskt nettverkssvar på FØRSTE last etter deploy, i
+  // stedet for SWR-ens serve-stale-først. Gamle versjonsnøkler ryddes ved
+  // CACHE-navnebump (activate-sveipet).
+  const key = new Request(req.url);
   const hit = await cache.match(key);
-  const network = fetch(req).then(res => {
+  // 'no-cache': revalider mot server (304 ved uendret). Default cache-modus
+  // kunne hente stale svar fra HTTP-diskcachen (kun Last-Modified-header →
+  // heuristisk freshness) og overskrive Cache Storage med gammelt innhold.
+  const network = fetch(req.url, { cache: 'no-cache' }).then(res => {
     if (res && res.ok) cache.put(key, res.clone()).catch(() => {});
     return res;
   });
