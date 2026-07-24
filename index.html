@@ -706,14 +706,14 @@
   <script src="js/names.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="command_help.js"></script>
-  <script>window.M2PY_APP = 'openstat';</script>
+  <script>window.M2PY_APP = 'microdata';</script>
   <script src="js/notebook-links.js"></script>
   <script>
     // Fallback hvis js/i18n.js ikke lastet (404 e.l.): vis norsk uendret.
     window.t = window.t || function (s) { return s; };
     window.i18nField = window.i18nField || function (obj, field) { return obj && obj[field]; };
 
-    window.M2PY_VERSION = '2026-07-24c';
+    window.M2PY_VERSION = '2026-07-24d';
 
     // One-time migration: remove obsolete localStorage keys from previous milestones
     // Safe to delete this snippet after a few months when most users have re-loaded
@@ -3765,11 +3765,11 @@
       t('barchart kjonn    // Til slutt lager vi et stolpediagram over kjønnsfordelingen'),
     ].join('\n');
 
-    // Repo raw base for committed sample data (OpenStat).
-    const _DATA_RAW = 'https://raw.githubusercontent.com/hmelberg/openstat/main/data/';
+    // Repo raw base for committed sample data (dette repoet).
+    const _DATA_RAW = 'https://raw.githubusercontent.com/hmelberg/microdata/main/data/';
 
     const _STARTUP_PY = [
-      '# OpenStat — a quick example. Edit it freely, or pick another under "Examples".',
+      '# Microdata — a quick example. Edit it freely, or pick another under "Examples".',
       '# Two ways to load data: the `# load` directive (below), or plain pandas.',
       '# load ' + _DATA_RAW + 'iris.csv as iris',
       '# (equivalent: iris = pd.read_csv("' + _DATA_RAW + 'iris.csv"))',
@@ -3784,7 +3784,7 @@
     ].join('\n');
 
     const _STARTUP_R = [
-      '# OpenStat — a quick example. Edit it freely, or pick another under "Examples".',
+      '# Microdata — a quick example. Edit it freely, or pick another under "Examples".',
       '# Two ways to load data: the `# load` directive (below), or plain read.csv().',
       '# load ' + _DATA_RAW + 'iris.csv as iris',
       '# (equivalent: iris <- read.csv("' + _DATA_RAW + 'iris.csv"))',
@@ -3797,7 +3797,7 @@
     ].join('\n');
 
     const _STARTUP_BRYTHON = [
-      '# OpenStat — Brython: lettvekts-Python som laster på et par sekunder.',
+      '# Microdata — Brython: lettvekts-Python som laster på et par sekunder.',
       '# Bra for dashboards. Full pandas/statistikk: bytt til Python-modus.',
       '# load ' + _DATA_RAW + 'iris.csv as iris',
       'import pandas_brython as pd',
