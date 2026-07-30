@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Microdata Script Runner – Dokumentasjon</title>
+<title>Microdata – Dokumentasjon</title>
 <style>
   :root {
     --accent: #2563eb;
@@ -167,20 +167,83 @@
 
   /* ── Section anchor offset ── */
   section { scroll-margin-top: 20px; }
+/* SYNC:START felles-css */
+/* ── Oversiktstabell først i hver hovedseksjon ── */
+.overview { margin: 0 0 28px; }
+.overview .doc-table { margin: 0; }
+.overview-hint {
+  font-size: 13px; color: var(--text-muted); margin: 6px 0 0;
+}
+
+/* ── Todelt eksempelblokk: kode ‖ resultat ── */
+.example {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+  background: var(--border); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; margin: 18px 0;
+}
+.example > * { background: var(--bg-card); }
+.example-code, .example-result { padding: 14px 16px; min-width: 0; }
+.example-code pre, .example-result pre {
+  margin: 0; overflow-x: auto; font-size: 13px; line-height: 1.6;
+}
+.example-label {
+  display: block; font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 8px;
+}
+.result { color: var(--text); }
+.result.illustration { color: var(--text-muted); font-style: italic; }
+.illustration-tag {
+  display: inline-block; font-size: 11px; font-style: normal;
+  padding: 1px 6px; border-radius: 4px; margin-left: 6px;
+  background: var(--bg-code); color: var(--text-muted);
+}
+@media (max-width: 900px) {
+  .example { grid-template-columns: 1fr; }
+}
+
+/* ── Kopier-knapp ── */
+.example-code { position: relative; }
+.copy-btn {
+  position: absolute; top: 10px; right: 10px;
+  font-size: 11px; padding: 3px 8px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-card); color: var(--text-muted);
+}
+.copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── Nav: filter + scrollspy ── */
+.nav-filter {
+  width: calc(100% - 36px); margin: 0 18px 14px; padding: 6px 9px;
+  font-size: 13px; font-family: inherit;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--bg); color: var(--text);
+}
+.nav-filter:focus { outline: none; border-color: var(--accent); }
+.nav-link-hidden { display: none !important; }
+nav a.nav-active {
+  color: var(--accent); background: var(--accent-light);
+  border-left: 2px solid var(--accent);
+}
+/* SYNC:END */
 </style>
 </head>
 <body>
 <div class="page">
 
 <nav>
-  <div class="nav-logo">Script Runner</div>
+  <div class="nav-logo">Microdata</div>
   <a href="hjelp.en.html" style="font-size:12px;color:var(--text-muted)">In English</a>
+  <input class="nav-filter" type="search" placeholder="Filtrer…" aria-label="Filtrer innholdsfortegnelsen">
   <div class="nav-section">Kom i gang</div>
   <a href="#intro">Hva er dette?</a>
-  <a href="#running">Kjøre og oversette</a>
-  <a href="#microdata">Microdata-kommandoer</a>
+  <a href="#running">Kjøre</a>
+  <div class="nav-section">Emulatoren</div>
+  <a href="#kommandoer">Kommandoene</a>
+  <a href="#avsloring">Avsløringskontroll</a>
+  <a href="#avvik">Avvik fra microdata.no</a>
+  <a href="#oversettere">py2m og r2m</a>
   <div class="nav-section">Editoren</div>
-  <a href="#editor">Editor og snarveier</a>
+  <a href="#editor">Editor</a>
   <a href="#tab-intro">Tab-autocomplete</a>
   <a href="#sidebar">Datasett-panel</a>
   <div class="nav-section">Lagre og dele</div>
@@ -190,259 +253,278 @@
   <a href="#widgets">Widgets</a>
   <div class="nav-section">AI assistent</div>
   <a href="#ai">AI assistent</a>
+  <div class="nav-section">Eksempler</div>
+  <a href="#eksempler">Eksempler</a>
   <div class="nav-section">Andre moduser</div>
   <a href="#modes">Moduser</a>
   <a href="#python">Python (Pyodide)</a>
   <a href="#r">R (WebR)</a>
   <a href="#hybrid">Hybrid-skript</a>
   <div class="nav-section">Referanse</div>
+  <a href="#referanse-snarveier">Tastatursnarveier</a>
   <a href="#tab-full">Tab-autocomplete (detalj)</a>
 </nav>
 
 <main>
 
   <div class="doc-header">
-    <h1>Microdata Script Runner</h1>
-    <p class="lead">Skriv og kjør microdata.no-kode, Python og R direkte i nettleseren — uten installasjon.</p>
+    <h1>Microdata</h1>
+    <p class="lead">Emulator av microdata.no — skriv og kjør microdata-kode.</p>
   </div>
 
-  <!-- ── INTRO ── -->
   <section id="intro">
     <h2>Hva er dette?</h2>
-    <p>Script Runner er et verktøy for å skrive og kjøre kode mot norske registerdata fra <strong>microdata.no</strong>. Du kan skrive microdata-kommandoer og se resultater umiddelbart, oversette mellom Python/R og microdata-syntaks, og kjøre hybridskript der ulike språk samarbeider.</p>
+    <p>En emulator av <a href="https://microdata.no">microdata.no</a>. Du skriver microdata-kommandoer, de oversettes til Python og kjøres i nettleseren mot syntetiske registerdata. Målet er at et skript som virker her, virker der.</p>
 
-    <div class="callout">
-      <strong>NB:</strong> Dette er et hobbyprosjekt og er ikke laget av microdata.no selv. Siden inneholder ikke ekte tall, og det gis ingen garantier for at analysene er korrekt implementert.
+    <div class="overview">
+      <table class="doc-table">
+        <thead><tr><th>Del</th><th>Hva du finner der</th></tr></thead>
+        <tbody>
+          <tr><td><a href="#kommandoer">Kommandoene</a></td><td>Språket, kommando for kommando</td></tr>
+          <tr><td><a href="#avsloring">Avsløringskontroll</a></td><td>Reglene som sensurerer output, og hvordan du skrur dem av</td></tr>
+          <tr><td><a href="#avvik">Avvik fra microdata.no</a></td><td>Der emulatoren ikke er tro mot originalen</td></tr>
+          <tr><td><a href="#oversettere">py2m og r2m</a></td><td>Python og R inn, microdata ut</td></tr>
+          <tr><td><a href="#tab-full">Referanse</a></td><td>Snarveier, autocomplete</td></tr>
+        </tbody>
+      </table>
     </div>
 
-    <p>Alt skjer i nettleseren — ingen data forlater maskinen din.</p>
+    <div class="callout">
+      <strong>NB:</strong> Dette er et hobbyprosjekt og er ikke laget av microdata.no. Dataene er syntetiske — ingen tall her er ekte.
+    </div>
 
     <div class="callout tip">
       <strong>Hurtigstart:</strong> Skriv microdata-kommandoer i tekstfeltet, trykk <kbd>Ctrl</kbd>+<kbd>Enter</kbd> eller knappen <strong>Kjør</strong>. Bruk <kbd>Tab</kbd> for forslag til kommandoer og variabler.
     </div>
   </section>
 
-  <!-- ── RUNNING ── -->
+  <!-- SYNC:START felles-running -->
   <section id="running">
-    <h2>Kjøre og oversette</h2>
+    <h2>Kjøre</h2>
 
     <h3>Kjøre direkte</h3>
     <p>Trykk <kbd>Ctrl</kbd>+<kbd>Enter</kbd> eller knappen <strong>Kjør</strong>. Resultater vises i outputfeltet. Tabeller, diagrammer og tekst vises automatisk.</p>
 
-    <h3>Oversette</h3>
-    <p>Knappen <strong>Oversett</strong> (pil-ikon) konverterer Python- eller R-kode til microdata-syntaks. Resultatet vises i outputfeltet — for å <strong>kjøre</strong> den oversatte koden må du enten kopiere den inn i editoren og bytte til microdata-modus, eller skrive den om til microdata direkte.</p>
 
     <h3>Stoppe / avbryte</h3>
     <p>Trykk <strong>Kjør</strong>-knappen igjen under kjøring for å avbryte.</p>
   </section>
+    <!-- SYNC:END -->
 
-  <!-- ── MICRODATA ── -->
-  <section id="microdata">
-    <h2>Microdata-kommandoer</h2>
-    <p>Microdata-syntaksen ligner på Stata. Her er de viktigste kommandoene:</p>
-
-    <h3>Datainnlasting</h3>
+  <section id="kommandoer">
+    <h2>Kommandoene</h2>
+    <p>microdata-språket er lite med vilje. Hver kommando gjør én ting, og rekkefølgen er den du ville skrevet på papir: hent data, lag variabler, oppsummer. Listen under er begrenset til kommandoer som faktisk er implementert i <code>m2py.py</code>.</p>
     <table class="doc-table">
-      <thead><tr><th>Kommando</th><th>Beskrivelse</th></tr></thead>
+      <thead><tr><th>Kommando</th><th>Gjør</th><th>Eksempel</th></tr></thead>
       <tbody>
-        <tr><td><code>require no.ssb.fdb:52 as db</code></td><td>Koble til en datakilde og gi den et navn</td></tr>
-        <tr><td><code>create-dataset navn</code></td><td>Opprett tomt datasett</td></tr>
-        <tr><td><code>import db/VARIABEL [dato] as alias</code></td><td>Importer variabel fra registerdata</td></tr>
-        <tr><td><code>import-event db/VARIABEL dato1 to dato2 as alias</code></td><td>Importer hendelsesdata</td></tr>
-        <tr><td><code>use datasett</code></td><td>Bytt aktivt datasett</td></tr>
-        <tr><td><code>merge datasett, by(var)</code></td><td>Slå sammen to datasett</td></tr>
-        <tr><td><code>clone-dataset nytt [fra]</code></td><td>Kopier datasett</td></tr>
+        <tr><td><code>require kilde as alias</code></td><td>Kobler til en datakilde og gir den et navn</td><td><code>require no.ssb.fdb:52 as db</code></td></tr>
+        <tr><td><code>create-dataset navn</code></td><td>Oppretter et tomt datasett og gjør det aktivt</td><td><code>create-dataset bef</code></td></tr>
+        <tr><td><code>import db/VARIABEL [dato] as alias</code></td><td>Importerer en variabel fra registerdata</td><td><code>import db/BEFOLKNING_KJOENN as kjonn</code></td></tr>
+        <tr><td><code>import-event db/VARIABEL dato1 to dato2 as alias</code></td><td>Importerer hendelsesdata i et tidsintervall</td><td><code>import-event db/SYKEHUSOPPHOLD_NPR 2015-01-01 to 2020-12-31 as opphold</code></td></tr>
+        <tr><td><code>use datasett</code></td><td>Bytter aktivt datasett</td><td><code>use bef</code></td></tr>
+        <tr><td><code>merge datasett, on(var)</code></td><td>Slår sammen to datasett på en nøkkelvariabel</td><td><code>merge inntekt, on(unit_id)</code></td></tr>
+        <tr><td><code>clone-dataset nytt [fra]</code></td><td>Kopierer et datasett</td><td><code>clone-dataset bef_kopi bef</code></td></tr>
+        <tr><td><code>generate ny = uttrykk</code></td><td>Lager en ny variabel</td><td><code>generate alder = 2024 - fodselsar</code></td></tr>
+        <tr><td><code>replace var = uttrykk [if betingelse]</code></td><td>Erstatter verdier, evt. betinget</td><td><code>replace inntekt = 0 if inntekt &lt; 0</code></td></tr>
+        <tr><td><code>rename gammel ny</code></td><td>Gir en variabel nytt navn</td><td><code>rename kjonn kjoenn</code></td></tr>
+        <tr><td><code>recode var (gammelt=nytt) ...</code></td><td>Rekoder kategorier</td><td><code>recode alder (0/17=1) (18/66=2) (67/120=3)</code></td></tr>
+        <tr><td><code>keep var1 var2 ... / keep if betingelse</code></td><td>Beholder utvalgte variabler eller rader</td><td><code>keep if alder &gt;= 18</code></td></tr>
+        <tr><td><code>drop var1 var2 ... / drop if betingelse</code></td><td>Fjerner variabler eller rader</td><td><code>drop unit_id</code></td></tr>
+        <tr><td><code>destring var</code></td><td>Konverterer tekst til tall</td><td><code>destring inntekt_streng</code></td></tr>
+        <tr><td><code>collapse (stat) var -&gt; navn, by(gruppevar)</code></td><td>Aggregerer til gruppenivå (én rad per gruppe)</td><td><code>collapse (mean) inntekt -&gt; snittinntekt, by(kjonn)</code></td></tr>
+        <tr><td><code>aggregate (stat) var -&gt; nyvar, by(gruppevar)</code></td><td>Legger til en aggregert kolonne uten å miste rader</td><td><code>aggregate (mean) inntekt -&gt; snittinntekt, by(kjonn)</code></td></tr>
+        <tr><td><code>summarize [variabler]</code></td><td>Deskriptiv statistikk</td><td><code>summarize inntekt</code></td></tr>
+        <tr><td><code>tabulate var [var2]</code></td><td>Frekvens- eller krysstabell</td><td><code>tabulate kjonn</code></td></tr>
+        <tr><td><code>correlate [variabler]</code></td><td>Korrelasjonsmatrise</td><td><code>correlate alder inntekt</code></td></tr>
+        <tr><td><code>regress y x1 x2 ...</code></td><td>OLS-regresjon</td><td><code>regress inntekt alder kjonn</code></td></tr>
+        <tr><td><code>logit / probit y x1 x2</code></td><td>Logistisk / probit-regresjon</td><td><code>logit hoyinntekt alder kjonn</code></td></tr>
+        <tr><td><code>ci var</code></td><td>Konfidensintervall</td><td><code>ci inntekt</code></td></tr>
+        <tr><td><code>barchart / histogram / scatter / boxplot var, by(gruppevar)</code></td><td>Diagrammer</td><td><code>histogram inntekt</code></td></tr>
+        <tr><td><code>kaplan-meier / cox / weibull</code></td><td>Overlevelsesanalyse</td><td><code>cox tid hendelse, covariates(alder kjonn)</code></td></tr>
       </tbody>
     </table>
 
-    <h3>Transformasjoner</h3>
-    <table class="doc-table">
-      <thead><tr><th>Kommando</th><th>Beskrivelse</th></tr></thead>
-      <tbody>
-        <tr><td><code>generate ny = uttrykk</code></td><td>Lag ny variabel</td></tr>
-        <tr><td><code>rename gammel ny</code></td><td>Gi variabel nytt navn</td></tr>
-        <tr><td><code>replace var = uttrykk [if betingelse]</code></td><td>Erstatt verdier</td></tr>
-        <tr><td><code>recode var (gammelt=nytt) ...</code></td><td>Rekode kategorier</td></tr>
-        <tr><td><code>keep var1 var2 ...</code></td><td>Behold kun disse variablene</td></tr>
-        <tr><td><code>drop var1 var2 ...</code></td><td>Fjern variabler</td></tr>
-        <tr><td><code>destring var</code></td><td>Konverter tekst til tall</td></tr>
-        <tr><td><code>collapse (stat) var [-> navn] ..., by(gruppevar)</code></td><td>Aggreger til gruppenivå</td></tr>
-        <tr><td><code>aggregate (stat) var -> nyvar, by(gruppevar)</code></td><td>Legg til aggregert kolonne (beholder alle rader)</td></tr>
-      </tbody>
-    </table>
+    <p><em>collapse</em>-statistikk: <code>mean</code> · <code>min</code> · <code>max</code> · <code>median</code> · <code>sum</code> · <code>count</code> · <code>sd</code> · <code>semean</code> · <code>sebinomial</code> · <code>percent</code> · <code>iqr</code> · <code>gini</code>. <code>collapse (first)</code> og <code>collapse (last)</code> finnes <strong>ikke</strong> — verken her eller i microdata.no; bruk en aggregert statistikk i stedet.</p>
+    <p><em>Multi-key:</em> kun ÉN variabel i <code>by()</code> og <code>on</code>. Lag en composite-nøkkel først: <code>generate composite = string(k1) ++ "_" ++ string(k2)</code>.</p>
+    <p><em>Pseudonym-variabler</em> (navn som slutter på <code>_FNR</code>, f.eks. <code>BEFOLKNING_MOR_FNR</code>) kan kun brukes som nøkkel i <code>collapse(by)</code> eller <code>merge(on)</code> — ikke i <code>generate</code>/<code>replace</code> eller sammenligninger. Se <a href="#avsloring">Avsløringskontroll</a>.</p>
 
-    <h3>Statistikk og visualisering</h3>
-    <table class="doc-table">
-      <thead><tr><th>Kommando</th><th>Beskrivelse</th></tr></thead>
-      <tbody>
-        <tr><td><code>summarize [variabler]</code></td><td>Deskriptiv statistikk</td></tr>
-        <tr><td><code>tabulate var [var2]</code></td><td>Frekvens- / krysstabell</td></tr>
-        <tr><td><code>correlate [variabler]</code></td><td>Korrelasjonsmatrise</td></tr>
-        <tr><td><code>regress y x1 x2 ...</code></td><td>OLS-regresjon</td></tr>
-        <tr><td><code>logit / probit y x1 x2</code></td><td>Logistisk / probit regresjon</td></tr>
-        <tr><td><code>ci var</code></td><td>Konfidensintervall</td></tr>
-        <tr><td><code>anova y x</code></td><td>Variansanalyse</td></tr>
-        <tr><td><code>barchart / histogram / scatter / boxplot var, by(gruppevar)</code></td><td>Diagrammer</td></tr>
-        <tr><td><code>kaplan-meier / cox / weibull</code></td><td>Overlevelsesanalyse</td></tr>
-      </tbody>
-    </table>
-
-    <h3>collapse-statistikk</h3>
-    <p>Tilgjengelige statistikkmål for <code>collapse</code> og <code>aggregate</code>:</p>
-    <p><code>mean</code> · <code>min</code> · <code>max</code> · <code>median</code> · <code>sum</code> · <code>count</code> · <code>sd</code> · <code>semean</code> · <code>sebinomial</code> · <code>percent</code> · <code>iqr</code> · <code>gini</code></p>
-    <p><em>NB:</em> <code>collapse (first)</code> og <code>collapse (last)</code> er <strong>ikke</strong> støttet i microdata.no — bruk i stedet en aggregert statistikk.</p>
-    <p><em>Multi-key:</em> kun ÉN variabel i <code>by()</code> og <code>on</code>. Lag composite-nøkkel først:
-       <code>generate composite = string(k1) ++ "_" ++ string(k2)</code>.</p>
-
-    <h3>Pseudonym-variabler</h3>
-    <p>Variabler som identifiserer enheter (typisk variabler med navn som slutter på <code>_FNR</code> — f.eks. <code>BEFOLKNING_MOR_FNR</code>) er <strong>pseudonymer</strong>. I microdata.no kan disse kun brukes som nøkkel i <code>collapse(by)</code> eller <code>merge(on)</code> — ikke i <code>generate</code>/<code>replace</code>, sammenligninger eller andre transformasjoner.</p>
-
-    <h3>Kontrollflyt</h3>
-    <p>For-løkker bruker prod-grammatikk: range med <code>n : m</code> (inklusiv), eller verdiliste (komma- eller whitespace-separert). Bruk <code>$i</code> for substitusjon. Ikke bruk parentes rundt iterator-listen eller literal ellipsis <code>...</code>.</p>
-    <pre><code>for i in 2018 : 2020
-  import db/INNTEKT_WLONN $i-01-01 as inntekt_$i
-end
-
-for forelder in mor, far
-  // ...
-end
-
-let maks = 200000
-generate hoy = (inntekt &gt; maks)</code></pre>
-
-    <h3>Avsløringskontroll</h3>
-    <p>m2py emulerer microdata.no sine regler som standard — både <em>syntaks/validering</em> (slik at skriptet ditt kjører i prod) og <em>sensurering av output</em> (slik at du ser samme tall som i prod). Du kan skru av alt i hamburger-menyen ("Avsløringskontroll: AV") for å eksperimentere uten begrensninger, men da risikerer du å skrive skript som ikke kjører i microdata.no. Konkrete regler:</p>
-    <ul>
-      <li><strong>Pseudonym-validering.</strong> Variabler som slutter på <code>_FNR</code> kan kun brukes som nøkkel i <code>collapse(by)</code> eller <code>merge(on)</code> — ikke i <code>generate</code>, <code>replace</code>, sammenligninger osv.</li>
-      <li><strong>Type-sjekk.</strong> Alfanumeriske variabler (f.eks. <code>BEFOLKNING_KJOENN</code>) avvises for numeriske operasjoner som <code>min</code>, <code>max</code>, <code>mean</code>, <code>sum</code>, <code>median</code>.</li>
-      <li><strong>For-løkker:</strong> bruk <code>$i</code>-substitusjon og enten range (<code>1998 : 2009</code>) eller komma/whitespace-liste. Parentes rundt verdier og literal <code>...</code> er ikke gyldig.</li>
-      <li><strong>Missing-verdier.</strong> Tildeling med <code>.</code> er OK (<code>generate x = .</code>). <strong>Sammenligning med</strong> <code>.</code> er derimot ikke gyldig — <code>keep if y == .</code> avvises i microdata.no. Bruk <code>sysmiss(y)</code> for å teste om en verdi er missing.</li>
-      <li><strong>Min populasjon 1000.</strong> <code>keep if</code>, <code>drop if</code> og <code>sample</code> kan ikke etterlate færre enn 1000 enheter.</li>
-      <li><strong>Tabeller med for mange små celler skjules.</strong> <code>tabulate</code> stoppes hvis mer enn 50 % av cellene har frekvens lavere enn 5.</li>
-      <li><strong>Endringer må påvirke ≥10 enheter.</strong> <code>generate</code>, <code>replace</code> og <code>recode</code> avvises hvis endringen påvirker 1–9 rader (eller alle bortsett fra 1–9).</li>
-      <li><strong>Deskriptiv statistikk krever ≥10 enheter.</strong> <code>summarize</code>, <code>correlate</code>, <code>ci</code>, <code>anova</code>, <code>normaltest</code> stoppes på populasjoner under 10.</li>
-      <li><strong>Median/persentiler vises med 3 signifikante sifre.</strong> I <code>summarize</code> blir f.eks. 47 238 til 47 200 og 2,7183 til 2,72.</li>
-      <li><strong>Winsorisering 1/99 %.</strong> Numeriske variabler kuttes ved 1- og 99-persentilen før visning av gjennomsnitt og standardavvik i <code>summarize</code>, og før plotting i <code>histogram</code>, <code>scatter</code> og <code>boxplot</code>. Median og kvartiler er ikke påvirket. Regresjon og collapse bruker rå data.</li>
-    </ul>
-
-    <h4>Per-script-overstyring</h4>
-    <p>Du kan også styre avsløringskontroll fra selve scriptet med et magisk direktiv øverst i koden. Direktivet er en vanlig kommentar (<code>//</code>) som ignoreres av microdata.no-produksjon, men leses av m2py før kjøring og slås tilbake igjen etterpå (påvirker ikke andre script):</p>
-    <pre><code>// m2py: disclosure-control=off
-create-dataset bef
-import db/BEFOLKNING_KJOENN as kjonn
-summarize kjonn</code></pre>
-    <p>Verdier: <code>on</code>/<code>off</code>, <code>true</code>/<code>false</code>, <code>1</code>/<code>0</code>, <code>yes</code>/<code>no</code>. Kortform <code>dc</code> aksepteres også: <code>// m2py: dc=off</code>. Nyttig i API-/script-bruk der man vil styre modus uten å endre globale innstillinger.</p>
-
-    <h2 id="hjelp-dataminimering">Dataminimering-vurdering</h2>
-    <p>
-      m2py kan be en AI vurdere om scriptet ditt praktiserer dataminimering —
-      prinsippet om å hente og bruke kun det minimum av data som trengs for
-      problemstillingen. Funksjonen er rådgivende; endelig vurdering ligger hos
-      forsker og dataansvarlig.
-    </p>
-    <p>
-      Vurderingen forankres i:
-    </p>
-    <ul>
-      <li>Personvernforordningen art. 5(1)(c) — dataminimering</li>
-      <li>Helseregisterloven § 6 — graden av personidentifikasjon</li>
-      <li>Personvernforordningen art. 89(1) — vitenskapelig forskning</li>
-      <li>Personvernforordningen art. 9 — særlige kategorier (sensitive opplysninger)</li>
-    </ul>
-
-    <h3>Slik fungerer det</h3>
-    <p>
-      Klikk hamburger-meny → "Vurder dataminimering". Første gang du bruker
-      funksjonen vises en bekreftelse på at scriptet sendes til Anthropic. Faktiske
-      mikrodata-verdier sendes aldri.
-    </p>
-    <p>
-      I valgmodalen kan du:
-    </p>
-    <ul>
-      <li><strong>Velge språk</strong> (auto / microdata / R / Python) — auto detekterer fra scriptet</li>
-      <li><strong>Velge rapportlengde</strong>: Kort (raske observasjoner) eller Lang (alle dimensjoner med oppfølgings­spørsmål)</li>
-      <li><strong>Be om revidert script</strong> — AI legger ved en konservativ revidert versjon på slutten av svaret, som du kan kopiere eller erstatte editoren med</li>
-      <li><strong>Spesifisere formål og kontekst</strong> — valgfritt; gir mer presis vurdering</li>
-    </ul>
-
-    <h3>Innlogging</h3>
-    <p>
-      AI-vurderingen krever at du er logget inn i m2py. Bruk Logg inn-knappen
-      øverst og følg lenken på epost. Når du er logget inn (via FHI- eller annen
-      godkjent epost-adresse), har du tilgang til dataminimering-funksjonen
-      automatisk — ingen separat tilgangsnøkkel trengs.
-    </p>
-
-    <h3>Sensitive variabler</h3>
-    <p>
-      AI flagger automatisk variabler som faller inn under <em>særlige kategorier</em>
-      (GDPR art. 9): etnisitet, religion, seksuell legning, særskilt sensitive
-      helseopplysninger (abort, kjønnssykdommer, psykiatri etc.), lov- og
-      straffeopplysninger. For disse kreves høyere begrunnelsesterskel.
-    </p>
-
-    <h3>Personvern-kommentarer i scriptet</h3>
-    <p>
-      Du kan legge til strukturerte begrunnelser direkte i scriptet:
-    </p>
-    <pre>// personvern blokk start
-// formål: Studere sammenheng mellom utdanning og inntekt
-// tidsperiode: 1970-1980 fordi kohorten skal være ferdig utdannet
-// geografi: kommune nødvendig for å se regionale forskjeller
-// sensitive grupper: nei
-// alternativer vurdert: SSB-tabell A-04 var for grovkornet
-// personvern blokk slutt</pre>
-    <p>
-      Eller fri tekst:
-    </p>
-    <pre>// personvern blokk start
-// Formål: studere sammenheng mellom utdanning og inntekt for kohort 1970-1980.
-// Tidsperioden valgt fordi kohorten skal være ferdig utdannet ved analyseslutt.
-// Kommune nødvendig for regionale forskjeller.
-// personvern blokk slutt</pre>
-    <p>
-      Hvis du huker av "Lagre som personvern-blokk" i sekundær-modalen, skriver
-      m2py innholdet inn i scriptet automatisk etter vurderingen.
-    </p>
-    <p>
-      Enkeltlinjer fungerer også:
-    </p>
-    <pre>// personvern: kuttet datoer til måned for å unngå unødig presisjon</pre>
-    <p>
-      Du kan også bruke <code>#</code> i stedet for <code>//</code> i Python/R-script.
-    </p>
-
-    <h3>Direktiver i scriptet</h3>
-    <p>
-      Du kan styre AI-oppførselen direkte i scriptet:
-    </p>
-    <pre>// personvern: revider-script: ja</pre>
-    <p>
-      Da slår AI på revidert-script-output uansett hva du velger i UI-en. Nyttig
-      hvis du har et template som alltid skal revideres.
-    </p>
+    <h3>Et helt skript</h3>
+    <p>Kjørt gjennom emulatoren akkurat slik det står, med avsløringskontroll på:</p>
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Kode <span class="badge badge-micro">micro</span></span>
+        <pre><code>generate lonn_1000 = lonn / 1000
+collapse (mean) lonn_1000 -&gt; snittlonn_1000, by(kjonn)</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Resultat</span>
+        <pre class="result">Genererte lonn_1000 med 5 000 enheter
+Aggregerte testdata gruppert på kjonn til 2 verdier</pre>
+      </div>
+    </div>
   </section>
 
-  <!-- ── EDITOR ── -->
+  <section id="avsloring">
+    <h2>Avsløringskontroll</h2>
+    <p>Emulatoren sensurerer output på samme måte som microdata.no gjør, fordi et skript som gir tall her og blir avvist der ikke er til hjelp. Kontrollen er på som standard i appen. Tersklene under er hentet direkte fra konstantene i <code>m2py.py</code> (linje 267–272), ikke fra hukommelsen:</p>
+    <table class="doc-table">
+      <thead><tr><th>Regel</th><th>Terskel</th><th>Effekt når den slår inn</th></tr></thead>
+      <tbody>
+        <tr><td>Min. populasjon</td><td><code>1000</code> enheter</td><td><code>keep if</code>, <code>drop if</code> og <code>sample</code> avvises hvis resultatet ville hatt færre enheter. Datasettet forblir uendret.</td></tr>
+        <tr><td>Min. endring</td><td><code>10</code> enheter</td><td><code>generate</code>, <code>replace</code> og <code>recode</code> avvises hvis endringen påvirker 1–9 enheter (eller alle bortsett fra 1–9). Unntak: alle eller ingen.</td></tr>
+        <tr><td>Min. populasjon for deskriptiv statistikk</td><td><code>10</code> enheter</td><td><code>summarize</code>, <code>correlate</code>, <code>ci</code>, <code>anova</code>, <code>normaltest</code> stoppes under terskelen — også per gruppe. Unntak: ren <code>count</code>/<code>sum</code>.</td></tr>
+        <tr><td>Små celler i tabeller</td><td>frekvens <code>&lt;5</code> i <code>&gt;50 %</code> av cellene</td><td><code>tabulate</code> (og panelvariantene) stoppes hvis mer enn halvparten av cellene har færre enn 5 enheter.</td></tr>
+        <tr><td>Winsorisering</td><td>1. og 99. persentil</td><td>Numeriske variabler kuttes ved 1-/99-persentilen før gjennomsnitt og standardavvik vises i <code>summarize</code>, og før <code>histogram</code>/<code>scatter</code>/<code>boxplot</code> plottes. Median og kvartiler er ikke påvirket. Regresjon og <code>collapse</code> bruker rå data.</td></tr>
+        <tr><td>Avrunding av persentiler</td><td>3 signifikante sifre</td><td>Median og persentiler i <code>summarize</code> rundes — f.eks. 47 238 → 47 200, 2,7183 → 2,72.</td></tr>
+        <tr><td>Pseudonym-validering</td><td>variabelnavn som slutter på <code>_FNR</code></td><td>Kan kun brukes som nøkkel i <code>collapse(by)</code> eller <code>merge(on)</code> — avvist i <code>generate</code>, <code>replace</code> og sammenligninger.</td></tr>
+        <tr><td>Type-sjekk</td><td>alfanumerisk variabel</td><td>Avvist for numeriske operasjoner (<code>min</code>, <code>max</code>, <code>mean</code>, <code>sum</code>, <code>median</code>). Bruk frekvens/<code>tabulate</code> i stedet.</td></tr>
+        <tr><td>Missing-sammenligning</td><td>sammenligning med <code>.</code></td><td><code>== .</code>/<code>!= .</code> avvises direkte (Stata-syntaks er ikke gyldig i microdata.no). Tildeling (<code>= .</code>) er OK. Bruk <code>sysmiss(x)</code> for å teste om en verdi mangler.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Skru den av</h3>
+    <p>Legg direktivet øverst i skriptet:</p>
+    <pre><code>// m2py: disclosure-control=off</code></pre>
+    <p>Direktivet er en vanlig kommentar, så microdata.no ignorerer det. Samme skript kan kjøres begge steder.</p>
+    <div class="callout">
+      <strong>Hva du mister:</strong> med kontrollen av er tallene ikke lenger sammenlignbare med det du ville fått i produksjon. Skru den av for å forstå dataene, ikke for å rapportere dem.
+    </div>
+
+    <h3>Slik ser en avvisning ut</h3>
+    <p>Dette er de mest nyttige eksemplene på siden: et skript som microdata.no faktisk ville avvist, med den ordrette feilmeldingen emulatoren gir.</p>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Kode <span class="badge badge-micro">micro</span></span>
+        <pre><code>keep if alder &gt; 68</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Resultat — avvist</span>
+        <pre class="result">FEIL: keep ville redusere populasjonen til 109 enheter. microdata.no krever minst 1000 enheter per populasjon. Datasettet er uendret.</pre>
+      </div>
+    </div>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Kode <span class="badge badge-micro">micro</span></span>
+        <pre><code>generate hoyeste = 1 if lonn &gt; 933381</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Resultat — avvist</span>
+        <pre class="result">FEIL: generate 'hoyeste' påvirker bare 7 av 5000 enheter. microdata.no tillater ikke endringer som påvirker færre enn 10 enheter (unntak: alle eller ingen).</pre>
+      </div>
+    </div>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Kode <span class="badge badge-micro">micro</span></span>
+        <pre><code>generate BEFOLKNING_MOR_FNR = alder
+generate test = BEFOLKNING_MOR_FNR + 1</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Resultat — andre linjen avvist</span>
+        <pre class="result">Genererte BEFOLKNING_MOR_FNR med 5 000 enheter
+FEIL: BEFOLKNING_MOR_FNR er en pseudonymvariabel og kan ikke brukes i generate-uttrykk. Pseudonymer kan kun brukes som nøkkel i collapse(by) eller merge(on).</pre>
+      </div>
+    </div>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Kode <span class="badge badge-micro">micro</span></span>
+        <pre><code>generate test = (lonn == .)</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Resultat — avvist</span>
+        <pre class="result">FEIL PÅ KOMMANDO 'generate' (ValueError): Sammenligning med `.` (Stata-syntaks som `x == .`) er ikke gyldig i microdata.no. Bruk `sysmiss(x)` for å teste om en verdi er missing (f.eks. `drop if sysmiss(x)`). Tildeling med `= .` (f.eks. `generate x = .`) er OK.</pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="avvik">
+    <h2>Avvik fra microdata.no</h2>
+    <p>Emulatoren er ikke perfekt. Dette er de kjente forskjellene — ikke en ansvarsfraskrivelse, men en liste.</p>
+    <table class="doc-table">
+      <thead><tr><th>Område</th><th>Her</th><th>På microdata.no</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Datatilkobling (<code>require</code>)</td>
+          <td><code>require kilde as alias</code> er en syntaks-tro kopi som logger en melding og ellers ikke gjør noe — hvilken kilde du skriver, spiller ingen rolle for hva du senere kan importere (koden er selv merket <em>«No-op mot faktisk SSB»</em> i <code>m2py.py</code>).</td>
+          <td><code>require</code> kobler faktisk til en godkjent registerkilde. Tilgang krever søknad og godkjenning, og bare de variablene kilden faktisk inneholder er tilgjengelige.</td>
+        </tr>
+        <tr>
+          <td>Selve dataene</td>
+          <td>Alle verdier kommer fra en seedet syntetisk generator (<code>MockDataEngine</code>/<code>mockdata_core.py</code>). Fordelinger er tilnærmet realistiske, men tallene er oppdiktet og har ingen sammenheng med virkelige registre.</td>
+          <td>Ekte, avidentifiserte registerdata, underlagt den samme avsløringskontrollen som emulatoren etterligner.</td>
+        </tr>
+        <tr>
+          <td>Andre moduser (Python, R, DuckDB, Brython, Statx, jamovi)</td>
+          <td>Seks ekstra kjøremiljøer tilgjengelig fra samme editor, som et tillegg utover selve microdata-språket — nyttig for å analysere videre eller sammenligne tilnærminger.</td>
+          <td>Disse motorene er ikke del av tjenesten som emuleres her. De er lagt til av dette hobbyprosjektet, ikke en påstand om at microdata.no tilbyr dem.</td>
+        </tr>
+        <tr>
+          <td>Skript-lagring og deling</td>
+          <td>Scripts lagres som lokale filer, i et GitHub-repo du selv kobler til, eller som en komprimert lenke i URL-en.</td>
+          <td>Prosjekter og notatbøker lagres og deles i selve tjenesten (server-side) — ikke via GitHub eller URL-komprimering.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="overview-hint">Oppdager du et avvik som ikke står her, er det verdt å melde.</p>
+  </section>
+
+  <section id="oversettere">
+    <h2>py2m og r2m</h2>
+    <p>Skriver du heller Python eller R, kan du la det oversettes til microdata-kommandoer. Knappen <strong>Oversett</strong> (pil-ikonet) gjør oversettelsen — resultatet vises i outputfeltet. For å <em>kjøre</em> den oversatte koden kopierer du den inn i editoren og bytter til microdata-modus. Oversettelsen er ikke fullstendig; den dekker de mønstrene som har en naturlig microdata-form, og alt den ikke kan oversette skrives ut som en synlig kommentar eller <code>// UNTRANSLATED</code>-linje — aldri stille droppet.</p>
+    <table class="doc-table">
+      <thead><tr><th>Fra</th><th>Til</th><th>Dekker</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Python (pandas)</td>
+          <td>microdata</td>
+          <td>Kolonneoperasjoner, radfiltrering, gruppeaggregering, frekvens-/krysstabeller, deskriptiv statistikk, utvalg (sampling) og OLS/logit/probit/poisson-regresjon med prediksjon — AST-basert, testet av 94 tester i <code>py2m/tests/</code>.</td>
+        </tr>
+        <tr>
+          <td>R (tidyverse)</td>
+          <td>microdata</td>
+          <td>dplyr-kjeder (<code>filter</code>/<code>mutate</code>/<code>select</code>/<code>rename</code>/<code>group_by</code>+<code>summarise</code>), base-R- og pakke-modeller (<code>lm</code>, <code>glm</code>, <code>lme4::lmer</code>, <code>plm::plm</code>, <code>survival::coxph</code> m.fl.), samt <code>recode</code>/<code>case_when</code>/<code>case_match</code> — testet av 184 tester i <code>r2m/test_r2m.R</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>Det oversetteren <strong>ikke</strong> dekker: kontrollflyt (løkker over annet enn literaler, <code>apply</code>/<code>lapply</code>/<code>sapply</code>), posisjonsbasert radvalg, sortering, deduplisering, data-I/O (<code>read_csv</code>/<code>read.csv</code>) og resultatinspeksjon (<code>head()</code>, <code>summary(model)</code>). Disse gir enten en tydelig <code>// UNTRANSLATED</code>-linje (py2m) eller en <code>//</code>-kommentar (r2m) — aldri en stille feil rad.</p>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Python inn <span class="badge badge-py">py</span></span>
+        <pre><code>df = df[df["alder"] > 25]
+df.groupby("kjonn")["lonn"].mean()</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">microdata ut</span>
+        <pre class="result">keep if alder > 25
+tabulate kjonn, summarize(lonn)</pre>
+      </div>
+    </div>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">R inn <span class="badge badge-r">r</span></span>
+        <pre><code>df &lt;- df %&gt;% filter(alder &gt; 25)
+df %&gt;% group_by(kjonn) %&gt;% summarise(snitt = mean(lonn))</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">microdata ut</span>
+        <pre class="result">keep if alder > 25
+collapse (mean) lonn -> snitt, by(kjonn)</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- SYNC:START felles-editor -->
   <section id="editor">
-    <h2>Editor og tastatursnarveier</h2>
-
-    <table class="doc-table">
-      <thead><tr><th>Snarvei</th><th>Handling</th></tr></thead>
-      <tbody>
-        <tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>Kjør scriptet</td></tr>
-        <tr><td><kbd>Tab</kbd></td><td>Autofullfør (kommando, variabel, metode)</td></tr>
-        <tr><td><kbd>Esc</kbd></td><td>Lukk autocomplete-liste</td></tr>
-        <tr><td>Klikk linjenummer</td><td>Sett / fjern stoppunkt (rød prikk) for Kjør skrittvis</td></tr>
-      </tbody>
-    </table>
-
-    <h3>Stoppunkter</h3>
-    <p>Klikk på et linjenummer for å sette et rød stoppunkt. Under <strong>Kjør skrittvis</strong> vil kjøringen pause ved stoppunktet og vente på at du trykker videre.</p>
+    <h2>Editor</h2>
+    <p>Klikk på et linjenummer for å sette et rødt stoppunkt. Under <strong>Kjør skrittvis</strong> pauser kjøringen ved stoppunktet og venter på at du trykker videre. Full liste over tastatursnarveier står i <a href="#referanse-snarveier">referansen</a>.</p>
   </section>
+    <!-- SYNC:END -->
 
-  <!-- ── TAB INTRO ── -->
   <section id="tab-intro">
     <h2>Tab-autocomplete</h2>
     <p>Trykk <kbd>Tab</kbd> i editoren for kontekstbevisste forslag: kommandoer, variabelnavn, DataFrame-metoder og mer. Etter <code>/</code> (f.eks. <code>import db/</code>) foreslås microdata-variabler fra katalogen. På tom linje foreslås kommandoer.</p>
@@ -452,19 +534,20 @@ summarize kjonn</code></pre>
     </div>
   </section>
 
-  <!-- ── SIDEBAR ── -->
+  <!-- SYNC:START felles-sidebar -->
   <section id="sidebar">
     <h2>Datasett-panel (høyre sidemeny)</h2>
     <p>Sidemenyen til høyre viser alle datasett som er lastet inn i gjeldende kjøring.</p>
     <ul>
       <li><strong>Antall variabler og rader</strong> per datasett</li>
       <li><strong>Variabelliste</strong> med type-ikon: <code>ABC</code> tekst, <code>123</code> numerisk, skjold-ikon for pseudonymisert ID</li>
-      <li>Klikk på en variabel for <strong>detaljvisning</strong>: navn, type, beskrivelse og lenke til microdata-katalogen</li>
+      <li>Klikk på en variabel for <strong>detaljvisning</strong>: navn, type og beskrivelse, med lenke til mer informasjon der den finnes</li>
     </ul>
     <p>Sidemenyen oppdateres automatisk etter hver kjøring og etter hvert blokk i Kjør skrittvis-modus.</p>
   </section>
+    <!-- SYNC:END -->
 
-  <!-- ── LAGRE OG DELE ── -->
+  <!-- SYNC:START felles-lagre -->
   <section id="lagre-dele">
     <h2>Lagre, dele og hente scripts</h2>
     <p>Alle valgene under ligger i <strong>hamburgermenyen</strong> øverst til venstre. De kjører i sin helhet i nettleseren din — vi lagrer aldri scriptene dine på en server.</p>
@@ -480,12 +563,26 @@ summarize kjonn</code></pre>
       <li>Passer for scripts opp til noen tusen tegn. Er scriptet for stort for en URL, får du beskjed — bruk «Last ned kode» (fil) eller GitHub i stedet.</li>
     </ul>
 
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Script i editoren <span class="badge">url</span></span>
+        <pre><code>print(sum(range(1, 101)))</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Resultat — det «Del»-knappen lager</span>
+        <pre class="result">{"v":1,"name":"","lang":"python","script":"print(sum(range(1, 101)))"}
+
+https://din-adresse.example/app/#s=H4sIAAAAAAAAE6tWKlOyMtRRykvMTVWyUlLSUcpJzEsHsgoqSzLy84D84uSizIISkEhRZl6JRnFprkYRUEmqhqGOgqGBoaamplItAIhdxIZGAAAA</pre>
+      </div>
+    </div>
+    <p>Adressen foran <code>#</code> er din egen (vist som placeholder over); alt fra <code>#s=</code> er ekte — scriptet, pakket i JSON, gzip-komprimert og base64url-kodet inn i selve lenken.</p>
+
     <h3>Åpne fra URL</h3>
     <p>Lim inn en <strong>direkte lenke</strong> til en tekstfil, så hentes innholdet inn i editoren. De siste URL-ene du har brukt huskes lokalt for rask gjenåpning.</p>
     <ul>
       <li>Fungerer med <strong>GitHub «raw»-lenker</strong>, <strong>GitHub gist</strong> (raw) og <strong>Dropbox</strong>.</li>
       <li>Vanlige delelenker (f.eks. en Google Drive- eller GitHub-<em>side</em>) virker <em>ikke</em> — du må bruke den rå fil-lenken. Får du en feilmelding, er det nesten alltid fordi kilden ikke tillater direkte henting (CORS).</li>
-      <li>Filendelsen styrer modus: <code>.py</code> → Python, <code>.r</code> → R, ellers Microdata.</li>
+      <li>Filendelsen styrer modus: <code>.py</code> → Python, <code>.r</code> → R, ellers standardmodus.</li>
     </ul>
 
     <h3>GitHub (for viderekomne)</h3>
@@ -521,30 +618,79 @@ summarize kjonn</code></pre>
       <li><strong>Det som er knyttet til én maskin</strong> er bare lokale ting i nettleseren: listen over «nylige URL-er» og det innlimte GitHub-tokenet. Selve scriptene dine i GitHub er <em>ikke</em> låst til maskinen.</li>
     </ul>
   </section>
+    <!-- SYNC:END -->
 
-  <!-- ── FORKLAR ── -->
+  <!-- SYNC:START felles-forklar -->
   <section id="forklar">
     <h2>Kjør skrittvis — steg-for-steg gjennomgang</h2>
-    <p><strong>Kjør skrittvis</strong>-knappen kjører scriptet ett <em>blokk</em> om gangen og leser opp kommentarene med tale. Alle kommentarlinjer som starter med <code>//</code> (microdata) eller <code>#</code> (Python/R) blir lest høyt — kode-linjene utføres uten kommentar. Nyttig for presentasjoner og undervisning.</p>
+    <p><strong>Kjør skrittvis</strong>-knappen kjører scriptet ett <em>blokk</em> om gangen og leser opp kommentarene med tale. Kommentarlinjer — de som starter med <code>#</code> eller <code>//</code>, avhengig av hvilket kommentartegn modusen bruker — blir lest høyt; kode-linjene utføres uten kommentar. Nyttig for presentasjoner og undervisning.</p>
 
     <h3>Blokker</h3>
     <p>En blokk er en gruppe sammenhengende linjer uten tomlinjer imellom. Én eller flere tomlinjer separerer blokker.</p>
-    <pre><code>// Denne kommentaren leses OPP før koden kjøres
-create-dataset df
-import db/BEFOLKNING_KJOENN as kjonn
+    <pre><code># Denne kommentaren leses OPP før koden kjøres
+df["alder"] = 2024 - df["fodselsar"]
 
-// Dette er neste blokk
-summarize kjonn
-// Denne kommentaren leses etter at resultatet vises</code></pre>
+# Dette er neste blokk
+df.groupby("kjonn")["lonn"].mean()
+# Denne kommentaren leses etter at resultatet vises</code></pre>
+
+    <p>Slik tolker Kjør skrittvis akkurat dette scriptet — to blokker, én foranstilt og én etterhengt kommentar:</p>
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Samme script <span class="badge badge-py">py</span></span>
+        <pre><code># Denne kommentaren leses OPP før koden kjøres
+df["alder"] = 2024 - df["fodselsar"]
+
+# Dette er neste blokk
+df.groupby("kjonn")["lonn"].mean()
+# Denne kommentaren leses etter at resultatet vises</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Resultat — blokkstrukturen</span>
+        <pre class="result">[
+  {
+    "code": "df[\"alder\"] = 2024 - df[\"fodselsar\"]",
+    "codeTrim": "df[\"alder\"] = 2024 - df[\"fodselsar\"]",
+    "commentItems": [
+      {
+        "silent": false,
+        "text": "Denne kommentaren leses OPP før koden kjøres",
+        "kwargs": {}
+      }
+    ],
+    "postCommentItems": [],
+    "skipCodeSpeech": false
+  },
+  {
+    "code": "df.groupby(\"kjonn\")[\"lonn\"].mean()",
+    "codeTrim": "df.groupby(\"kjonn\")[\"lonn\"].mean()",
+    "commentItems": [
+      {
+        "silent": false,
+        "text": "Dette er neste blokk",
+        "kwargs": {}
+      }
+    ],
+    "postCommentItems": [
+      {
+        "silent": false,
+        "text": "Denne kommentaren leses etter at resultatet vises",
+        "kwargs": {}
+      }
+    ],
+    "skipCodeSpeech": false
+  }
+]</pre>
+      </div>
+    </div>
 
     <h3>Kommentarsyntaks</h3>
     <table class="doc-table">
-      <thead><tr><th>Syntaks</th><th>Modus</th><th>Effekt</th></tr></thead>
+      <thead><tr><th>Syntaks</th><th>Effekt</th></tr></thead>
       <tbody>
-        <tr><td><code>// tekst</code></td><td><span class="badge badge-micro">Microdata</span></td><td>Leses som tale; foranstilt kommentar leses FØR koden, etterhengt leses ETTER</td></tr>
-        <tr><td><code># tekst</code></td><td><span class="badge badge-py">Python</span> <span class="badge badge-r">R</span></td><td>Samme som ovenfor</td></tr>
-        <tr><td><code>//-</code> eller <code>#-</code></td><td>Alle</td><td>Stille kommentar — første kodeord leses <em>ikke</em> høyt, og tekst etter <code>-</code> leses heller ikke</td></tr>
-        <tr><td><code>//(lang=nb-NO,rate=1.2) tekst</code></td><td>Alle</td><td>Tale med tilpassede parametere (språk, hastighet, stemme, toneleie)</td></tr>
+        <tr><td><code># tekst</code> / <code>// tekst</code></td><td>Leses som tale; foranstilt kommentar leses FØR koden, etterhengt leses ETTER</td></tr>
+        <tr><td><code>#-</code> / <code>//-</code></td><td>Stille kommentar — første kodeord leses <em>ikke</em> høyt, og tekst etter <code>-</code> leses heller ikke</td></tr>
+        <tr><td><code>//(lang=nb-NO,rate=1.2) tekst</code></td><td>Tale med tilpassede parametere (språk, hastighet, stemme, toneleie)</td></tr>
       </tbody>
     </table>
 
@@ -555,18 +701,16 @@ summarize kjonn
       <li>Stoppunkter (klikk på linjenummer) gjør at kjøringen pauser automatisk</li>
     </ul>
   </section>
+    <!-- SYNC:END -->
 
-  <!-- ── WIDGETS ── -->
+  <!-- SYNC:START felles-widgets -->
   <section id="widgets">
     <h2>Widgets i Kjør skrittvis</h2>
     <p>Widgets er interaktive kort som vises mens scriptet kjøres skrittvis. De settes inn som spesielle kommentarlinjer og er tilgjengelig i alle moduser.</p>
 
     <h3>Syntaks</h3>
-    <pre><code>// microdata:
-//widget NAVN { ...json... }
-
-# python eller R:
-#widget NAVN { ...json... }</code></pre>
+    <pre><code>#widget NAVN { ...json... }</code></pre>
+    <p>Kommentartegnet følger modusen: <code>#</code> i de fleste moduser, <code>//</code> i moduser som bruker det som kommentartegn — begge tolkes likt.</p>
 
     <h3>Blokk-syntaks for lengre innhold</h3>
     <p>For HTML, SVG og markdown med flere linjer kan du bruke blokk-syntaks i stedet for JSON:</p>
@@ -614,26 +758,68 @@ summarize kjonn
       </tbody>
     </table>
 
+    <h3>Slik tolkes en widget-linje</h3>
+    <p>Kommentarlinja er JSON etter widget-navnet. Det appen faktisk bygger av linja:</p>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Kode</span>
+        <pre><code>//widget title {"text":"Kapittel 1","size":"full"}</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Resultat — tolket som</span>
+        <pre class="result">{
+  "name": "title",
+  "payload": {
+    "text": "Kapittel 1",
+    "size": "full"
+  }
+}</pre>
+      </div>
+    </div>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Kode</span>
+        <pre><code>//widget question {"q":"Hva er p-verdien?","options":["&lt;0.05","&gt;0.05"],"answer":0}</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Resultat — tolket som</span>
+        <pre class="result">{
+  "name": "question",
+  "payload": {
+    "q": "Hva er p-verdien?",
+    "options": [
+      "&lt;0.05",
+      "&gt;0.05"
+    ],
+    "answer": 0
+  }
+}</pre>
+      </div>
+    </div>
+
     <div class="callout">
       Alle widgets støtter <code>speak="tekst"</code> for parallell taleopplesning mens widgeten vises, og <code>auto_advance_ms=3000</code> for automatisk lukking etter angitt tid.
     </div>
   </section>
+    <!-- SYNC:END -->
 
-  <!-- ── AI ── -->
+  <!-- SYNC:START felles-ai -->
   <section id="ai">
     <h2>AI assistent</h2>
-    <p>Et eksperimentelt sidepanel med en AI-assistent som kan svare på spørsmål om microdata-syntaks, foreslå variabler og generere eller revidere skript. Åpnes med stjerne-ikonet øverst til høyre eller <kbd>Ctrl</kbd>+<kbd>I</kbd>.</p>
+    <p>Et eksperimentelt sidepanel med en AI-assistent som kan svare på spørsmål om syntaks, foreslå variabler og generere eller revidere skript. Åpnes med stjerne-ikonet øverst til høyre eller <kbd>Ctrl</kbd>+<kbd>I</kbd>.</p>
 
     <div class="callout">
-      <strong>Krever egen Anthropic API-nøkkel.</strong> Klikk tannhjul-ikonet i AI-panelet og lim inn en nøkkel fra <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. Nøkkelen lagres kun lokalt i nettleseren (localStorage) og sendes som <code>X-Anthropic-Key</code>-header direkte videre til Anthropic for hver forespørsel.
+      <strong>Krever API-nøkkel.</strong> Klikk tannhjul-ikonet i AI-panelet for å sette den opp. Nøkkelen lagres kun lokalt i nettleseren (localStorage).
     </div>
 
     <h3>Hva assistenten kan gjøre</h3>
     <p>Assistenten klassifiserer spørsmålet og svarer på én av tre måter:</p>
     <ul>
-      <li><strong>Spørsmål</strong> — forklarer kommandoer, syntaks og bruk («Hva gjør reshape long?»)</li>
-      <li><strong>Variabel-søk</strong> — finner relevante variabler i microdata-katalogen («Hvilke variabler finnes for utdanning?»)</li>
-      <li><strong>Skript-generering</strong> — lager et komplett microdata-skript fra et naturlig spørsmål («Vis sammendragsstatistikk for inntekt og kjønn»)</li>
+      <li><strong>Spørsmål</strong> — forklarer kommandoer, syntaks og bruk («Hva gjør denne funksjonen?»)</li>
+      <li><strong>Variabel-søk</strong> — finner relevante variabler i datakatalogen («Hvilke variabler finnes for utdanning?»)</li>
+      <li><strong>Skript-generering</strong> — lager et komplett skript fra et naturlig språk-spørsmål («Vis sammendragsstatistikk for inntekt og kjønn»)</li>
     </ul>
 
     <h3>Revidere et eksisterende skript</h3>
@@ -656,7 +842,7 @@ summarize kjonn
 
     <h3>Andre kontroller</h3>
     <ul>
-      <li><strong>Tannhjul</strong> — endre API-nøkkel og base-URL</li>
+      <li><strong>Tannhjul</strong> — endre API-nøkkel og andre innstillinger</li>
       <li><strong>Søppelbøtte</strong> — tøm samtalen (sletter ikke noe på serveren)</li>
       <li><strong>×</strong> — lukk panelet</li>
       <li><kbd>Enter</kbd> sender, <kbd>Shift</kbd>+<kbd>Enter</kbd> gir ny linje</li>
@@ -668,30 +854,43 @@ summarize kjonn
     <div class="callout">
       <strong>Eksperimentell.</strong> AI-assistenten kan ta feil, foreslå variabler som ikke finnes, eller generere skript som ikke kjører. Sjekk alltid resultatet før bruk.
     </div>
+      <!-- SYNC:END -->
+    <h3>Nøkkelen i Microdata</h3>
+    <p>Lim inn din egen Anthropic-nøkkel (opprettet på <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>) under tannhjul-ikonet i AI-panelet. Nøkkelen lagres kun lokalt i nettleseren (localStorage) og sendes som <code>X-Anthropic-Key</code>-header direkte til Anthropic for hver forespørsel — det finnes ingen mellomtjener her.</p>
   </section>
 
-  <!-- ── MODES ── -->
+  <!-- SYNC:START felles-eksempler -->
+  <section id="eksempler">
+    <h2>Eksempler</h2>
+    <p>Knappen <strong>Eksempler</strong> åpner en liste som er filtrert på modusen du står i. Listen bygges av appen selv, så den viser alltid det som faktisk finnes.</p>
+    <table class="doc-table">
+      <thead><tr><th>Du vil</th><th>Gjør</th></tr></thead>
+      <tbody>
+        <tr><td>Se hva som er mulig i denne modusen</td><td>Trykk <strong>Eksempler</strong></td></tr>
+        <tr><td>Starte fra et eksempel</td><td>Velg det — det erstatter innholdet i editoren</td></tr>
+        <tr><td>Beholde det du har skrevet</td><td>Lagre først; eksempelet overskriver editoren</td></tr>
+      </tbody>
+    </table>
+  </section>
+    <!-- SYNC:END -->
+
   <section id="modes">
     <h2>Moduser</h2>
-    <p>Velg modus fra dropdown-menyen i bunnbaren, eller bruk modusveksler-linjer i scriptet for å veksle underveis (se <a href="#hybrid">Hybrid-skript</a>).</p>
-
-    <div class="card-grid">
-      <div class="card">
-        <div class="card-title"><span class="badge badge-micro">Microdata</span> Standard</div>
-        <div class="card-body">Microdata.no-syntaks. Laster registerdata, oppretter datasett, kjører statistikk og diagrammer.</div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span class="badge badge-py">Python</span> Pyodide</div>
-        <div class="card-body">Komplett Python i nettleseren. Pandas, NumPy, Matplotlib, Scikit-learn, SciPy osv. er tilgjengelig.</div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span class="badge badge-r">R</span> WebR</div>
-        <div class="card-body">Komplett R i nettleseren. Tidyverse, ggplot2, dplyr, survival m.m. installeres automatisk ved bruk.</div>
-      </div>
-    </div>
+    <p>Velg modus fra dropdown-menyen i bunnbaren, eller bruk modusveksler-linjer i scriptet for å veksle underveis (se <a href="#hybrid">Hybrid-skript</a>). microdata-språket denne siden ellers dokumenterer er bare én av sju moduser i editoren — de andre seks er lagt til av dette hobbyprosjektet, se <a href="#avvik">Avvik fra microdata.no</a>.</p>
+    <table class="doc-table">
+      <thead><tr><th>Modus</th><th>Motor</th><th>Beskrivelse</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-micro">Microdata</span></td><td>m2py</td><td>microdata.no-syntaks — språket resten av denne siden dokumenterer.</td></tr>
+        <tr><td><span class="badge badge-py">Python</span></td><td>Pyodide</td><td>Fullstendig Python i nettleseren (WebAssembly). pandas, NumPy, Matplotlib, scikit-learn, SciPy m.m.</td></tr>
+        <tr><td><span class="badge badge-r">R</span></td><td>WebR</td><td>Fullstendig R i nettleseren (WebAssembly). Tidyverse, ggplot2, dplyr, survival m.m. installeres automatisk ved bruk.</td></tr>
+        <tr><td>DuckDB</td><td>duckdb-wasm</td><td>Ren SQL mot datasettene dine — kjører nativt uten Python-oppstart for rene SQL-kjøringer.</td></tr>
+        <tr><td>Brython</td><td>Brython</td><td>En lettere, raskere Python-motor med et voksende pandas/numpy/matplotlib-lag.</td></tr>
+        <tr><td>Statx</td><td>pdexplorer</td><td>Stata-syntaks (<code>.do</code>-stil, <code>use</code> m.m.) kjørt gjennom et pandas-basert Stata-motstykke.</td></tr>
+        <tr><td>jamovi</td><td>jmv i WebR</td><td>Ekte jamovi-analyser (jmv-pakken) med jamovi sitt eget dialog-GUI for valg av analyse.</td></tr>
+      </tbody>
+    </table>
   </section>
 
-  <!-- ── PYTHON ── -->
   <section id="python">
     <h2>Python (Pyodide)</h2>
     <p>Python kjøres i nettleseren via <a href="https://pyodide.org" target="_blank" rel="noopener">Pyodide</a> (WebAssembly). Ingen installasjon nødvendig. Tilgjengelige pakker inkluderer:</p>
@@ -709,39 +908,15 @@ summarize kjonn
         <tr><td><code>to_microdata(df, "navn")</code></td><td>Send en pandas DataFrame tilbake til microdata-tolken som et navngitt datasett</td></tr>
       </tbody>
     </table>
-
-    <h3>Oversettelse til microdata</h3>
-    <p>Følgende Python-mønstre oversettes godt av <em>py2m</em>:</p>
-    <ul>
-      <li><code>df = pd.read_csv(...)</code> → <code>import</code>-kommandoer</li>
-      <li><code>df.groupby("x")["y"].mean()</code> → <code>collapse (mean) y, by(x)</code></li>
-      <li><code>df[df["x"] &gt; 0]</code> → <code>keep if x &gt; 0</code></li>
-      <li><code>df["ny"] = df["x"] + df["y"]</code> → <code>generate ny = x + y</code></li>
-      <li><code>df.rename(columns={"a": "b"})</code> → <code>rename a b</code></li>
-      <li><code>df.merge(df2, on="id")</code> → <code>merge</code></li>
-    </ul>
-    <p>Kode som bruker egendefinerte klasser, list comprehensions, rekursjon, asynkron logikk eller komplekse lambda-uttrykk oversettes ikke og må skrives om.</p>
+    <p>Skal Python-koden oversettes til microdata i stedet for å kjøres direkte, se <a href="#oversettere">py2m og r2m</a>.</p>
   </section>
 
-  <!-- ── R ── -->
   <section id="r">
     <h2>R (WebR)</h2>
     <p>R kjøres via <a href="https://docs.r-wasm.org/webr/latest/" target="_blank" rel="noopener">WebR</a> (WebAssembly). Pakker installeres automatisk første gang de brukes (<code>library(dplyr)</code> osv.).</p>
-
-    <h3>Oversettelse til microdata</h3>
-    <p>Følgende R-mønstre oversettes godt av <em>r2m</em>:</p>
-    <ul>
-      <li><code>df %&gt;% filter(x &gt; 0)</code> → <code>keep if x &gt; 0</code></li>
-      <li><code>df %&gt;% select(x, y)</code> → <code>keep x y</code></li>
-      <li><code>df %&gt;% mutate(ny = x + y)</code> → <code>generate ny = x + y</code></li>
-      <li><code>df %&gt;% group_by(g) %&gt;% summarise(m = mean(x))</code> → <code>collapse (mean) x -> m, by(g)</code></li>
-      <li><code>df %&gt;% rename(ny = gammel)</code> → <code>rename gammel ny</code></li>
-      <li><code>left_join(df, df2, by = "id")</code> → <code>merge</code></li>
-    </ul>
-    <p>Kode som bruker <code>purrr</code>, egendefinerte R6-klasser, Shiny, miljømanipulasjon eller komplekse NSE-uttrykk oversettes ikke automatisk.</p>
+    <p>Skal R-koden oversettes til microdata i stedet for å kjøres direkte, se <a href="#oversettere">py2m og r2m</a>.</p>
   </section>
 
-  <!-- ── HYBRID ── -->
   <section id="hybrid">
     <h2>Hybrid-skript</h2>
     <p>Du kan blande microdata, Python og R i samme script ved å bruke <strong>modusveksler-linjer</strong>.</p>
@@ -794,10 +969,25 @@ library(dplyr)
 df %>% group_by(kjonn) %>%
   summarise(snitt = mean(inntekt, na.rm = TRUE))</code></pre>
 
-    <p>Datasettene fra microdata-seksjonen overføres automatisk til Python som pandas DataFrames og til R som data frames.</p>
+    <p>Datasettene fra microdata-blokkene overføres automatisk til Python som pandas DataFrames og til R som data frames.</p>
   </section>
 
-  <!-- ── TAB FULL ── -->
+  <!-- SYNC:START felles-referanse-snarveier -->
+  <section id="referanse-snarveier">
+    <h2>Tastatursnarveier</h2>
+    <table class="doc-table">
+      <thead><tr><th>Snarvei</th><th>Handling</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>Kjør scriptet</td></tr>
+        <tr><td><kbd>Tab</kbd></td><td>Autofullfør (kommando, variabel, metode)</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Lukk autocomplete-liste</td></tr>
+        <tr><td>Klikk linjenummer</td><td>Sett / fjern stoppunkt (rød prikk) for Kjør skrittvis</td></tr>
+      </tbody>
+    </table>
+  </section>
+    <!-- SYNC:END -->
+
+  <!-- SYNC:START felles-referanse-tab -->
   <section id="tab-full">
     <h2>Tab-autocomplete — fullstendig referanse</h2>
     <p>Trykk <kbd>Tab</kbd> i editoren for kontekstbevisste forslag. Reglene er de samme i alle moduser:</p>
@@ -807,13 +997,13 @@ df %>% group_by(kjonn) %>%
       <tbody>
         <tr>
           <td>Etter <code>/</code> (f.eks. <code>import db/</code>)</td>
-          <td>Microdata-variabelnavn fra katalogen</td>
+          <td>Katalogvariabler, i moduser med en tilkoblet kildekatalog</td>
         </tr>
         <tr>
           <td>Tomt linjebegynnelse</td>
           <td>
-            <span class="badge badge-micro">Microdata</span> kommandoer<br>
-            <span class="badge badge-py">Python</span> nøkkelord + innebygde funksjoner<br>
+            Kommandoer eller nøkkelord for aktiv modus — f.eks.
+            <span class="badge badge-py">Python</span> innebygde funksjoner,
             <span class="badge badge-r">R</span> base R- og tidyverse-funksjoner
           </td>
         </tr>
@@ -845,27 +1035,141 @@ df %>% group_by(kjonn) %>%
     </table>
 
     <h3>Variabelinformasjon</h3>
-    <p>Når du velger et microdata-variabelnavn fra autocomplete-listen, vises en liten popup med navn, type og beskrivelse fra katalogen. Klikk <strong>Mer info</strong> for å åpne full dokumentasjon på microdata.no.</p>
+    <p>Når du velger et variabelnavn fra autocomplete-listen, vises en liten popup med navn, type og beskrivelse. Klikk <strong>Mer info</strong> for å åpne fullstendig dokumentasjon, der det finnes.</p>
   </section>
+    <!-- SYNC:END -->
 
 </main>
 </div>
 
 <script>
-  // Highlight nav link matching current scroll position
-  const sections = document.querySelectorAll('section[id]');
-  const navLinks = document.querySelectorAll('nav a');
-  function updateNav() {
-    let current = '';
-    sections.forEach(s => {
-      if (window.scrollY >= s.offsetTop - 60) current = s.id;
-    });
-    navLinks.forEach(a => {
-      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+/* SYNC:START felles-js */
+(function hjelpUI(w) {
+  'use strict';
+
+  // Ren funksjon — node-testet i tests/js/test_hjelp_ui.mjs.
+  // Returnerer indeksene i `labels` som matcher `query`.
+  function matchNav(query, labels) {
+    var q = String(query || '').trim().toLowerCase();
+    var out = [];
+    for (var i = 0; i < labels.length; i++) {
+      if (!q || String(labels[i]).toLowerCase().indexOf(q) >= 0) out.push(i);
+    }
+    return out;
+  }
+
+  // Ren funksjon — node-testet i tests/js/test_hjelp_ui.mjs.
+  // Velger hvilken seksjon scrollspyen skal markere som aktiv: første id i
+  // `intersectingIds` (observatørens egen rekkefølge, dvs. dokumentrekkefølge)
+  // hvis noe faktisk er synlig nå, ellers den forrige aktive — ALDRI tomt,
+  // bortsett fra første kall før noe seksjon i det hele tatt har vært synlig.
+  // Uten dette blir highlighten borte hver gang ingen seksjon overlapper det
+  // smale observasjonsbåndet (typisk øverst og nederst på siden).
+  function pickActiveId(prevId, intersectingIds) {
+    if (intersectingIds.length) return intersectingIds[0];
+    return prevId || null;
+  }
+
+  function navLinks() {
+    return Array.prototype.slice.call(document.querySelectorAll('nav a[href^="#"]'));
+  }
+
+  function initNavFilter() {
+    var input = document.querySelector('.nav-filter');
+    if (!input || input.dataset.wired) return;
+    input.dataset.wired = '1';
+    var links = navLinks();
+    var labels = links.map(function (a) { return a.textContent; });
+    input.addEventListener('input', function () {
+      var keep = matchNav(input.value, labels);
+      var show = Object.create(null);
+      keep.forEach(function (i) { show[i] = true; });
+      links.forEach(function (a, i) {
+        a.classList.toggle('nav-link-hidden', !show[i]);
+      });
+      // Skjul en seksjonsoverskrift som ikke har synlige lenker under seg.
+      Array.prototype.forEach.call(
+        document.querySelectorAll('nav .nav-section'),
+        function (h) {
+          var any = false, el = h.nextElementSibling;
+          while (el && !el.classList.contains('nav-section')) {
+            if (el.tagName === 'A' && !el.classList.contains('nav-link-hidden')) any = true;
+            el = el.nextElementSibling;
+          }
+          h.classList.toggle('nav-link-hidden', !any);
+        });
     });
   }
-  window.addEventListener('scroll', updateNav, { passive: true });
-  updateNav();
+
+  function initScrollspy() {
+    var links = navLinks();
+    if (!links.length || document.body.dataset.spyWired) return;
+    document.body.dataset.spyWired = '1';
+    var byId = Object.create(null);
+    links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+    var targets = Object.keys(byId)
+      .map(function (id) { return document.getElementById(id); })
+      .filter(Boolean);
+    if (!targets.length || !w.IntersectionObserver) return;
+    var seen = Object.create(null);
+    var activeId = null;
+    var obs = new w.IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { seen[e.target.id] = e.isIntersecting; });
+      var intersecting = targets
+        .filter(function (t) { return seen[t.id]; })
+        .map(function (t) { return t.id; });
+      var next = pickActiveId(activeId, intersecting);
+      if (next === activeId) return;
+      activeId = next;
+      links.forEach(function (a) { a.classList.remove('nav-active'); });
+      if (activeId && byId[activeId]) byId[activeId].classList.add('nav-active');
+    }, { rootMargin: '-80px 0px -70% 0px' });
+    targets.forEach(function (t) { obs.observe(t); });
+  }
+
+  function initCopyButtons() {
+    Array.prototype.forEach.call(
+      document.querySelectorAll('.example-code'),
+      function (box) {
+        if (box.querySelector('.copy-btn')) return;
+        var pre = box.querySelector('pre');
+        if (!pre) return;
+        var btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.type = 'button';
+        btn.textContent = 'Kopier';
+        btn.addEventListener('click', function () {
+          var text = pre.textContent;
+          var flash = function (label) {
+            btn.textContent = label;
+            w.setTimeout(function () { btn.textContent = 'Kopier'; }, 1400);
+          };
+          var ok = function () { flash('Kopiert'); };
+          var fail = function () { flash('Kopier feilet'); };
+          if (w.navigator && w.navigator.clipboard) {
+            w.navigator.clipboard.writeText(text).then(ok, fail);
+          } else {
+            fail();
+          }
+        });
+        box.appendChild(btn);
+      });
+  }
+
+  w.HjelpUI = {
+    matchNav: matchNav,
+    pickActiveId: pickActiveId,
+    initNavFilter: initNavFilter,
+    initScrollspy: initScrollspy,
+    initCopyButtons: initCopyButtons,
+  };
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', function () {
+      initNavFilter(); initScrollspy(); initCopyButtons();
+    });
+  }
+})(typeof window !== 'undefined' ? window : this);
+/* SYNC:END */
 </script>
-</body>
-</html>
+</body></html>

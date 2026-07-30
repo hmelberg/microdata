@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Microdata Script Runner – Documentation</title>
+<title>Microdata – Documentation</title>
 <style>
   :root {
     --accent: #2563eb;
@@ -167,20 +167,83 @@
 
   /* ── Section anchor offset ── */
   section { scroll-margin-top: 20px; }
+/* SYNC:START felles-css */
+/* ── Oversiktstabell først i hver hovedseksjon ── */
+.overview { margin: 0 0 28px; }
+.overview .doc-table { margin: 0; }
+.overview-hint {
+  font-size: 13px; color: var(--text-muted); margin: 6px 0 0;
+}
+
+/* ── Todelt eksempelblokk: kode ‖ resultat ── */
+.example {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+  background: var(--border); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; margin: 18px 0;
+}
+.example > * { background: var(--bg-card); }
+.example-code, .example-result { padding: 14px 16px; min-width: 0; }
+.example-code pre, .example-result pre {
+  margin: 0; overflow-x: auto; font-size: 13px; line-height: 1.6;
+}
+.example-label {
+  display: block; font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 8px;
+}
+.result { color: var(--text); }
+.result.illustration { color: var(--text-muted); font-style: italic; }
+.illustration-tag {
+  display: inline-block; font-size: 11px; font-style: normal;
+  padding: 1px 6px; border-radius: 4px; margin-left: 6px;
+  background: var(--bg-code); color: var(--text-muted);
+}
+@media (max-width: 900px) {
+  .example { grid-template-columns: 1fr; }
+}
+
+/* ── Kopier-knapp ── */
+.example-code { position: relative; }
+.copy-btn {
+  position: absolute; top: 10px; right: 10px;
+  font-size: 11px; padding: 3px 8px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-card); color: var(--text-muted);
+}
+.copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── Nav: filter + scrollspy ── */
+.nav-filter {
+  width: calc(100% - 36px); margin: 0 18px 14px; padding: 6px 9px;
+  font-size: 13px; font-family: inherit;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--bg); color: var(--text);
+}
+.nav-filter:focus { outline: none; border-color: var(--accent); }
+.nav-link-hidden { display: none !important; }
+nav a.nav-active {
+  color: var(--accent); background: var(--accent-light);
+  border-left: 2px solid var(--accent);
+}
+/* SYNC:END */
 </style>
 </head>
 <body>
 <div class="page">
 
 <nav>
-  <div class="nav-logo">Script Runner</div>
+  <div class="nav-logo">Microdata</div>
   <a href="hjelp.html" style="font-size:12px;color:var(--text-muted)">Norsk versjon</a>
+  <input class="nav-filter" type="search" placeholder="Filter…" aria-label="Filter the table of contents">
   <div class="nav-section">Getting started</div>
   <a href="#intro">What is this?</a>
-  <a href="#running">Running and translating</a>
-  <a href="#microdata">Microdata commands</a>
+  <a href="#running">Running</a>
+  <div class="nav-section">The emulator</div>
+  <a href="#kommandoer">The commands</a>
+  <a href="#avsloring">Disclosure control</a>
+  <a href="#avvik">Differences from microdata.no</a>
+  <a href="#oversettere">py2m and r2m</a>
   <div class="nav-section">The editor</div>
-  <a href="#editor">Editor and shortcuts</a>
+  <a href="#editor">Editor</a>
   <a href="#tab-intro">Tab autocomplete</a>
   <a href="#sidebar">Dataset panel</a>
   <div class="nav-section">Save and share</div>
@@ -190,259 +253,278 @@
   <a href="#widgets">Widgets</a>
   <div class="nav-section">AI assistant</div>
   <a href="#ai">AI assistant</a>
+  <div class="nav-section">Examples</div>
+  <a href="#eksempler">Examples</a>
   <div class="nav-section">Other modes</div>
   <a href="#modes">Modes</a>
   <a href="#python">Python (Pyodide)</a>
   <a href="#r">R (WebR)</a>
   <a href="#hybrid">Hybrid scripts</a>
   <div class="nav-section">Reference</div>
+  <a href="#referanse-snarveier">Keyboard shortcuts</a>
   <a href="#tab-full">Tab autocomplete (detail)</a>
 </nav>
 
 <main>
 
   <div class="doc-header">
-    <h1>Microdata Script Runner</h1>
-    <p class="lead">Write and run microdata.no code, Python and R directly in the browser — no installation required.</p>
+    <h1>Microdata</h1>
+    <p class="lead">An emulator of microdata.no — write and run microdata code.</p>
   </div>
 
-  <!-- ── INTRO ── -->
   <section id="intro">
     <h2>What is this?</h2>
-    <p>Script Runner is a tool for writing and running code against Norwegian register data from <strong>microdata.no</strong>. You can write microdata commands and see results immediately, translate between Python/R and microdata syntax, and run hybrid scripts where different languages work together.</p>
+    <p>An emulator of <a href="https://microdata.no">microdata.no</a>. You write microdata commands, they are translated to Python and run in the browser against synthetic register data. The goal is that a script that works here also works there.</p>
 
-    <div class="callout">
-      <strong>Note:</strong> This is a hobby project and is not made by microdata.no itself. The page does not contain real figures, and there is no guarantee that the analyses are correctly implemented.
+    <div class="overview">
+      <table class="doc-table">
+        <thead><tr><th>Section</th><th>What you'll find there</th></tr></thead>
+        <tbody>
+          <tr><td><a href="#kommandoer">The commands</a></td><td>The language, command by command</td></tr>
+          <tr><td><a href="#avsloring">Disclosure control</a></td><td>The rules that censor output, and how to turn them off</td></tr>
+          <tr><td><a href="#avvik">Differences from microdata.no</a></td><td>Where the emulator isn't faithful to the original</td></tr>
+          <tr><td><a href="#oversettere">py2m and r2m</a></td><td>Python and R in, microdata out</td></tr>
+          <tr><td><a href="#tab-full">Reference</a></td><td>Shortcuts, autocomplete</td></tr>
+        </tbody>
+      </table>
     </div>
 
-    <p>Everything happens in the browser — no data leaves your machine.</p>
+    <div class="callout">
+      <strong>Note:</strong> This is a hobby project and is not made by microdata.no. The data is synthetic — no numbers here are real.
+    </div>
 
     <div class="callout tip">
-      <strong>Quick start:</strong> Write microdata commands in the text field, press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> or the <strong>Run</strong> button. Use <kbd>Tab</kbd> for suggested commands and variables.
+      <strong>Quick start:</strong> Write microdata commands in the text field, press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> or the <strong>Run</strong> button. Use <kbd>Tab</kbd> for suggestions for commands and variables.
     </div>
   </section>
 
-  <!-- ── RUNNING ── -->
+  <!-- SYNC:START felles-running -->
   <section id="running">
-    <h2>Running and translating</h2>
+    <h2>Running</h2>
 
     <h3>Running directly</h3>
     <p>Press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> or the <strong>Run</strong> button. Results are shown in the output field. Tables, charts and text are displayed automatically.</p>
 
-    <h3>Translating</h3>
-    <p>The <strong>Translate</strong> button (arrow icon) converts Python or R code to microdata syntax. The result is shown in the output field — to <strong>run</strong> the translated code you must either copy it into the editor and switch to microdata mode, or rewrite it directly in microdata.</p>
 
     <h3>Stop / cancel</h3>
     <p>Press the <strong>Run</strong> button again while running to cancel.</p>
   </section>
+    <!-- SYNC:END -->
 
-  <!-- ── MICRODATA ── -->
-  <section id="microdata">
-    <h2>Microdata commands</h2>
-    <p>The microdata syntax resembles Stata. Here are the most important commands:</p>
-
-    <h3>Loading data</h3>
+  <section id="kommandoer">
+    <h2>The commands</h2>
+    <p>The microdata language is deliberately small. Each command does one thing, and the order is the one you'd write on paper: fetch data, build variables, summarize. The list below is limited to commands that are actually implemented in <code>m2py.py</code>.</p>
     <table class="doc-table">
-      <thead><tr><th>Command</th><th>Description</th></tr></thead>
+      <thead><tr><th>Command</th><th>Does</th><th>Example</th></tr></thead>
       <tbody>
-        <tr><td><code>require no.ssb.fdb:52 as db</code></td><td>Connect to a data source and give it a name</td></tr>
-        <tr><td><code>create-dataset navn</code></td><td>Create an empty dataset</td></tr>
-        <tr><td><code>import db/VARIABEL [dato] as alias</code></td><td>Import a variable from register data</td></tr>
-        <tr><td><code>import-event db/VARIABEL dato1 to dato2 as alias</code></td><td>Import event data</td></tr>
-        <tr><td><code>use datasett</code></td><td>Switch active dataset</td></tr>
-        <tr><td><code>merge datasett, by(var)</code></td><td>Merge two datasets</td></tr>
-        <tr><td><code>clone-dataset nytt [fra]</code></td><td>Copy dataset</td></tr>
+        <tr><td><code>require source as alias</code></td><td>Connects to a data source and names it</td><td><code>require no.ssb.fdb:52 as db</code></td></tr>
+        <tr><td><code>create-dataset name</code></td><td>Creates an empty dataset and makes it active</td><td><code>create-dataset bef</code></td></tr>
+        <tr><td><code>import db/VARIABLE [date] as alias</code></td><td>Imports a variable from register data</td><td><code>import db/BEFOLKNING_KJOENN as kjonn</code></td></tr>
+        <tr><td><code>import-event db/VARIABLE date1 to date2 as alias</code></td><td>Imports event data over a time interval</td><td><code>import-event db/SYKEHUSOPPHOLD_NPR 2015-01-01 to 2020-12-31 as opphold</code></td></tr>
+        <tr><td><code>use dataset</code></td><td>Switches the active dataset</td><td><code>use bef</code></td></tr>
+        <tr><td><code>merge dataset, on(var)</code></td><td>Merges two datasets on a key variable</td><td><code>merge inntekt, on(unit_id)</code></td></tr>
+        <tr><td><code>clone-dataset new [from]</code></td><td>Copies a dataset</td><td><code>clone-dataset bef_kopi bef</code></td></tr>
+        <tr><td><code>generate new = expr</code></td><td>Creates a new variable</td><td><code>generate alder = 2024 - fodselsar</code></td></tr>
+        <tr><td><code>replace var = expr [if condition]</code></td><td>Replaces values, optionally conditionally</td><td><code>replace inntekt = 0 if inntekt &lt; 0</code></td></tr>
+        <tr><td><code>rename old new</code></td><td>Renames a variable</td><td><code>rename kjonn kjoenn</code></td></tr>
+        <tr><td><code>recode var (old=new) ...</code></td><td>Recodes categories</td><td><code>recode alder (0/17=1) (18/66=2) (67/120=3)</code></td></tr>
+        <tr><td><code>keep var1 var2 ... / keep if condition</code></td><td>Keeps selected variables or rows</td><td><code>keep if alder &gt;= 18</code></td></tr>
+        <tr><td><code>drop var1 var2 ... / drop if condition</code></td><td>Removes variables or rows</td><td><code>drop unit_id</code></td></tr>
+        <tr><td><code>destring var</code></td><td>Converts text to numbers</td><td><code>destring inntekt_streng</code></td></tr>
+        <tr><td><code>collapse (stat) var -&gt; name, by(groupvar)</code></td><td>Aggregates to group level (one row per group)</td><td><code>collapse (mean) inntekt -&gt; snittinntekt, by(kjonn)</code></td></tr>
+        <tr><td><code>aggregate (stat) var -&gt; newvar, by(groupvar)</code></td><td>Adds an aggregated column without losing rows</td><td><code>aggregate (mean) inntekt -&gt; snittinntekt, by(kjonn)</code></td></tr>
+        <tr><td><code>summarize [variables]</code></td><td>Descriptive statistics</td><td><code>summarize inntekt</code></td></tr>
+        <tr><td><code>tabulate var [var2]</code></td><td>Frequency or cross table</td><td><code>tabulate kjonn</code></td></tr>
+        <tr><td><code>correlate [variables]</code></td><td>Correlation matrix</td><td><code>correlate alder inntekt</code></td></tr>
+        <tr><td><code>regress y x1 x2 ...</code></td><td>OLS regression</td><td><code>regress inntekt alder kjonn</code></td></tr>
+        <tr><td><code>logit / probit y x1 x2</code></td><td>Logistic / probit regression</td><td><code>logit hoyinntekt alder kjonn</code></td></tr>
+        <tr><td><code>ci var</code></td><td>Confidence interval</td><td><code>ci inntekt</code></td></tr>
+        <tr><td><code>barchart / histogram / scatter / boxplot var, by(groupvar)</code></td><td>Charts</td><td><code>histogram inntekt</code></td></tr>
+        <tr><td><code>kaplan-meier / cox / weibull</code></td><td>Survival analysis</td><td><code>cox tid hendelse, covariates(alder kjonn)</code></td></tr>
       </tbody>
     </table>
 
-    <h3>Transformations</h3>
-    <table class="doc-table">
-      <thead><tr><th>Command</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td><code>generate ny = uttrykk</code></td><td>Create a new variable</td></tr>
-        <tr><td><code>rename gammel ny</code></td><td>Give the variable a new name</td></tr>
-        <tr><td><code>replace var = uttrykk [if betingelse]</code></td><td>Replace values</td></tr>
-        <tr><td><code>recode var (gammelt=nytt) ...</code></td><td>Recode categories</td></tr>
-        <tr><td><code>keep var1 var2 ...</code></td><td>Keep only these variables</td></tr>
-        <tr><td><code>drop var1 var2 ...</code></td><td>Remove variables</td></tr>
-        <tr><td><code>destring var</code></td><td>Convert text to numbers</td></tr>
-        <tr><td><code>collapse (stat) var [-> navn] ..., by(gruppevar)</code></td><td>Aggregate to group level</td></tr>
-        <tr><td><code>aggregate (stat) var -> nyvar, by(gruppevar)</code></td><td>Add an aggregated column (keeps all rows)</td></tr>
-      </tbody>
-    </table>
+    <p><em>collapse</em> statistics: <code>mean</code> · <code>min</code> · <code>max</code> · <code>median</code> · <code>sum</code> · <code>count</code> · <code>sd</code> · <code>semean</code> · <code>sebinomial</code> · <code>percent</code> · <code>iqr</code> · <code>gini</code>. <code>collapse (first)</code> and <code>collapse (last)</code> do <strong>not</strong> exist — neither here nor on microdata.no; use an aggregated statistic instead.</p>
+    <p><em>Multi-key:</em> only ONE variable in <code>by()</code> and <code>on</code>. Build a composite key first: <code>generate composite = string(k1) ++ "_" ++ string(k2)</code>.</p>
+    <p><em>Pseudonym variables</em> (names ending in <code>_FNR</code>, e.g. <code>BEFOLKNING_MOR_FNR</code>) can only be used as a key in <code>collapse(by)</code> or <code>merge(on)</code> — not in <code>generate</code>/<code>replace</code> or comparisons. See <a href="#avsloring">Disclosure control</a>.</p>
 
-    <h3>Statistics and visualization</h3>
-    <table class="doc-table">
-      <thead><tr><th>Command</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td><code>summarize [variabler]</code></td><td>Descriptive statistics</td></tr>
-        <tr><td><code>tabulate var [var2]</code></td><td>Frequency / cross table</td></tr>
-        <tr><td><code>correlate [variabler]</code></td><td>Correlation matrix</td></tr>
-        <tr><td><code>regress y x1 x2 ...</code></td><td>OLS regression</td></tr>
-        <tr><td><code>logit / probit y x1 x2</code></td><td>Logistic / probit regression</td></tr>
-        <tr><td><code>ci var</code></td><td>Confidence interval</td></tr>
-        <tr><td><code>anova y x</code></td><td>Analysis of variance</td></tr>
-        <tr><td><code>barchart / histogram / scatter / boxplot var, by(gruppevar)</code></td><td>Charts</td></tr>
-        <tr><td><code>kaplan-meier / cox / weibull</code></td><td>Survival analysis</td></tr>
-      </tbody>
-    </table>
-
-    <h3>collapse statistics</h3>
-    <p>Available statistical measures for <code>collapse</code> and <code>aggregate</code>:</p>
-    <p><code>mean</code> · <code>min</code> · <code>max</code> · <code>median</code> · <code>sum</code> · <code>count</code> · <code>sd</code> · <code>semean</code> · <code>sebinomial</code> · <code>percent</code> · <code>iqr</code> · <code>gini</code></p>
-    <p><em>Note:</em> <code>collapse (first)</code> and <code>collapse (last)</code> are <strong>not</strong> supported in microdata.no — use an aggregated statistic instead.</p>
-    <p><em>Multi-key:</em> only ONE variable in <code>by()</code> and <code>on</code>. Create a composite key first:
-       <code>generate composite = string(k1) ++ "_" ++ string(k2)</code>.</p>
-
-    <h3>Pseudonym variables</h3>
-    <p>Variables that identify units (typically variables with names ending in <code>_FNR</code> — e.g. <code>BEFOLKNING_MOR_FNR</code>) are <strong>pseudonyms</strong>. In microdata.no these can only be used as a key in <code>collapse(by)</code> or <code>merge(on)</code> — not in <code>generate</code>/<code>replace</code>, comparisons or other transformations.</p>
-
-    <h3>Control flow</h3>
-    <p>For loops use the prod grammar: a range with <code>n : m</code> (inclusive), or a value list (comma- or whitespace-separated). Use <code>$i</code> for substitution. Do not use parentheses around the iterator list or a literal ellipsis <code>...</code>.</p>
-    <pre><code>for i in 2018 : 2020
-  import db/INNTEKT_WLONN $i-01-01 as inntekt_$i
-end
-
-for forelder in mor, far
-  // ...
-end
-
-let maks = 200000
-generate hoy = (inntekt &gt; maks)</code></pre>
-
-    <h3>Disclosure control</h3>
-    <p>m2py emulates microdata.no's rules by default — both <em>syntax/validation</em> (so your script runs in prod) and <em>suppression of output</em> (so you see the same numbers as in prod). You can turn everything off in the hamburger menu ("Disclosure control: OFF") to experiment without restrictions, but then you risk writing scripts that won't run in microdata.no. Specific rules:</p>
-    <ul>
-      <li><strong>Pseudonym validation.</strong> Variables ending in <code>_FNR</code> can only be used as a key in <code>collapse(by)</code> or <code>merge(on)</code> — not in <code>generate</code>, <code>replace</code>, comparisons, etc.</li>
-      <li><strong>Type check.</strong> Alphanumeric variables (e.g. <code>BEFOLKNING_KJOENN</code>) are rejected for numeric operations such as <code>min</code>, <code>max</code>, <code>mean</code>, <code>sum</code>, <code>median</code>.</li>
-      <li><strong>For loops:</strong> use <code>$i</code> substitution and either a range (<code>1998 : 2009</code>) or a comma/whitespace list. Parentheses around values and a literal <code>...</code> are not valid.</li>
-      <li><strong>Missing values.</strong> Assignment with <code>.</code> is OK (<code>generate x = .</code>). <strong>Comparison with</strong> <code>.</code>, however, is not valid — <code>keep if y == .</code> is rejected in microdata.no. Use <code>sysmiss(y)</code> to test whether a value is missing.</li>
-      <li><strong>Minimum population 1000.</strong> <code>keep if</code>, <code>drop if</code> and <code>sample</code> cannot leave fewer than 1000 units.</li>
-      <li><strong>Tables with too many small cells are suppressed.</strong> <code>tabulate</code> is blocked if more than 50% of the cells have a frequency lower than 5.</li>
-      <li><strong>Changes must affect ≥10 units.</strong> <code>generate</code>, <code>replace</code> and <code>recode</code> are rejected if the change affects 1–9 rows (or all except 1–9).</li>
-      <li><strong>Descriptive statistics require ≥10 units.</strong> <code>summarize</code>, <code>correlate</code>, <code>ci</code>, <code>anova</code>, <code>normaltest</code> are blocked for populations under 10.</li>
-      <li><strong>Median/percentiles are shown with 3 significant digits.</strong> In <code>summarize</code>, for example, 47,238 becomes 47,200 and 2.7183 becomes 2.72.</li>
-      <li><strong>Winsorization 1/99%.</strong> Numeric variables are capped at the 1st and 99th percentile before displaying the mean and standard deviation in <code>summarize</code>, and before plotting in <code>histogram</code>, <code>scatter</code> and <code>boxplot</code>. The median and quartiles are not affected. Regression and collapse use raw data.</li>
-    </ul>
-
-    <h4>Per-script override</h4>
-    <p>You can also control disclosure control from within the script itself with a magic directive at the top of the code. The directive is an ordinary comment (<code>//</code>) that is ignored by microdata.no production, but is read by m2py before execution and switched back afterwards (does not affect other scripts):</p>
-    <pre><code>// m2py: disclosure-control=off
-create-dataset bef
-import db/BEFOLKNING_KJOENN as kjonn
-summarize kjonn</code></pre>
-    <p>Values: <code>on</code>/<code>off</code>, <code>true</code>/<code>false</code>, <code>1</code>/<code>0</code>, <code>yes</code>/<code>no</code>. The short form <code>dc</code> is also accepted: <code>// m2py: dc=off</code>. Useful in API/script usage where you want to control the mode without changing global settings.</p>
-
-    <h2 id="hjelp-dataminimering">Data minimisation assessment</h2>
-    <p>
-      m2py can ask an AI to assess whether your script practices data minimisation —
-      the principle of retrieving and using only the minimum amount of data needed
-      for the research question. The feature is advisory; the final assessment rests
-      with the researcher and data controller.
-    </p>
-    <p>
-      The assessment is grounded in:
-    </p>
-    <ul>
-      <li>GDPR Art. 5(1)(c) — data minimisation</li>
-      <li>Norwegian Health Registry Act (Helseregisterloven) § 6 — degree of personal identification</li>
-      <li>GDPR Art. 89(1) — scientific research</li>
-      <li>GDPR Art. 9 — special categories (sensitive data)</li>
-    </ul>
-
-    <h3>How it works</h3>
-    <p>
-      Click the hamburger menu → "Assess data minimisation". The first time you use the
-      feature, a confirmation is shown that the script is sent to Anthropic. Actual
-      microdata values are never sent.
-    </p>
-    <p>
-      In the options modal you can:
-    </p>
-    <ul>
-      <li><strong>Choose language</strong> (auto / microdata / R / Python) — auto detects from the script</li>
-      <li><strong>Choose report length</strong>: Short (quick observations) or Long (all dimensions with follow-up questions)</li>
-      <li><strong>Request a revised script</strong> — the AI appends a conservative revised version at the end of the answer, which you can copy or replace the editor with</li>
-      <li><strong>Specify purpose and context</strong> — optional; gives a more precise assessment</li>
-    </ul>
-
-    <h3>Login</h3>
-    <p>
-      The AI assessment requires that you are logged in to m2py. Use the Log in button
-      at the top and follow the link in the email. Once you are logged in (via an FHI
-      or other approved email address), you have access to the data minimisation
-      feature automatically — no separate access key is needed.
-    </p>
-
-    <h3>Sensitive variables</h3>
-    <p>
-      The AI automatically flags variables that fall under <em>special categories</em>
-      (GDPR Art. 9): ethnicity, religion, sexual orientation, particularly sensitive
-      health information (abortion, sexually transmitted diseases, psychiatry, etc.),
-      and legal/criminal records. These require a higher justification threshold.
-    </p>
-
-    <h3>Privacy comments in the script</h3>
-    <p>
-      You can add structured justifications directly in the script:
-    </p>
-    <pre>// personvern blokk start
-// purpose: Study the relationship between education and income
-// time period: 1970-1980 because the cohort should have completed education
-// geography: municipality needed to see regional differences
-// sensitive groups: no
-// alternatives considered: SSB table A-04 was too coarse-grained
-// personvern blokk slutt</pre>
-    <p>
-      Or free text:
-    </p>
-    <pre>// personvern blokk start
-// Purpose: study the relationship between education and income for the 1970-1980 cohort.
-// The time period was chosen because the cohort should have completed education by the end of the analysis.
-// Municipality needed for regional differences.
-// personvern blokk slutt</pre>
-    <p>
-      If you check "Save as privacy block" in the secondary modal, m2py writes the
-      content into the script automatically after the assessment.
-    </p>
-    <p>
-      Single lines also work:
-    </p>
-    <pre>// personvern: dates truncated to month to avoid unnecessary precision</pre>
-    <p>
-      You can also use <code>#</code> instead of <code>//</code> in Python/R scripts.
-    </p>
-
-    <h3>Directives in the script</h3>
-    <p>
-      You can control the AI behavior directly in the script:
-    </p>
-    <pre>// personvern: revider-script: ja</pre>
-    <p>
-      This makes the AI turn on revised-script output regardless of what you choose in
-      the UI. Useful if you have a template that should always be revised.
-    </p>
+    <h3>A whole script</h3>
+    <p>Run through the emulator exactly as written, with disclosure control on:</p>
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Code <span class="badge badge-micro">micro</span></span>
+        <pre><code>generate lonn_1000 = lonn / 1000
+collapse (mean) lonn_1000 -&gt; snittlonn_1000, by(kjonn)</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Result</span>
+        <pre class="result">Genererte lonn_1000 med 5 000 enheter
+Aggregerte testdata gruppert på kjonn til 2 verdier</pre>
+      </div>
+    </div>
   </section>
 
-  <!-- ── EDITOR ── -->
+  <section id="avsloring">
+    <h2>Disclosure control</h2>
+    <p>The emulator censors output the same way microdata.no does, because a script that produces numbers here and gets rejected there isn't much help. The control is on by default in the app. The thresholds below are taken directly from the constants in <code>m2py.py</code> (lines 267–272), not from memory:</p>
+    <table class="doc-table">
+      <thead><tr><th>Rule</th><th>Threshold</th><th>Effect when triggered</th></tr></thead>
+      <tbody>
+        <tr><td>Min. population</td><td><code>1000</code> units</td><td><code>keep if</code>, <code>drop if</code> and <code>sample</code> are rejected if the result would have fewer units. The dataset is left unchanged.</td></tr>
+        <tr><td>Min. change</td><td><code>10</code> units</td><td><code>generate</code>, <code>replace</code> and <code>recode</code> are rejected if the change affects 1–9 units (or all but 1–9). Exception: all or none.</td></tr>
+        <tr><td>Min. population for descriptive stats</td><td><code>10</code> units</td><td><code>summarize</code>, <code>correlate</code>, <code>ci</code>, <code>anova</code>, <code>normaltest</code> are blocked below the threshold — per group as well. Exception: plain <code>count</code>/<code>sum</code>.</td></tr>
+        <tr><td>Small cells in tables</td><td>frequency <code>&lt;5</code> in <code>&gt;50%</code> of cells</td><td><code>tabulate</code> (and the panel variants) are blocked if more than half the cells have fewer than 5 units.</td></tr>
+        <tr><td>Winsorizing</td><td>1st and 99th percentile</td><td>Numeric variables are clipped at the 1st/99th percentile before mean and standard deviation are shown in <code>summarize</code>, and before <code>histogram</code>/<code>scatter</code>/<code>boxplot</code> are plotted. Median and quartiles are unaffected. Regression and <code>collapse</code> use raw data.</td></tr>
+        <tr><td>Percentile rounding</td><td>3 significant digits</td><td>Median and percentiles in <code>summarize</code> are rounded — e.g. 47,238 → 47,200, 2.7183 → 2.72.</td></tr>
+        <tr><td>Pseudonym validation</td><td>variable names ending in <code>_FNR</code></td><td>Can only be used as a key in <code>collapse(by)</code> or <code>merge(on)</code> — rejected in <code>generate</code>, <code>replace</code> and comparisons.</td></tr>
+        <tr><td>Type check</td><td>alphanumeric variable</td><td>Rejected for numeric operations (<code>min</code>, <code>max</code>, <code>mean</code>, <code>sum</code>, <code>median</code>). Use frequency/<code>tabulate</code> instead.</td></tr>
+        <tr><td>Missing comparison</td><td>comparison with <code>.</code></td><td><code>== .</code>/<code>!= .</code> is rejected outright (Stata syntax is not valid in microdata.no). Assignment (<code>= .</code>) is OK. Use <code>sysmiss(x)</code> to test whether a value is missing.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Turning it off</h3>
+    <p>Add the directive at the top of the script:</p>
+    <pre><code>// m2py: disclosure-control=off</code></pre>
+    <p>The directive is an ordinary comment, so microdata.no ignores it. The same script can run in both places.</p>
+    <div class="callout">
+      <strong>What you lose:</strong> with the control off, the numbers are no longer comparable to what you'd get in production. Turn it off to understand the data, not to report it.
+    </div>
+
+    <h3>What a rejection looks like</h3>
+    <p>These are the most useful examples on this page: a script that microdata.no would actually reject, with the emulator's exact error message.</p>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Code <span class="badge badge-micro">micro</span></span>
+        <pre><code>keep if alder &gt; 68</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Result — rejected</span>
+        <pre class="result">FEIL: keep ville redusere populasjonen til 109 enheter. microdata.no krever minst 1000 enheter per populasjon. Datasettet er uendret.</pre>
+      </div>
+    </div>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Code <span class="badge badge-micro">micro</span></span>
+        <pre><code>generate hoyeste = 1 if lonn &gt; 933381</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Result — rejected</span>
+        <pre class="result">FEIL: generate 'hoyeste' påvirker bare 7 av 5000 enheter. microdata.no tillater ikke endringer som påvirker færre enn 10 enheter (unntak: alle eller ingen).</pre>
+      </div>
+    </div>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Code <span class="badge badge-micro">micro</span></span>
+        <pre><code>generate BEFOLKNING_MOR_FNR = alder
+generate test = BEFOLKNING_MOR_FNR + 1</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Result — second line rejected</span>
+        <pre class="result">Genererte BEFOLKNING_MOR_FNR med 5 000 enheter
+FEIL: BEFOLKNING_MOR_FNR er en pseudonymvariabel og kan ikke brukes i generate-uttrykk. Pseudonymer kan kun brukes som nøkkel i collapse(by) eller merge(on).</pre>
+      </div>
+    </div>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Code <span class="badge badge-micro">micro</span></span>
+        <pre><code>generate test = (lonn == .)</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Result — rejected</span>
+        <pre class="result">FEIL PÅ KOMMANDO 'generate' (ValueError): Sammenligning med `.` (Stata-syntaks som `x == .`) er ikke gyldig i microdata.no. Bruk `sysmiss(x)` for å teste om en verdi er missing (f.eks. `drop if sysmiss(x)`). Tildeling med `= .` (f.eks. `generate x = .`) er OK.</pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="avvik">
+    <h2>Differences from microdata.no</h2>
+    <p>The emulator isn't perfect. These are the known differences — not a disclaimer, but a list.</p>
+    <table class="doc-table">
+      <thead><tr><th>Area</th><th>Here</th><th>On microdata.no</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Data connection (<code>require</code>)</td>
+          <td><code>require source as alias</code> is a syntax-faithful copy that logs a message and otherwise does nothing — whichever source you write makes no difference to what you can later import (the code itself is commented <em>"No-op against actual SSB"</em> in <code>m2py.py</code>).</td>
+          <td><code>require</code> actually connects to an approved register source. Access requires an application and approval, and only the variables the source actually contains are available.</td>
+        </tr>
+        <tr>
+          <td>The data itself</td>
+          <td>All values come from a seeded synthetic generator (<code>MockDataEngine</code>/<code>mockdata_core.py</code>). Distributions are approximately realistic, but the numbers are made up and bear no relation to real registers.</td>
+          <td>Real, de-identified register data, subject to the same disclosure control the emulator imitates.</td>
+        </tr>
+        <tr>
+          <td>Other modes (Python, R, DuckDB, Brython, Statx, jamovi)</td>
+          <td>Six extra runtime environments available from the same editor, as an addition beyond the microdata language itself — useful for further analysis or comparing approaches.</td>
+          <td>These engines are not part of the service being emulated here. They were added by this hobby project, not a claim that microdata.no offers them.</td>
+        </tr>
+        <tr>
+          <td>Script storage and sharing</td>
+          <td>Scripts are stored as local files, in a GitHub repo you connect yourself, or as a compressed link in the URL.</td>
+          <td>Projects and notebooks are stored and shared inside the service itself (server-side) — not via GitHub or URL compression.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="overview-hint">If you find a difference that isn't listed here, it's worth reporting.</p>
+  </section>
+
+  <section id="oversettere">
+    <h2>py2m and r2m</h2>
+    <p>If you'd rather write Python or R, you can have it translated into microdata commands. The <strong>Translate</strong> button (the arrow icon) does the translation — the result appears in the output field. To <em>run</em> the translated code, copy it into the editor and switch to microdata mode. The translation isn't complete; it covers the patterns that have a natural microdata form, and anything it can't translate is printed as a visible comment or an <code>// UNTRANSLATED</code> line — never silently dropped.</p>
+    <table class="doc-table">
+      <thead><tr><th>From</th><th>To</th><th>Covers</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Python (pandas)</td>
+          <td>microdata</td>
+          <td>Column operations, row filtering, group aggregation, frequency/cross tables, descriptive statistics, sampling, and OLS/logit/probit/poisson regression with prediction — AST-based, tested by 94 tests in <code>py2m/tests/</code>.</td>
+        </tr>
+        <tr>
+          <td>R (tidyverse)</td>
+          <td>microdata</td>
+          <td>dplyr chains (<code>filter</code>/<code>mutate</code>/<code>select</code>/<code>rename</code>/<code>group_by</code>+<code>summarise</code>), base-R and package models (<code>lm</code>, <code>glm</code>, <code>lme4::lmer</code>, <code>plm::plm</code>, <code>survival::coxph</code> etc.), plus <code>recode</code>/<code>case_when</code>/<code>case_match</code> — tested by 184 tests in <code>r2m/test_r2m.R</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>What the translator does <strong>not</strong> cover: control flow (loops over anything but literals, <code>apply</code>/<code>lapply</code>/<code>sapply</code>), positional row selection, sorting, deduplication, data I/O (<code>read_csv</code>/<code>read.csv</code>), and result inspection (<code>head()</code>, <code>summary(model)</code>). These produce either a clear <code>// UNTRANSLATED</code> line (py2m) or a <code>//</code> comment (r2m) — never a silently wrong row.</p>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Python in <span class="badge badge-py">py</span></span>
+        <pre><code>df = df[df["alder"] > 25]
+df.groupby("kjonn")["lonn"].mean()</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">microdata out</span>
+        <pre class="result">keep if alder > 25
+tabulate kjonn, summarize(lonn)</pre>
+      </div>
+    </div>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">R in <span class="badge badge-r">r</span></span>
+        <pre><code>df &lt;- df %&gt;% filter(alder &gt; 25)
+df %&gt;% group_by(kjonn) %&gt;% summarise(snitt = mean(lonn))</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">microdata out</span>
+        <pre class="result">keep if alder > 25
+collapse (mean) lonn -> snitt, by(kjonn)</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- SYNC:START felles-editor -->
   <section id="editor">
-    <h2>Editor and keyboard shortcuts</h2>
-
-    <table class="doc-table">
-      <thead><tr><th>Shortcut</th><th>Action</th></tr></thead>
-      <tbody>
-        <tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>Run the script</td></tr>
-        <tr><td><kbd>Tab</kbd></td><td>Autocomplete (command, variable, method)</td></tr>
-        <tr><td><kbd>Esc</kbd></td><td>Close autocomplete list</td></tr>
-        <tr><td>Click line number</td><td>Set / remove breakpoint (red dot) for Run step by step</td></tr>
-      </tbody>
-    </table>
-
-    <h3>Breakpoints</h3>
-    <p>Click a line number to set a red breakpoint. During <strong>Run step by step</strong>, execution will pause at the breakpoint and wait for you to press continue.</p>
+    <h2>Editor</h2>
+    <p>Click a line number to set a red breakpoint. During <strong>Run step by step</strong>, execution pauses at the breakpoint and waits for you to press continue. The full list of keyboard shortcuts is in the <a href="#referanse-snarveier">reference</a>.</p>
   </section>
+    <!-- SYNC:END -->
 
-  <!-- ── TAB INTRO ── -->
   <section id="tab-intro">
     <h2>Tab autocomplete</h2>
     <p>Press <kbd>Tab</kbd> in the editor for context-aware suggestions: commands, variable names, DataFrame methods and more. After <code>/</code> (e.g. <code>import db/</code>), microdata variables from the catalogue are suggested. On an empty line, commands are suggested.</p>
@@ -452,19 +534,20 @@ summarize kjonn</code></pre>
     </div>
   </section>
 
-  <!-- ── SIDEBAR ── -->
+  <!-- SYNC:START felles-sidebar -->
   <section id="sidebar">
     <h2>Dataset panel (right sidebar)</h2>
     <p>The sidebar on the right shows all datasets loaded in the current run.</p>
     <ul>
       <li><strong>Number of variables and rows</strong> per dataset</li>
       <li><strong>Variable list</strong> with type icon: <code>ABC</code> text, <code>123</code> numeric, shield icon for pseudonymised ID</li>
-      <li>Click a variable for <strong>detail view</strong>: name, type, description and link to the microdata catalogue</li>
+      <li>Click a variable for <strong>detail view</strong>: name, type and description, with a link to more information where it exists</li>
     </ul>
     <p>The sidebar updates automatically after each run and after each block in Run step by step mode.</p>
   </section>
+    <!-- SYNC:END -->
 
-  <!-- ── LAGRE OG DELE ── -->
+  <!-- SYNC:START felles-lagre -->
   <section id="lagre-dele">
     <h2>Save, share and fetch scripts</h2>
     <p>All the options below are in the <strong>hamburger menu</strong> at the top left. They run entirely in your browser — we never store your scripts on a server.</p>
@@ -480,12 +563,26 @@ summarize kjonn</code></pre>
       <li>Suitable for scripts up to a few thousand characters. If the script is too large for a URL, you'll be notified — use "Download code" (file) or GitHub instead.</li>
     </ul>
 
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Script in the editor <span class="badge">url</span></span>
+        <pre><code>print(sum(range(1, 101)))</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Result — what the "Share" button produces</span>
+        <pre class="result">{"v":1,"name":"","lang":"python","script":"print(sum(range(1, 101)))"}
+
+https://din-adresse.example/app/#s=H4sIAAAAAAAAE6tWKlOyMtRRykvMTVWyUlLSUcpJzEsHsgoqSzLy84D84uSizIISkEhRZl6JRnFprkYRUEmqhqGOgqGBoaamplItAIhdxIZGAAAA</pre>
+      </div>
+    </div>
+    <p>The part before <code>#</code> is your own address (shown as a placeholder above); everything from <code>#s=</code> on is real — the script, wrapped in JSON, gzip-compressed and base64url-encoded straight into the link itself.</p>
+
     <h3>Open from URL</h3>
     <p>Paste a <strong>direct link</strong> to a text file, and the content is fetched into the editor. The most recent URLs you've used are remembered locally for quick reopening.</p>
     <ul>
       <li>Works with <strong>GitHub "raw" links</strong>, <strong>GitHub gist</strong> (raw) and <strong>Dropbox</strong>.</li>
       <li>Regular share links (e.g. a Google Drive or GitHub <em>page</em>) do <em>not</em> work — you must use the raw file link. If you get an error message, it's almost always because the source doesn't allow direct fetching (CORS).</li>
-      <li>The file extension controls the mode: <code>.py</code> → Python, <code>.r</code> → R, otherwise Microdata.</li>
+      <li>The file extension controls the mode: <code>.py</code> → Python, <code>.r</code> → R, otherwise the default mode.</li>
     </ul>
 
     <h3>GitHub (advanced)</h3>
@@ -521,30 +618,79 @@ summarize kjonn</code></pre>
       <li><strong>What is tied to one machine</strong> is only local things in the browser: the list of "recent URLs" and the pasted-in GitHub token. Your actual scripts in GitHub are <em>not</em> locked to the machine.</li>
     </ul>
   </section>
+    <!-- SYNC:END -->
 
-  <!-- ── FORKLAR ── -->
+  <!-- SYNC:START felles-forklar -->
   <section id="forklar">
     <h2>Run step by step — a step-by-step walkthrough</h2>
-    <p><strong>Run step by step</strong> runs the script one <em>block</em> at a time and reads the comments aloud using speech. All comment lines starting with <code>//</code> (microdata) or <code>#</code> (Python/R) are read aloud — the code lines are executed without commentary. Useful for presentations and teaching.</p>
+    <p><strong>Run step by step</strong> runs the script one <em>block</em> at a time and reads the comments aloud using speech. Comment lines — those starting with <code>#</code> or <code>//</code>, depending on which comment character the mode uses — are read aloud; the code lines are executed without commentary. Useful for presentations and teaching.</p>
 
     <h3>Blocks</h3>
     <p>A block is a group of consecutive lines with no blank lines between them. One or more blank lines separate blocks.</p>
-    <pre><code>// This comment is read ALOUD before the code runs
-create-dataset df
-import db/BEFOLKNING_KJOENN as kjonn
+    <pre><code># This comment is read ALOUD before the code runs
+df["alder"] = 2024 - df["fodselsar"]
 
-// This is the next block
-summarize kjonn
-// This comment is read after the result is shown</code></pre>
+# This is the next block
+df.groupby("kjonn")["lonn"].mean()
+# This comment is read after the result is shown</code></pre>
+
+    <p>What Run step by step actually makes of that script — two blocks, one leading and one trailing comment. The result is generated by the app's real block parser, so the demo script below is left in Norwegian on purpose (translating it would mean showing hand-edited output instead of the parser's real one) — <code>"Denne kommentaren leses OPP før koden kjøres"</code> = "This comment is read ALOUD before the code runs", <code>"Dette er neste blokk"</code> = "This is the next block", <code>"Denne kommentaren leses etter at resultatet vises"</code> = "This comment is read after the result is shown":</p>
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Same script <span class="badge badge-py">py</span></span>
+        <pre><code># Denne kommentaren leses OPP før koden kjøres
+df["alder"] = 2024 - df["fodselsar"]
+
+# Dette er neste blokk
+df.groupby("kjonn")["lonn"].mean()
+# Denne kommentaren leses etter at resultatet vises</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Result — the block structure</span>
+        <pre class="result">[
+  {
+    "code": "df[\"alder\"] = 2024 - df[\"fodselsar\"]",
+    "codeTrim": "df[\"alder\"] = 2024 - df[\"fodselsar\"]",
+    "commentItems": [
+      {
+        "silent": false,
+        "text": "Denne kommentaren leses OPP før koden kjøres",
+        "kwargs": {}
+      }
+    ],
+    "postCommentItems": [],
+    "skipCodeSpeech": false
+  },
+  {
+    "code": "df.groupby(\"kjonn\")[\"lonn\"].mean()",
+    "codeTrim": "df.groupby(\"kjonn\")[\"lonn\"].mean()",
+    "commentItems": [
+      {
+        "silent": false,
+        "text": "Dette er neste blokk",
+        "kwargs": {}
+      }
+    ],
+    "postCommentItems": [
+      {
+        "silent": false,
+        "text": "Denne kommentaren leses etter at resultatet vises",
+        "kwargs": {}
+      }
+    ],
+    "skipCodeSpeech": false
+  }
+]</pre>
+      </div>
+    </div>
 
     <h3>Comment syntax</h3>
     <table class="doc-table">
-      <thead><tr><th>Syntax</th><th>Mode</th><th>Effect</th></tr></thead>
+      <thead><tr><th>Syntax</th><th>Effect</th></tr></thead>
       <tbody>
-        <tr><td><code>// text</code></td><td><span class="badge badge-micro">Microdata</span></td><td>Read as speech; a leading comment is read BEFORE the code, a trailing one is read AFTER</td></tr>
-        <tr><td><code># text</code></td><td><span class="badge badge-py">Python</span> <span class="badge badge-r">R</span></td><td>Same as above</td></tr>
-        <tr><td><code>//-</code> or <code>#-</code></td><td>All</td><td>Silent comment — the first code word is <em>not</em> read aloud, and text after <code>-</code> is not read either</td></tr>
-        <tr><td><code>//(lang=nb-NO,rate=1.2) text</code></td><td>All</td><td>Speech with custom parameters (language, rate, voice, pitch)</td></tr>
+        <tr><td><code># text</code> / <code>// text</code></td><td>Read as speech; a leading comment is read BEFORE the code, a trailing one is read AFTER</td></tr>
+        <tr><td><code>#-</code> / <code>//-</code></td><td>Silent comment — the first code word is <em>not</em> read aloud, and text after <code>-</code> is not read either</td></tr>
+        <tr><td><code>//(lang=nb-NO,rate=1.2) text</code></td><td>Speech with custom parameters (language, rate, voice, pitch)</td></tr>
       </tbody>
     </table>
 
@@ -555,18 +701,16 @@ summarize kjonn
       <li>Breakpoints (click a line number) make the run pause automatically</li>
     </ul>
   </section>
+    <!-- SYNC:END -->
 
-  <!-- ── WIDGETS ── -->
+  <!-- SYNC:START felles-widgets -->
   <section id="widgets">
     <h2>Widgets in Run step by step</h2>
     <p>Widgets are interactive cards shown while the script runs step by step. They are inserted as special comment lines and are available in all modes.</p>
 
     <h3>Syntax</h3>
-    <pre><code>// microdata:
-//widget NAME { ...json... }
-
-# python or R:
-#widget NAME { ...json... }</code></pre>
+    <pre><code>#widget NAME { ...json... }</code></pre>
+    <p>The comment character follows the mode: <code>#</code> in most modes, <code>//</code> in modes that use it as the comment character — both are interpreted the same way.</p>
 
     <h3>Block syntax for longer content</h3>
     <p>For HTML, SVG and markdown with multiple lines, you can use block syntax instead of JSON:</p>
@@ -614,26 +758,68 @@ summarize kjonn
       </tbody>
     </table>
 
+    <h3>How a widget line is parsed</h3>
+    <p>The comment line is JSON after the widget name. What the app actually builds from the line:</p>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Code</span>
+        <pre><code>//widget title {"text":"Kapittel 1","size":"full"}</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Result — parsed as</span>
+        <pre class="result">{
+  "name": "title",
+  "payload": {
+    "text": "Kapittel 1",
+    "size": "full"
+  }
+}</pre>
+      </div>
+    </div>
+
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Code</span>
+        <pre><code>//widget question {"q":"Hva er p-verdien?","options":["&lt;0.05","&gt;0.05"],"answer":0}</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Result — parsed as</span>
+        <pre class="result">{
+  "name": "question",
+  "payload": {
+    "q": "Hva er p-verdien?",
+    "options": [
+      "&lt;0.05",
+      "&gt;0.05"
+    ],
+    "answer": 0
+  }
+}</pre>
+      </div>
+    </div>
+
     <div class="callout">
       All widgets support <code>speak="text"</code> for parallel speech narration while the widget is shown, and <code>auto_advance_ms=3000</code> for automatic closing after a specified time.
     </div>
   </section>
+    <!-- SYNC:END -->
 
-  <!-- ── AI ── -->
+  <!-- SYNC:START felles-ai -->
   <section id="ai">
     <h2>AI assistant</h2>
-    <p>An experimental side panel with an AI assistant that can answer questions about microdata syntax, suggest variables, and generate or revise scripts. Opened with the star icon at the top right or <kbd>Ctrl</kbd>+<kbd>I</kbd>.</p>
+    <p>An experimental side panel with an AI assistant that can answer questions about syntax, suggest variables, and generate or revise scripts. Opened with the star icon at the top right or <kbd>Ctrl</kbd>+<kbd>I</kbd>.</p>
 
     <div class="callout">
-      <strong>Requires your own Anthropic API key.</strong> Click the gear icon in the AI panel and paste in a key from <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. The key is stored only locally in the browser (localStorage) and sent as an <code>X-Anthropic-Key</code> header straight through to Anthropic for each request.
+      <strong>Requires an API key.</strong> Click the gear icon in the AI panel to set it up. The key is stored only locally in the browser (localStorage).
     </div>
 
     <h3>What the assistant can do</h3>
     <p>The assistant classifies the question and answers in one of three ways:</p>
     <ul>
-      <li><strong>Question</strong> — explains commands, syntax and usage ("What does reshape long do?")</li>
-      <li><strong>Variable search</strong> — finds relevant variables in the microdata catalogue ("What variables exist for education?")</li>
-      <li><strong>Script generation</strong> — creates a complete microdata script from a natural-language question ("Show summary statistics for income and gender")</li>
+      <li><strong>Question</strong> — explains commands, syntax and usage ("What does this function do?")</li>
+      <li><strong>Variable search</strong> — finds relevant variables in the data catalogue ("What variables exist for education?")</li>
+      <li><strong>Script generation</strong> — creates a complete script from a natural-language question ("Show summary statistics for income and gender")</li>
     </ul>
 
     <h3>Revising an existing script</h3>
@@ -656,7 +842,7 @@ summarize kjonn
 
     <h3>Other controls</h3>
     <ul>
-      <li><strong>Gear icon</strong> — change API key and base URL</li>
+      <li><strong>Gear icon</strong> — change API key and other settings</li>
       <li><strong>Trash icon</strong> — clear the conversation (does not delete anything on the server)</li>
       <li><strong>×</strong> — close the panel</li>
       <li><kbd>Enter</kbd> sends, <kbd>Shift</kbd>+<kbd>Enter</kbd> inserts a new line</li>
@@ -668,30 +854,43 @@ summarize kjonn
     <div class="callout">
       <strong>Experimental.</strong> The AI assistant can be wrong, suggest variables that don't exist, or generate scripts that don't run. Always check the result before use.
     </div>
+      <!-- SYNC:END -->
+    <h3>Getting a key in Microdata</h3>
+    <p>Paste your own Anthropic key (created at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>) under the gear icon in the AI panel. The key is stored only locally in the browser (localStorage) and is sent as an <code>X-Anthropic-Key</code> header directly to Anthropic on every request — there is no server in between here.</p>
   </section>
 
-  <!-- ── MODES ── -->
+  <!-- SYNC:START felles-eksempler -->
+  <section id="eksempler">
+    <h2>Examples</h2>
+    <p>The <strong>Examples</strong> button opens a list filtered to the mode you're in. The list is built by the app itself, so it always shows what actually exists.</p>
+    <table class="doc-table">
+      <thead><tr><th>You want to</th><th>Do</th></tr></thead>
+      <tbody>
+        <tr><td>See what's possible in this mode</td><td>Press <strong>Examples</strong></td></tr>
+        <tr><td>Start from an example</td><td>Select it — it replaces the content of the editor</td></tr>
+        <tr><td>Keep what you've written</td><td>Save first; the example overwrites the editor</td></tr>
+      </tbody>
+    </table>
+  </section>
+    <!-- SYNC:END -->
+
   <section id="modes">
     <h2>Modes</h2>
-    <p>Choose a mode from the dropdown menu in the bottom bar, or use mode-switch lines in the script to switch along the way (see <a href="#hybrid">Hybrid scripts</a>).</p>
-
-    <div class="card-grid">
-      <div class="card">
-        <div class="card-title"><span class="badge badge-micro">Microdata</span> Standard</div>
-        <div class="card-body">Microdata.no syntax. Loads register data, creates datasets, runs statistics and charts.</div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span class="badge badge-py">Python</span> Pyodide</div>
-        <div class="card-body">Complete Python in the browser. Pandas, NumPy, Matplotlib, Scikit-learn, SciPy, etc. are available.</div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span class="badge badge-r">R</span> WebR</div>
-        <div class="card-body">Complete R in the browser. Tidyverse, ggplot2, dplyr, survival, etc. are installed automatically on use.</div>
-      </div>
-    </div>
+    <p>Choose a mode from the dropdown in the bottom bar, or use mode-switch lines in the script to switch mid-script (see <a href="#hybrid">Hybrid scripts</a>). The microdata language documented on the rest of this page is only one of seven modes in the editor — the other six were added by this hobby project, see <a href="#avvik">Differences from microdata.no</a>.</p>
+    <table class="doc-table">
+      <thead><tr><th>Mode</th><th>Engine</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-micro">Microdata</span></td><td>m2py</td><td>microdata.no syntax — the language the rest of this page documents.</td></tr>
+        <tr><td><span class="badge badge-py">Python</span></td><td>Pyodide</td><td>Full Python in the browser (WebAssembly). pandas, NumPy, Matplotlib, scikit-learn, SciPy and more.</td></tr>
+        <tr><td><span class="badge badge-r">R</span></td><td>WebR</td><td>Full R in the browser (WebAssembly). Tidyverse, ggplot2, dplyr, survival etc. install automatically on first use.</td></tr>
+        <tr><td>DuckDB</td><td>duckdb-wasm</td><td>Plain SQL against your datasets — runs natively without a Python boot for pure SQL runs.</td></tr>
+        <tr><td>Brython</td><td>Brython</td><td>A lighter, faster Python engine with a growing pandas/numpy/matplotlib layer.</td></tr>
+        <tr><td>Statx</td><td>pdexplorer</td><td>Stata syntax (<code>.do</code>-style, <code>use</code> etc.) run through a pandas-based Stata counterpart.</td></tr>
+        <tr><td>jamovi</td><td>jmv in WebR</td><td>Real jamovi analyses (the jmv package) with jamovi's own dialog GUI for choosing an analysis.</td></tr>
+      </tbody>
+    </table>
   </section>
 
-  <!-- ── PYTHON ── -->
   <section id="python">
     <h2>Python (Pyodide)</h2>
     <p>Python runs in the browser via <a href="https://pyodide.org" target="_blank" rel="noopener">Pyodide</a> (WebAssembly). No installation required. Available packages include:</p>
@@ -709,39 +908,15 @@ summarize kjonn
         <tr><td><code>to_microdata(df, "navn")</code></td><td>Send a pandas DataFrame back to the microdata interpreter as a named dataset</td></tr>
       </tbody>
     </table>
-
-    <h3>Translation to microdata</h3>
-    <p>The following Python patterns translate well with <em>py2m</em>:</p>
-    <ul>
-      <li><code>df = pd.read_csv(...)</code> → <code>import</code> commands</li>
-      <li><code>df.groupby("x")["y"].mean()</code> → <code>collapse (mean) y, by(x)</code></li>
-      <li><code>df[df["x"] &gt; 0]</code> → <code>keep if x &gt; 0</code></li>
-      <li><code>df["ny"] = df["x"] + df["y"]</code> → <code>generate ny = x + y</code></li>
-      <li><code>df.rename(columns={"a": "b"})</code> → <code>rename a b</code></li>
-      <li><code>df.merge(df2, on="id")</code> → <code>merge</code></li>
-    </ul>
-    <p>Code that uses custom classes, list comprehensions, recursion, asynchronous logic or complex lambda expressions is not translated and must be rewritten.</p>
+    <p>To have Python code translated to microdata instead of run directly, see <a href="#oversettere">py2m and r2m</a>.</p>
   </section>
 
-  <!-- ── R ── -->
   <section id="r">
     <h2>R (WebR)</h2>
     <p>R runs via <a href="https://docs.r-wasm.org/webr/latest/" target="_blank" rel="noopener">WebR</a> (WebAssembly). Packages are installed automatically the first time they're used (<code>library(dplyr)</code>, etc.).</p>
-
-    <h3>Translation to microdata</h3>
-    <p>The following R patterns translate well with <em>r2m</em>:</p>
-    <ul>
-      <li><code>df %&gt;% filter(x &gt; 0)</code> → <code>keep if x &gt; 0</code></li>
-      <li><code>df %&gt;% select(x, y)</code> → <code>keep x y</code></li>
-      <li><code>df %&gt;% mutate(ny = x + y)</code> → <code>generate ny = x + y</code></li>
-      <li><code>df %&gt;% group_by(g) %&gt;% summarise(m = mean(x))</code> → <code>collapse (mean) x -> m, by(g)</code></li>
-      <li><code>df %&gt;% rename(ny = gammel)</code> → <code>rename gammel ny</code></li>
-      <li><code>left_join(df, df2, by = "id")</code> → <code>merge</code></li>
-    </ul>
-    <p>Code that uses <code>purrr</code>, custom R6 classes, Shiny, environment manipulation or complex NSE expressions is not translated automatically.</p>
+    <p>To have R code translated to microdata instead of run directly, see <a href="#oversettere">py2m and r2m</a>.</p>
   </section>
 
-  <!-- ── HYBRID ── -->
   <section id="hybrid">
     <h2>Hybrid scripts</h2>
     <p>You can mix microdata, Python and R in the same script by using <strong>mode-switch lines</strong>.</p>
@@ -794,26 +969,41 @@ library(dplyr)
 df %>% group_by(kjonn) %>%
   summarise(snitt = mean(inntekt, na.rm = TRUE))</code></pre>
 
-    <p>The datasets from the microdata section are automatically transferred to Python as pandas DataFrames and to R as data frames.</p>
+    <p>The datasets from the microdata blocks are automatically transferred to Python as pandas DataFrames and to R as data frames.</p>
   </section>
 
-  <!-- ── TAB FULL ── -->
+  <!-- SYNC:START felles-referanse-snarveier -->
+  <section id="referanse-snarveier">
+    <h2>Keyboard shortcuts</h2>
+    <table class="doc-table">
+      <thead><tr><th>Shortcut</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>Run the script</td></tr>
+        <tr><td><kbd>Tab</kbd></td><td>Autocomplete (command, variable, method)</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Close the autocomplete list</td></tr>
+        <tr><td>Click line number</td><td>Set / remove a breakpoint (red dot) for Run step by step</td></tr>
+      </tbody>
+    </table>
+  </section>
+    <!-- SYNC:END -->
+
+  <!-- SYNC:START felles-referanse-tab -->
   <section id="tab-full">
     <h2>Tab autocomplete — full reference</h2>
-    <p>Press <kbd>Tab</kbd> in the editor for context-aware suggestions. The rules are the same in all modes:</p>
+    <p>Press <kbd>Tab</kbd> in the editor for context-aware suggestions. The rules are the same in every mode:</p>
 
     <table class="doc-table">
       <thead><tr><th>Context</th><th>Suggestion</th></tr></thead>
       <tbody>
         <tr>
           <td>After <code>/</code> (e.g. <code>import db/</code>)</td>
-          <td>Microdata variable names from the catalogue</td>
+          <td>Catalogue variables, in modes with a connected source catalogue</td>
         </tr>
         <tr>
           <td>Empty start of line</td>
           <td>
-            <span class="badge badge-micro">Microdata</span> commands<br>
-            <span class="badge badge-py">Python</span> keywords + built-in functions<br>
+            Commands or keywords for the active mode — e.g.
+            <span class="badge badge-py">Python</span> built-in functions,
             <span class="badge badge-r">R</span> base R and tidyverse functions
           </td>
         </tr>
@@ -845,27 +1035,141 @@ df %>% group_by(kjonn) %>%
     </table>
 
     <h3>Variable information</h3>
-    <p>When you select a microdata variable name from the autocomplete list, a small popup shows the name, type and description from the catalogue. Click <strong>More info</strong> to open full documentation on microdata.no.</p>
+    <p>When you select a variable name from the autocomplete list, a small popup shows the name, type and description. Click <strong>More info</strong> to open full documentation, where it exists.</p>
   </section>
+    <!-- SYNC:END -->
 
 </main>
 </div>
 
 <script>
-  // Highlight nav link matching current scroll position
-  const sections = document.querySelectorAll('section[id]');
-  const navLinks = document.querySelectorAll('nav a');
-  function updateNav() {
-    let current = '';
-    sections.forEach(s => {
-      if (window.scrollY >= s.offsetTop - 60) current = s.id;
-    });
-    navLinks.forEach(a => {
-      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+/* SYNC:START felles-js */
+(function hjelpUI(w) {
+  'use strict';
+
+  // Ren funksjon — node-testet i tests/js/test_hjelp_ui.mjs.
+  // Returnerer indeksene i `labels` som matcher `query`.
+  function matchNav(query, labels) {
+    var q = String(query || '').trim().toLowerCase();
+    var out = [];
+    for (var i = 0; i < labels.length; i++) {
+      if (!q || String(labels[i]).toLowerCase().indexOf(q) >= 0) out.push(i);
+    }
+    return out;
+  }
+
+  // Ren funksjon — node-testet i tests/js/test_hjelp_ui.mjs.
+  // Velger hvilken seksjon scrollspyen skal markere som aktiv: første id i
+  // `intersectingIds` (observatørens egen rekkefølge, dvs. dokumentrekkefølge)
+  // hvis noe faktisk er synlig nå, ellers den forrige aktive — ALDRI tomt,
+  // bortsett fra første kall før noe seksjon i det hele tatt har vært synlig.
+  // Uten dette blir highlighten borte hver gang ingen seksjon overlapper det
+  // smale observasjonsbåndet (typisk øverst og nederst på siden).
+  function pickActiveId(prevId, intersectingIds) {
+    if (intersectingIds.length) return intersectingIds[0];
+    return prevId || null;
+  }
+
+  function navLinks() {
+    return Array.prototype.slice.call(document.querySelectorAll('nav a[href^="#"]'));
+  }
+
+  function initNavFilter() {
+    var input = document.querySelector('.nav-filter');
+    if (!input || input.dataset.wired) return;
+    input.dataset.wired = '1';
+    var links = navLinks();
+    var labels = links.map(function (a) { return a.textContent; });
+    input.addEventListener('input', function () {
+      var keep = matchNav(input.value, labels);
+      var show = Object.create(null);
+      keep.forEach(function (i) { show[i] = true; });
+      links.forEach(function (a, i) {
+        a.classList.toggle('nav-link-hidden', !show[i]);
+      });
+      // Skjul en seksjonsoverskrift som ikke har synlige lenker under seg.
+      Array.prototype.forEach.call(
+        document.querySelectorAll('nav .nav-section'),
+        function (h) {
+          var any = false, el = h.nextElementSibling;
+          while (el && !el.classList.contains('nav-section')) {
+            if (el.tagName === 'A' && !el.classList.contains('nav-link-hidden')) any = true;
+            el = el.nextElementSibling;
+          }
+          h.classList.toggle('nav-link-hidden', !any);
+        });
     });
   }
-  window.addEventListener('scroll', updateNav, { passive: true });
-  updateNav();
+
+  function initScrollspy() {
+    var links = navLinks();
+    if (!links.length || document.body.dataset.spyWired) return;
+    document.body.dataset.spyWired = '1';
+    var byId = Object.create(null);
+    links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+    var targets = Object.keys(byId)
+      .map(function (id) { return document.getElementById(id); })
+      .filter(Boolean);
+    if (!targets.length || !w.IntersectionObserver) return;
+    var seen = Object.create(null);
+    var activeId = null;
+    var obs = new w.IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { seen[e.target.id] = e.isIntersecting; });
+      var intersecting = targets
+        .filter(function (t) { return seen[t.id]; })
+        .map(function (t) { return t.id; });
+      var next = pickActiveId(activeId, intersecting);
+      if (next === activeId) return;
+      activeId = next;
+      links.forEach(function (a) { a.classList.remove('nav-active'); });
+      if (activeId && byId[activeId]) byId[activeId].classList.add('nav-active');
+    }, { rootMargin: '-80px 0px -70% 0px' });
+    targets.forEach(function (t) { obs.observe(t); });
+  }
+
+  function initCopyButtons() {
+    Array.prototype.forEach.call(
+      document.querySelectorAll('.example-code'),
+      function (box) {
+        if (box.querySelector('.copy-btn')) return;
+        var pre = box.querySelector('pre');
+        if (!pre) return;
+        var btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.type = 'button';
+        btn.textContent = 'Kopier';
+        btn.addEventListener('click', function () {
+          var text = pre.textContent;
+          var flash = function (label) {
+            btn.textContent = label;
+            w.setTimeout(function () { btn.textContent = 'Kopier'; }, 1400);
+          };
+          var ok = function () { flash('Kopiert'); };
+          var fail = function () { flash('Kopier feilet'); };
+          if (w.navigator && w.navigator.clipboard) {
+            w.navigator.clipboard.writeText(text).then(ok, fail);
+          } else {
+            fail();
+          }
+        });
+        box.appendChild(btn);
+      });
+  }
+
+  w.HjelpUI = {
+    matchNav: matchNav,
+    pickActiveId: pickActiveId,
+    initNavFilter: initNavFilter,
+    initScrollspy: initScrollspy,
+    initCopyButtons: initCopyButtons,
+  };
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', function () {
+      initNavFilter(); initScrollspy(); initCopyButtons();
+    });
+  }
+})(typeof window !== 'undefined' ? window : this);
+/* SYNC:END */
 </script>
-</body>
-</html>
+</body></html>

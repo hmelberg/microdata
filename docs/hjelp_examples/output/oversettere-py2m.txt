@@ -1,0 +1,2 @@
+keep if alder > 25
+tabulate kjonn, summarize(lonn)

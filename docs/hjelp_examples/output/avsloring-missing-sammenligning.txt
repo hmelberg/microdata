@@ -1,0 +1,1 @@
+FEIL PÅ KOMMANDO 'generate' (ValueError): Sammenligning med `.` (Stata-syntaks som `x == .`) er ikke gyldig i microdata.no. Bruk `sysmiss(x)` for å teste om en verdi er missing (f.eks. `drop if sysmiss(x)`). Tildeling med `= .` (f.eks. `generate x = .`) er OK.
