@@ -236,6 +236,7 @@ nav a.nav-active {
   <input class="nav-filter" type="search" placeholder="Filter…" aria-label="Filter the table of contents">
   <div class="nav-section">Getting started</div>
   <a href="#intro">What is this?</a>
+  <a href="#hurtigstart">30 seconds</a>
   <a href="#running">Running</a>
   <div class="nav-section">The emulator</div>
   <a href="#kommandoer">The commands</a>
@@ -280,8 +281,9 @@ nav a.nav-active {
       <table class="doc-table">
         <thead><tr><th>Section</th><th>What you'll find there</th></tr></thead>
         <tbody>
+          <tr><td><a href="#hurtigstart">30 seconds</a></td><td>Paste, run, see a result</td></tr>
           <tr><td><a href="#kommandoer">The commands</a></td><td>The language, command by command</td></tr>
-          <tr><td><a href="#avsloring">Disclosure control</a></td><td>The rules that censor output, and how to turn them off</td></tr>
+          <tr><td><a href="#avsloring">Disclosure control</a></td><td>The rules that censor output when turned on, and how to control them</td></tr>
           <tr><td><a href="#avvik">Differences from microdata.no</a></td><td>Where the emulator isn't faithful to the original</td></tr>
           <tr><td><a href="#oversettere">py2m and r2m</a></td><td>Python and R in, microdata out</td></tr>
           <tr><td><a href="#tab-full">Reference</a></td><td>Shortcuts, autocomplete</td></tr>
@@ -298,6 +300,22 @@ nav a.nav-active {
     </div>
   </section>
 
+  <section id="hurtigstart">
+    <h2>30 seconds</h2>
+    <p>Choose <strong>microdata</strong> in the mode menu (it's the default), paste this, and press <kbd>Ctrl</kbd>+<kbd>Enter</kbd>:</p>
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Code <span class="badge badge-micro">micro</span></span>
+        <pre><code>generate alder_pluss10 = alder + 10</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Result</span>
+        <pre class="result">Genererte alder_pluss10 med 5 000 enheter</pre>
+      </div>
+    </div>
+    <p>No <code>import</code> or <code>require</code> needed here — a demo dataset is already loaded. See what the command actually did, and the rest of the language, in <a href="#kommandoer">The commands</a>.</p>
+  </section>
+
   <!-- SYNC:START felles-running -->
   <section id="running">
     <h2>Running</h2>
@@ -309,8 +327,7 @@ nav a.nav-active {
     <h3>Stop / cancel</h3>
     <p>Press the <strong>Run</strong> button again while running to cancel.</p>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <section id="kommandoer">
     <h2>The commands</h2>
     <p>The microdata language is deliberately small. Each command does one thing, and the order is the one you'd write on paper: fetch data, build variables, summarize. The list below is limited to commands that are actually implemented in <code>m2py.py</code>.</p>
@@ -348,6 +365,41 @@ nav a.nav-active {
     <p><em>Multi-key:</em> only ONE variable in <code>by()</code> and <code>on</code>. Build a composite key first: <code>generate composite = string(k1) ++ "_" ++ string(k2)</code>.</p>
     <p><em>Pseudonym variables</em> (names ending in <code>_FNR</code>, e.g. <code>BEFOLKNING_MOR_FNR</code>) can only be used as a key in <code>collapse(by)</code> or <code>merge(on)</code> — not in <code>generate</code>/<code>replace</code> or comparisons. See <a href="#avsloring">Disclosure control</a>.</p>
 
+    <h3>Control flow</h3>
+    <p>For-loops use production grammar: a range with <code>n : m</code> (inclusive), or a value list (comma- or space-separated). Use <code>$i</code> for text substitution in names. Three things are invalid and produce their own error messages from <code>m2py.py</code>: parentheses around the value list, a literal ellipsis <code>...</code>, and nested <code>for...end</code> blocks (write multiple levels in one loop with <code>;</code> instead, e.g. <code>for i in 1:2; j in 3:4</code>).</p>
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Code <span class="badge badge-micro">micro</span></span>
+        <pre><code>for i in 2018 : 2020
+  generate innt_$i = lonn + $i
+end</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Result</span>
+        <pre class="result">Genererte innt_2018 med 5 000 enheter
+Genererte innt_2019 med 5 000 enheter
+Genererte innt_2020 med 5 000 enheter</pre>
+      </div>
+    </div>
+
+    <h3>Panel data</h3>
+    <p>A separate command family for data with multiple measurement points per unit (long/panel format). Not covered by this page's harness — the table alone is taken from <code>command_help.js</code>, cross-checked against dispatch in <code>m2py.py</code>:</p>
+    <table class="doc-table">
+      <thead><tr><th>Command</th><th>Does</th></tr></thead>
+      <tbody>
+        <tr><td><code>import-panel register-var time1 time2 ...</code></td><td>Imports a variable at multiple points in time in panel/long format (multiple rows per unit)</td></tr>
+        <tr><td><code>reshape-to-panel prefix</code></td><td>Converts a wide dataset (e.g. <code>lonn2014</code>, <code>lonn2018</code>) to panel/long format</td></tr>
+        <tr><td><code>reshape-from-panel</code></td><td>Converts panel/long format back to wide format (one row per unit)</td></tr>
+        <tr><td><code>summarize-panel var-list [if]</code></td><td>Like <code>summarize</code>, but split by measurement point</td></tr>
+        <tr><td><code>tabulate-panel var-list [if]</code></td><td>Frequency/volume table for panel variables over time</td></tr>
+        <tr><td><code>transitions-panel var-name var-list [if]</code></td><td>Transition probabilities between categories over time</td></tr>
+        <tr><td><code>regress-panel y x1 x2 ..., fe|re|be|pooled</code></td><td>Panel regression (fixed/random/between effects, or pooled)</td></tr>
+        <tr><td><code>regress-panel-diff y group treated x1 x2 ...</code></td><td>Difference-in-differences regression (ATET = the coefficient of <code>group#treated</code>)</td></tr>
+        <tr><td><code>regress-panel-predict y x1 x2 ...</code></td><td>Like <code>regress-panel</code>, but generates predicted values/residuals/unit effects</td></tr>
+      </tbody>
+    </table>
+    <p class="overview-hint">The tables on this page cover the most-used commands, not all ~150 identifiers in <code>command_help.js</code> — date/math/string helper functions (<code>sqrt</code>, <code>substr</code>, <code>inrange</code> etc.) and label commands (<code>assign-labels</code>, <code>define-labels</code>) are not listed here.</p>
+
     <h3>A whole script</h3>
     <p>Run through the emulator exactly as written, with disclosure control on:</p>
     <div class="example">
@@ -366,7 +418,7 @@ Aggregerte testdata gruppert på kjonn til 2 verdier</pre>
 
   <section id="avsloring">
     <h2>Disclosure control</h2>
-    <p>The emulator censors output the same way microdata.no does, because a script that produces numbers here and gets rejected there isn't much help. The control is on by default in the app. The thresholds below are taken directly from the constants in <code>m2py.py</code> (lines 267–272), not from memory:</p>
+    <p>The emulator can censor output the same way microdata.no does, because a script that produces numbers here and gets rejected there isn't much help. <strong>The control is off by default</strong> — without it you see raw, uncensored numbers that are not comparable to what microdata.no would actually show. The thresholds below are taken directly from the constants in <code>m2py.py</code> (lines 267–272), not from memory, and apply when the control is turned on:</p>
     <table class="doc-table">
       <thead><tr><th>Rule</th><th>Threshold</th><th>Effect when triggered</th></tr></thead>
       <tbody>
@@ -382,12 +434,12 @@ Aggregerte testdata gruppert på kjonn til 2 verdier</pre>
       </tbody>
     </table>
 
-    <h3>Turning it off</h3>
-    <p>Add the directive at the top of the script:</p>
-    <pre><code>// m2py: disclosure-control=off</code></pre>
+    <h3>Turning it on</h3>
+    <p>Check "Disclosure control" in the hamburger menu, or add the directive at the top of the script:</p>
+    <pre><code>// m2py: disclosure-control=on</code></pre>
     <p>The directive is an ordinary comment, so microdata.no ignores it. The same script can run in both places.</p>
     <div class="callout">
-      <strong>What you lose:</strong> with the control off, the numbers are no longer comparable to what you'd get in production. Turn it off to understand the data, not to report it.
+      <strong>What you lose without it:</strong> with the control off (the app's default), the numbers are not comparable to what you'd get in production — no population minimum, no winsorizing, no rounding. Use OFF to explore the data quickly; turn ON when you want to see what microdata.no would actually show or accept.
     </div>
 
     <h3>What a rejection looks like</h3>
@@ -523,8 +575,7 @@ collapse (mean) lonn -> snitt, by(kjonn)</pre>
     <h2>Editor</h2>
     <p>Click a line number to set a red breakpoint. During <strong>Run step by step</strong>, execution pauses at the breakpoint and waits for you to press continue. The full list of keyboard shortcuts is in the <a href="#referanse-snarveier">reference</a>.</p>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <section id="tab-intro">
     <h2>Tab autocomplete</h2>
     <p>Press <kbd>Tab</kbd> in the editor for context-aware suggestions: commands, variable names, DataFrame methods and more. After <code>/</code> (e.g. <code>import db/</code>), microdata variables from the catalogue are suggested. On an empty line, commands are suggested.</p>
@@ -545,8 +596,7 @@ collapse (mean) lonn -> snitt, by(kjonn)</pre>
     </ul>
     <p>The sidebar updates automatically after each run and after each block in Run step by step mode.</p>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <!-- SYNC:START felles-lagre -->
   <section id="lagre-dele">
     <h2>Save, share and fetch scripts</h2>
@@ -618,8 +668,7 @@ https://din-adresse.example/app/#s=H4sIAAAAAAAAE6tWKlOyMtRRykvMTVWyUlLSUcpJzEsHs
       <li><strong>What is tied to one machine</strong> is only local things in the browser: the list of "recent URLs" and the pasted-in GitHub token. Your actual scripts in GitHub are <em>not</em> locked to the machine.</li>
     </ul>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <!-- SYNC:START felles-forklar -->
   <section id="forklar">
     <h2>Run step by step — a step-by-step walkthrough</h2>
@@ -701,8 +750,7 @@ df.groupby("kjonn")["lonn"].mean()
       <li>Breakpoints (click a line number) make the run pause automatically</li>
     </ul>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <!-- SYNC:START felles-widgets -->
   <section id="widgets">
     <h2>Widgets in Run step by step</h2>
@@ -803,8 +851,7 @@ df.groupby("kjonn")["lonn"].mean()
       All widgets support <code>speak="text"</code> for parallel speech narration while the widget is shown, and <code>auto_advance_ms=3000</code> for automatic closing after a specified time.
     </div>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <!-- SYNC:START felles-ai -->
   <section id="ai">
     <h2>AI assistant</h2>
@@ -854,7 +901,7 @@ df.groupby("kjonn")["lonn"].mean()
     <div class="callout">
       <strong>Experimental.</strong> The AI assistant can be wrong, suggest variables that don't exist, or generate scripts that don't run. Always check the result before use.
     </div>
-      <!-- SYNC:END -->
+    <!-- SYNC:END -->
     <h3>Getting a key in Microdata</h3>
     <p>Paste your own Anthropic key (created at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>) under the gear icon in the AI panel. The key is stored only locally in the browser (localStorage) and is sent as an <code>X-Anthropic-Key</code> header directly to Anthropic on every request — there is no server in between here.</p>
   </section>
@@ -872,8 +919,7 @@ df.groupby("kjonn")["lonn"].mean()
       </tbody>
     </table>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <section id="modes">
     <h2>Modes</h2>
     <p>Choose a mode from the dropdown in the bottom bar, or use mode-switch lines in the script to switch mid-script (see <a href="#hybrid">Hybrid scripts</a>). The microdata language documented on the rest of this page is only one of seven modes in the editor — the other six were added by this hobby project, see <a href="#avvik">Differences from microdata.no</a>.</p>
@@ -985,8 +1031,7 @@ df %>% group_by(kjonn) %>%
       </tbody>
     </table>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <!-- SYNC:START felles-referanse-tab -->
   <section id="tab-full">
     <h2>Tab autocomplete — full reference</h2>
@@ -1037,8 +1082,7 @@ df %>% group_by(kjonn) %>%
     <h3>Variable information</h3>
     <p>When you select a variable name from the autocomplete list, a small popup shows the name, type and description. Click <strong>More info</strong> to open full documentation, where it exists.</p>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
 </main>
 </div>
 

@@ -236,6 +236,7 @@ nav a.nav-active {
   <input class="nav-filter" type="search" placeholder="Filtrer…" aria-label="Filtrer innholdsfortegnelsen">
   <div class="nav-section">Kom i gang</div>
   <a href="#intro">Hva er dette?</a>
+  <a href="#hurtigstart">30 sekunder</a>
   <a href="#running">Kjøre</a>
   <div class="nav-section">Emulatoren</div>
   <a href="#kommandoer">Kommandoene</a>
@@ -280,8 +281,9 @@ nav a.nav-active {
       <table class="doc-table">
         <thead><tr><th>Del</th><th>Hva du finner der</th></tr></thead>
         <tbody>
+          <tr><td><a href="#hurtigstart">30 sekunder</a></td><td>Lim inn, kjør, se et resultat</td></tr>
           <tr><td><a href="#kommandoer">Kommandoene</a></td><td>Språket, kommando for kommando</td></tr>
-          <tr><td><a href="#avsloring">Avsløringskontroll</a></td><td>Reglene som sensurerer output, og hvordan du skrur dem av</td></tr>
+          <tr><td><a href="#avsloring">Avsløringskontroll</a></td><td>Reglene som sensurerer output når de er slått på, og hvordan du styrer dem</td></tr>
           <tr><td><a href="#avvik">Avvik fra microdata.no</a></td><td>Der emulatoren ikke er tro mot originalen</td></tr>
           <tr><td><a href="#oversettere">py2m og r2m</a></td><td>Python og R inn, microdata ut</td></tr>
           <tr><td><a href="#tab-full">Referanse</a></td><td>Snarveier, autocomplete</td></tr>
@@ -298,6 +300,22 @@ nav a.nav-active {
     </div>
   </section>
 
+  <section id="hurtigstart">
+    <h2>30 sekunder</h2>
+    <p>Velg <strong>microdata</strong> i modusmenyen (det er standard), lim inn dette, og trykk <kbd>Ctrl</kbd>+<kbd>Enter</kbd>:</p>
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Kode <span class="badge badge-micro">micro</span></span>
+        <pre><code>generate alder_pluss10 = alder + 10</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Resultat</span>
+        <pre class="result">Genererte alder_pluss10 med 5 000 enheter</pre>
+      </div>
+    </div>
+    <p>Ingen <code>import</code> eller <code>require</code> trengs her — et demo-datasett er allerede lastet. Se hva kommandoen egentlig gjorde, og resten av språket, i <a href="#kommandoer">Kommandoene</a>.</p>
+  </section>
+
   <!-- SYNC:START felles-running -->
   <section id="running">
     <h2>Kjøre</h2>
@@ -309,8 +327,7 @@ nav a.nav-active {
     <h3>Stoppe / avbryte</h3>
     <p>Trykk <strong>Kjør</strong>-knappen igjen under kjøring for å avbryte.</p>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <section id="kommandoer">
     <h2>Kommandoene</h2>
     <p>microdata-språket er lite med vilje. Hver kommando gjør én ting, og rekkefølgen er den du ville skrevet på papir: hent data, lag variabler, oppsummer. Listen under er begrenset til kommandoer som faktisk er implementert i <code>m2py.py</code>.</p>
@@ -348,6 +365,41 @@ nav a.nav-active {
     <p><em>Multi-key:</em> kun ÉN variabel i <code>by()</code> og <code>on</code>. Lag en composite-nøkkel først: <code>generate composite = string(k1) ++ "_" ++ string(k2)</code>.</p>
     <p><em>Pseudonym-variabler</em> (navn som slutter på <code>_FNR</code>, f.eks. <code>BEFOLKNING_MOR_FNR</code>) kan kun brukes som nøkkel i <code>collapse(by)</code> eller <code>merge(on)</code> — ikke i <code>generate</code>/<code>replace</code> eller sammenligninger. Se <a href="#avsloring">Avsløringskontroll</a>.</p>
 
+    <h3>Kontrollflyt</h3>
+    <p>For-løkker bruker prod-grammatikk: en range med <code>n : m</code> (inklusiv), eller en verdiliste (komma- eller mellomrom-separert). Bruk <code>$i</code> for tekstsubstitusjon i navn. Tre ting er ugyldige og gir egne feilmeldinger fra <code>m2py.py</code>: parentes rundt verdilisten, literal ellipsis <code>...</code>, og nøstede <code>for...end</code>-blokker (skriv flere nivåer i én løkke med <code>;</code> i stedet, f.eks. <code>for i in 1:2; j in 3:4</code>).</p>
+    <div class="example">
+      <div class="example-code">
+        <span class="example-label">Kode <span class="badge badge-micro">micro</span></span>
+        <pre><code>for i in 2018 : 2020
+  generate innt_$i = lonn + $i
+end</code></pre>
+      </div>
+      <div class="example-result">
+        <span class="example-label">Resultat</span>
+        <pre class="result">Genererte innt_2018 med 5 000 enheter
+Genererte innt_2019 med 5 000 enheter
+Genererte innt_2020 med 5 000 enheter</pre>
+      </div>
+    </div>
+
+    <h3>Paneldata</h3>
+    <p>Egen kommandofamilie for data med flere målepunkter per enhet (long/panel-format). Ikke dekket av harnessen på denne siden — tabellen alene er hentet fra <code>command_help.js</code>, kryssjekket mot dispatch i <code>m2py.py</code>:</p>
+    <table class="doc-table">
+      <thead><tr><th>Kommando</th><th>Gjør</th></tr></thead>
+      <tbody>
+        <tr><td><code>import-panel register-var tid1 tid2 ...</code></td><td>Importerer en variabel på flere tidspunkter i panel-/long-format (flere rader per enhet)</td></tr>
+        <tr><td><code>reshape-to-panel prefiks</code></td><td>Gjør om wide-datasett (f.eks. <code>lonn2014</code>, <code>lonn2018</code>) til panel-/long-format</td></tr>
+        <tr><td><code>reshape-from-panel</code></td><td>Gjør om panel-/long-format tilbake til wide-format (én rad per enhet)</td></tr>
+        <tr><td><code>summarize-panel var-list [if]</code></td><td>Som <code>summarize</code>, men fordelt per måletidspunkt</td></tr>
+        <tr><td><code>tabulate-panel var-list [if]</code></td><td>Frekvens-/volumtabell for panelvariabler over tid</td></tr>
+        <tr><td><code>transitions-panel var-name var-list [if]</code></td><td>Overgangssannsynligheter mellom kategorier over tid</td></tr>
+        <tr><td><code>regress-panel y x1 x2 ..., fe|re|be|pooled</code></td><td>Panelregresjon (fixed/random/between effects eller pooled)</td></tr>
+        <tr><td><code>regress-panel-diff y group treated x1 x2 ...</code></td><td>Diff-in-diff-regresjon (ATET = koeffisienten til <code>group#treated</code>)</td></tr>
+        <tr><td><code>regress-panel-predict y x1 x2 ...</code></td><td>Som <code>regress-panel</code>, men genererer predikerte verdier/residualer/enhetseffekter</td></tr>
+      </tbody>
+    </table>
+    <p class="overview-hint">Tabellene på denne siden dekker de mest brukte kommandoene, ikke alle ~150 identifikatorene i <code>command_help.js</code> — hjelpefunksjoner for dato/matte/streng (<code>sqrt</code>, <code>substr</code>, <code>inrange</code> osv.) og etikett-kommandoer (<code>assign-labels</code>, <code>define-labels</code>) er ikke listet her.</p>
+
     <h3>Et helt skript</h3>
     <p>Kjørt gjennom emulatoren akkurat slik det står, med avsløringskontroll på:</p>
     <div class="example">
@@ -366,7 +418,7 @@ Aggregerte testdata gruppert på kjonn til 2 verdier</pre>
 
   <section id="avsloring">
     <h2>Avsløringskontroll</h2>
-    <p>Emulatoren sensurerer output på samme måte som microdata.no gjør, fordi et skript som gir tall her og blir avvist der ikke er til hjelp. Kontrollen er på som standard i appen. Tersklene under er hentet direkte fra konstantene i <code>m2py.py</code> (linje 267–272), ikke fra hukommelsen:</p>
+    <p>Emulatoren kan sensurere output på samme måte som microdata.no gjør, fordi et skript som gir tall her og blir avvist der ikke er til hjelp. <strong>Kontrollen er av som standard</strong> — uten den ser du rå, usensurerte tall som ikke er sammenlignbare med det microdata.no faktisk ville vist. Tersklene under er hentet direkte fra konstantene i <code>m2py.py</code> (linje 267–272), ikke fra hukommelsen, og gjelder når kontrollen er slått på:</p>
     <table class="doc-table">
       <thead><tr><th>Regel</th><th>Terskel</th><th>Effekt når den slår inn</th></tr></thead>
       <tbody>
@@ -382,12 +434,12 @@ Aggregerte testdata gruppert på kjonn til 2 verdier</pre>
       </tbody>
     </table>
 
-    <h3>Skru den av</h3>
-    <p>Legg direktivet øverst i skriptet:</p>
-    <pre><code>// m2py: disclosure-control=off</code></pre>
+    <h3>Slå den på</h3>
+    <p>Kryss av «Avsløringskontroll» i hamburgermenyen, eller legg direktivet øverst i skriptet:</p>
+    <pre><code>// m2py: disclosure-control=on</code></pre>
     <p>Direktivet er en vanlig kommentar, så microdata.no ignorerer det. Samme skript kan kjøres begge steder.</p>
     <div class="callout">
-      <strong>Hva du mister:</strong> med kontrollen av er tallene ikke lenger sammenlignbare med det du ville fått i produksjon. Skru den av for å forstå dataene, ikke for å rapportere dem.
+      <strong>Hva du mister uten den:</strong> med kontrollen av (appens standard) er tallene ikke sammenlignbare med det du ville fått i produksjon — ingen populasjonsminimum, ingen winsorisering, ingen avrunding. Bruk AV for å utforske dataene raskt; slå PÅ når du vil se hva microdata.no faktisk ville vist eller godtatt.
     </div>
 
     <h3>Slik ser en avvisning ut</h3>
@@ -523,8 +575,7 @@ collapse (mean) lonn -> snitt, by(kjonn)</pre>
     <h2>Editor</h2>
     <p>Klikk på et linjenummer for å sette et rødt stoppunkt. Under <strong>Kjør skrittvis</strong> pauser kjøringen ved stoppunktet og venter på at du trykker videre. Full liste over tastatursnarveier står i <a href="#referanse-snarveier">referansen</a>.</p>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <section id="tab-intro">
     <h2>Tab-autocomplete</h2>
     <p>Trykk <kbd>Tab</kbd> i editoren for kontekstbevisste forslag: kommandoer, variabelnavn, DataFrame-metoder og mer. Etter <code>/</code> (f.eks. <code>import db/</code>) foreslås microdata-variabler fra katalogen. På tom linje foreslås kommandoer.</p>
@@ -545,8 +596,7 @@ collapse (mean) lonn -> snitt, by(kjonn)</pre>
     </ul>
     <p>Sidemenyen oppdateres automatisk etter hver kjøring og etter hvert blokk i Kjør skrittvis-modus.</p>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <!-- SYNC:START felles-lagre -->
   <section id="lagre-dele">
     <h2>Lagre, dele og hente scripts</h2>
@@ -618,8 +668,7 @@ https://din-adresse.example/app/#s=H4sIAAAAAAAAE6tWKlOyMtRRykvMTVWyUlLSUcpJzEsHs
       <li><strong>Det som er knyttet til én maskin</strong> er bare lokale ting i nettleseren: listen over «nylige URL-er» og det innlimte GitHub-tokenet. Selve scriptene dine i GitHub er <em>ikke</em> låst til maskinen.</li>
     </ul>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <!-- SYNC:START felles-forklar -->
   <section id="forklar">
     <h2>Kjør skrittvis — steg-for-steg gjennomgang</h2>
@@ -701,8 +750,7 @@ df.groupby("kjonn")["lonn"].mean()
       <li>Stoppunkter (klikk på linjenummer) gjør at kjøringen pauser automatisk</li>
     </ul>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <!-- SYNC:START felles-widgets -->
   <section id="widgets">
     <h2>Widgets i Kjør skrittvis</h2>
@@ -803,8 +851,7 @@ df.groupby("kjonn")["lonn"].mean()
       Alle widgets støtter <code>speak="tekst"</code> for parallell taleopplesning mens widgeten vises, og <code>auto_advance_ms=3000</code> for automatisk lukking etter angitt tid.
     </div>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <!-- SYNC:START felles-ai -->
   <section id="ai">
     <h2>AI assistent</h2>
@@ -854,7 +901,7 @@ df.groupby("kjonn")["lonn"].mean()
     <div class="callout">
       <strong>Eksperimentell.</strong> AI-assistenten kan ta feil, foreslå variabler som ikke finnes, eller generere skript som ikke kjører. Sjekk alltid resultatet før bruk.
     </div>
-      <!-- SYNC:END -->
+    <!-- SYNC:END -->
     <h3>Nøkkelen i Microdata</h3>
     <p>Lim inn din egen Anthropic-nøkkel (opprettet på <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>) under tannhjul-ikonet i AI-panelet. Nøkkelen lagres kun lokalt i nettleseren (localStorage) og sendes som <code>X-Anthropic-Key</code>-header direkte til Anthropic for hver forespørsel — det finnes ingen mellomtjener her.</p>
   </section>
@@ -872,8 +919,7 @@ df.groupby("kjonn")["lonn"].mean()
       </tbody>
     </table>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <section id="modes">
     <h2>Moduser</h2>
     <p>Velg modus fra dropdown-menyen i bunnbaren, eller bruk modusveksler-linjer i scriptet for å veksle underveis (se <a href="#hybrid">Hybrid-skript</a>). microdata-språket denne siden ellers dokumenterer er bare én av sju moduser i editoren — de andre seks er lagt til av dette hobbyprosjektet, se <a href="#avvik">Avvik fra microdata.no</a>.</p>
@@ -985,8 +1031,7 @@ df %>% group_by(kjonn) %>%
       </tbody>
     </table>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
   <!-- SYNC:START felles-referanse-tab -->
   <section id="tab-full">
     <h2>Tab-autocomplete — fullstendig referanse</h2>
@@ -1037,8 +1082,7 @@ df %>% group_by(kjonn) %>%
     <h3>Variabelinformasjon</h3>
     <p>Når du velger et variabelnavn fra autocomplete-listen, vises en liten popup med navn, type og beskrivelse. Klikk <strong>Mer info</strong> for å åpne fullstendig dokumentasjon, der det finnes.</p>
   </section>
-    <!-- SYNC:END -->
-
+  <!-- SYNC:END -->
 </main>
 </div>
 

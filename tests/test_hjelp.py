@@ -217,6 +217,52 @@ def test_oversettere_nevner_py2m_og_r2m():
     assert "py2m" in blokk and "r2m" in blokk
 
 
+# ── Koordinator-runde: kritisk faktafeil rettet ────────────────────────────
+# «Kontrollen er på som standard» var galt — index.html:2177 (getDisclosureControl,
+# localStorage default '0') og m2py.py:8-9 («Default: AV») stemmer overens: av
+# er standarden. docs/README.md sa «default PÅ» og var kilden til feilen.
+
+def test_avsloring_sier_av_som_standard_ikke_pa():
+    text = read("hjelp.html")
+    m = re.search(r'<section id="avsloring".*?</section>', text, re.DOTALL)
+    assert m, "fant ikke avsloring-seksjonen"
+    blokk = m.group(0)
+    assert "av som standard" in blokk, (
+        "avsloring skal si at kontrollen er AV som standard (m2py.py:8-9, "
+        "index.html:2177) — ikke PÅ")
+    assert "på som standard" not in blokk, (
+        "«på som standard» er den motsatte, gale påstanden")
+    assert "disclosure-control=on" in blokk, (
+        "«Slå den på»-instruksjonen skal vise =on, ikke =off"
+    )
+
+
+def test_hurtigstart_finnes_og_krever_ingen_import():
+    """#hurtigstart skal la en helt ny leser lime inn og kjøre noe med det
+    samme — ingen import/require, siden det krever data som ikke finnes."""
+    ids = grab("hjelp.html").section_ids
+    assert "hurtigstart" in ids, "mangler #hurtigstart"
+    text = read("hjelp.html")
+    m = re.search(r'<section id="hurtigstart".*?</section>', text, re.DOTALL)
+    assert m
+    blokk = m.group(0)
+    assert 'class="example"' in blokk, "#hurtigstart mangler et kjørbart eksempel"
+    assert "require" not in blokk.split("<pre><code>")[1].split("</code></pre>")[0], (
+        "hurtigstart-eksempelet bør ikke kreve require/import for en førstegangsbruker")
+
+
+def test_kommandoer_dekker_for_lokker_og_paneldata():
+    """Reviewfunn: for-løkker og hele paneldata-familien manglet. Begge har
+    egne, ekte kommandoer/feilmeldinger i m2py.py og skal være nevnt."""
+    text = read("hjelp.html")
+    m = re.search(r'<section id="kommandoer".*?</section>', text, re.DOTALL)
+    assert m
+    blokk = m.group(0)
+    for term in ("for i in", "import-panel", "regress-panel", "tabulate-panel",
+                 "summarize-panel", "reshape-to-panel", "reshape-from-panel"):
+        assert term in blokk, f"#kommandoer mangler «{term}»"
+
+
 # ── Ikke-kjørte resultater skal være merket som illustrasjon ────────────────
 
 def test_ikke_kjorte_resultater_er_merket():
@@ -282,9 +328,9 @@ def test_modustabell_finnes_og_er_utenfor_sync():
 # ── Engelsk parallell ────────────────────────────────────────────────────────
 
 EN_SEKSJONER = [
-    "intro", "running", "kommandoer", "avsloring", "avvik", "oversettere",
-    "editor", "tab-intro", "sidebar", "lagre-dele", "forklar", "widgets",
-    "ai", "eksempler", "modes", "python", "r", "hybrid",
+    "intro", "hurtigstart", "running", "kommandoer", "avsloring", "avvik",
+    "oversettere", "editor", "tab-intro", "sidebar", "lagre-dele", "forklar",
+    "widgets", "ai", "eksempler", "modes", "python", "r", "hybrid",
     "referanse-snarveier", "tab-full",
 ]
 

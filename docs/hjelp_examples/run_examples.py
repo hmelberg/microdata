@@ -50,6 +50,14 @@ def build_frame():
 # gjelder når brukeren har PÅ (appens standardinnstilling).
 MICRODATA_EXAMPLES = [
     {
+        # #hurtigstart: DC av (appens faktiske standard, m2py.py:8-9) — den
+        # aller første kommandoen en leser prøver skal ikke kreve at de vet
+        # noe om avsløringskontroll ennå.
+        "id": "hurtigstart",
+        "dc": False,
+        "lines": ["generate alder_pluss10 = alder + 10"],
+    },
+    {
         "id": "kommandoer-helt-skript",
         "dc": True,
         "lines": [
@@ -123,6 +131,38 @@ def run_microdata_example(example: dict, df) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# #kommandoer «Kontrollflyt»: for/end-løkker kan IKKE kjøres linje for linje
+# gjennom _execute_instruction (det mønsteret over) — 'for' samler kroppen
+# sin og itererer via MicroInterpreter._run_script_body (m2py.py:8010), som
+# krever hele skriptteksten på én gang. Verifisert: linje-for-linje-kjøring av
+# en for/end-blokk gir "FEIL: 'for' er ikke gyldig her" i stedet for å løkke.
+# Bruker derfor run_script() direkte for dette ene eksempelet.
+def run_microdata_script_example(script: str, dc: bool = True) -> str:
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    import m2py
+    from m2py import MicroInterpreter
+
+    saved = getattr(m2py, "M2PY_DISCLOSURE_CONTROL", None)
+    m2py.M2PY_DISCLOSURE_CONTROL = "1" if dc else "0"
+    try:
+        it = MicroInterpreter(metadata_path=None)
+        it.datasets["testdata"] = build_frame().copy()
+        it.active_name = "testdata"
+        it.output_log.clear()
+        it.run_script(script, echo_commands=False)
+        return "\n".join(str(m).strip() for m in it.output_log if str(m).strip())
+    finally:
+        if saved is None:
+            try:
+                del m2py.M2PY_DISCLOSURE_CONTROL
+            except AttributeError:
+                pass
+        else:
+            m2py.M2PY_DISCLOSURE_CONTROL = saved
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # #oversettere: py2m og r2m kjørt på ekte kode gjennom de faktiske
 # oversetterne — ikke en håndskrevet "slik ser det omtrent ut".
 def run_py2m_example() -> str:
@@ -163,6 +203,11 @@ def main() -> int:
         text = run_microdata_example(ex, df)
         (OUTDIR / f"{ex['id']}.txt").write_text(text + "\n", encoding="utf-8")
         print(f"  {ex['id']}: {len(text)} tegn")
+
+    forloop_script = "for i in 2018 : 2020\n  generate innt_$i = lonn + $i\nend"
+    forloop_text = run_microdata_script_example(forloop_script, dc=False)
+    (OUTDIR / "kommandoer-forlokke.txt").write_text(forloop_text + "\n", encoding="utf-8")
+    print(f"  kommandoer-forlokke: {len(forloop_text)} tegn")
 
     py2m_text = run_py2m_example()
     (OUTDIR / "oversettere-py2m.txt").write_text(py2m_text + "\n", encoding="utf-8")
