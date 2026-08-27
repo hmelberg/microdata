@@ -292,8 +292,8 @@
       <h3 data-i18n>Konto og innstillinger</h3>
 
       <div id="aiCfgByokStored" style="display:none; margin-bottom:18px;">
-        <div class="ai-modal-help" style="margin-bottom:6px;" data-i18n>Egen Anthropic-nøkkel er lagret i denne nettleseren.</div>
-        <button type="button" class="ai-modal-btn" id="aiCfgByokRemove" data-i18n>Fjern nøkkel</button>
+        <div class="ai-modal-help" style="margin-bottom:6px;" data-i18n>Nøkkel eller passord er lagret i denne nettleseren.</div>
+        <button type="button" class="ai-modal-btn" id="aiCfgByokRemove" data-i18n>Fjern</button>
       </div>
 
       <div style="margin-bottom:14px;">
@@ -302,9 +302,9 @@
       </div>
 
       <div id="aiCfgAnthropicSection" style="margin-bottom:18px;">
-        <label for="aiCfgAnthropicKey" data-i18n>Anthropic API-nøkkel</label>
-        <input type="password" id="aiCfgAnthropicKey" placeholder="sk-ant-…" autocomplete="off">
-        <div class="ai-modal-help" data-i18n-html>Lag en API-nøkkel på <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> og lim den inn her. Nøkkelen lagres kun i denne nettleseren; forespørsler går via appens server, men nøkkelen lagres eller logges ikke der. Forbruk belastes din egen Anthropic-konto. Gir også tilgang til Web-knappen i python/r/duckdb-modus.</div>
+        <label for="aiCfgAnthropicKey" data-i18n>API-nøkkel eller tilgangspassord</label>
+        <input type="password" id="aiCfgAnthropicKey" placeholder="sk-ant-… eller passord" autocomplete="off">
+        <div class="ai-modal-help" data-i18n-html>Lim inn <strong>enten</strong> din egen API-nøkkel fra <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> (begynner med <code>sk-ant-</code>) <strong>eller</strong> tilgangspassordet du har fått. Med egen nøkkel belastes forbruket din egen konto; med passord brukes appens nøkkel. Feltet kjenner forskjellen på prefikset <code>sk-ant-</code> — mangler det, behandles det du limte inn som passord, så en halvklippet nøkkel gir «feil passord» og ikke «ugyldig nøkkel». Verdien lagres kun i denne nettleseren; forespørsler går via appens server, men verken nøkkel eller passord lagres eller logges der. Gir også tilgang til Web-knappen i python/r/duckdb-modus.</div>
       </div>
 
       <div id="aiCfgProviderFields" style="display:none; margin-bottom:18px;">
@@ -9829,6 +9829,7 @@ def _run_microdata_chunk(_code):
   <script src="js/enc-crypto.js"></script>
   <script src="js/data-loader.js"></script>
   <script src="js/duckdb-native.js"></script>
+  <script src="js/ai-credential.js"></script>
   <script src="js/ai-chat.js"></script>
   <script src="js/github-storage.js"></script>
 

@@ -1395,7 +1395,9 @@
       }
 
       function refreshUserPanel() {
-        if (dom.aiCfgByokStored) dom.aiCfgByokStored.style.display = state.anthropicKey ? '' : 'none';
+        if (dom.aiCfgByokStored) {
+          dom.aiCfgByokStored.style.display = (state.anthropicKey || state.accessToken) ? '' : 'none';
+        }
         if (window.mdSyncWebBtnVisibility) window.mdSyncWebBtnVisibility();
       }
 
@@ -1452,7 +1454,7 @@
 
       function openSettings() {
         fillProviderSelect();
-        if (dom.aiCfgAnthropicKey) dom.aiCfgAnthropicKey.value = state.anthropicKey;
+        if (dom.aiCfgAnthropicKey) dom.aiCfgAnthropicKey.value = state.anthropicKey || state.accessToken;
         var cfg = providerConfig();
         var pr = presetForConfig(cfg);
         if (dom.aiCfgProviderType) dom.aiCfgProviderType.value = pr.id;
@@ -1466,9 +1468,23 @@
       }
       function closeSettings() { dom.aiSettingsBackdrop.classList.remove('open'); }
       function saveSettings() {
-        const akey = dom.aiCfgAnthropicKey ? dom.aiCfgAnthropicKey.value.trim() : '';
-        if (akey) localStorage.setItem(LS_KEY_ANTHROPIC, akey);
-        else localStorage.removeItem(LS_KEY_ANTHROPIC);
+        // Ett felt, to slag legitimasjon. Den som IKKE ble skrevet inn
+        // fjernes, ellers ville en gammel nøkkel fortsatt vunnet presedensen
+        // i edgeAuthHeaders etter at brukeren byttet til passord.
+        const entered = dom.aiCfgAnthropicKey ? dom.aiCfgAnthropicKey.value.trim() : '';
+        const kind = window.AiCredential.classify(entered);
+        try {
+          if (kind === 'anthropic') {
+            localStorage.setItem(LS_KEY_ANTHROPIC, entered);
+            localStorage.removeItem(LS_KEY_ACCESS);
+          } else if (kind === 'access') {
+            localStorage.setItem(LS_KEY_ACCESS, entered);
+            localStorage.removeItem(LS_KEY_ANTHROPIC);
+          } else {
+            localStorage.removeItem(LS_KEY_ANTHROPIC);
+            localStorage.removeItem(LS_KEY_ACCESS);
+          }
+        } catch (e) {}
 
         var id = dom.aiCfgProviderType ? dom.aiCfgProviderType.value : 'anthropic';
         var pr = presetById(id);
@@ -1540,7 +1556,11 @@
 
         if (dom.aiCfgByokRemove) {
           dom.aiCfgByokRemove.addEventListener('click', () => {
+            // Begge slagene legitimasjon deler ETT felt, så «Fjern» må tømme
+            // begge — ellers ville et lagret passord overlevd at brukeren
+            // trodde han hadde fjernet nøkkelen.
             localStorage.removeItem(LS_KEY_ANTHROPIC);
+            localStorage.removeItem(LS_KEY_ACCESS);
             if (dom.aiCfgAnthropicKey) dom.aiCfgAnthropicKey.value = '';
             if (dom.aiCfgByokStored) dom.aiCfgByokStored.style.display = 'none';
             if (window.mdSyncWebBtnVisibility) window.mdSyncWebBtnVisibility();
