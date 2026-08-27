@@ -83,3 +83,69 @@ export function chooseModel(
   }
   return base.effort === undefined ? { model } : { model, effort: base.effort };
 }
+
+// ── resolveLlm ────────────────────────────────────────────────────────────
+// Nøkkel + modell + effort + leverandør, avgjort ETT sted for alle fem
+// endepunktene. Grunnen til at dette ikke gjentas per handler er invarianten
+// under, som er en sikkerhetsfeil og ikke en stilsak:
+//
+//   En X-Llm-Key ALENE beviser ingenting. Den er leverandør-agnostisk og blir
+//   aldri validert av porten (auth.ts kan ikke vite hvem den tilhører). En
+//   handler som godtar allowLlmKey MÅ derfor avvise enhver forespørsel uten
+//   komplett provider-config — ellers autentiserer en vilkårlig streng seg
+//   inn og faller gjennom til serverens egen ANTHROPIC_API_KEY. Det er en
+//   anonym bypass av hele BYOK-modellen, og den ville se ut som en vanlig
+//   vellykket forespørsel i loggen.
+//
+// askstat håndhever den i én handler; microdata har fem, så den bor her.
+
+import { extractByokKey, extractLlmKey } from "./auth.ts";
+import { type ProviderConfig, parseProviderConfig } from "./providers/config.ts";
+
+export interface LlmChoice {
+  apiKey: string;
+  model: string;
+  effort?: string;
+  provider?: ProviderConfig;
+}
+
+/**
+ * Returnerer valget, eller en ferdig feilrespons som handleren skal
+ * returnere uendret (400 ugyldig leverandør / 401 bypass-forsøk / 500
+ * manglende servernøkkel).
+ *
+ * NB for kallstedet: på leverandørveien er `provider.model` sannheten —
+ * `choice.model` gjelder kun den anthropic-native veien. streamProvider
+ * leser derfor aldri choice.model.
+ */
+export function resolveLlm(
+  request: Request,
+  body: { provider?: unknown; quality?: unknown },
+  site: CallSite,
+  env: (k: string) => string | undefined = (k) => Deno.env.get(k),
+): LlmChoice | Response {
+  const parsed = parseProviderConfig(body.provider, request);
+  if (parsed && "error" in parsed) return parsed.error;
+  const provider: ProviderConfig | undefined = parsed ?? undefined;
+
+  const byokKey = extractByokKey(request);
+  // Invarianten. Rekkefølgen er med vilje: en gyldig BYOK-nøkkel er nok i seg
+  // selv, så den sjekkes først; det er BARE llm-key-uten-config som er farlig.
+  if (!byokKey && extractLlmKey(request) && !provider) {
+    return new Response(
+      "X-Llm-Key krever komplett leverandørkonfigurasjon (provider-feltet i forespørselen)",
+      { status: 401 },
+    );
+  }
+
+  const apiKey = provider?.key ?? byokKey ?? env("ANTHROPIC_API_KEY");
+  if (!apiKey) {
+    console.error("ANTHROPIC_API_KEY is not set");
+    return new Response("Server configuration error", { status: 500 });
+  }
+
+  const choice = chooseModel(site, coerceQuality(body.quality), env);
+  return provider
+    ? { apiKey, model: choice.model, effort: choice.effort, provider }
+    : { apiKey, model: choice.model, effort: choice.effort };
+}
