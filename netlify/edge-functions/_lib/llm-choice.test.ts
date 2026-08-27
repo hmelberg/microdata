@@ -4,8 +4,8 @@ import { chooseModel, coerceQuality } from "./llm-choice.ts";
 const noEnv = (_k: string) => undefined;
 
 Deno.test("per-call defaults when the user expressed no preference", () => {
-  assertEquals(chooseModel("svar", null, noEnv), { model: "claude-sonnet-5", effort: "high" });
-  assertEquals(chooseModel("dm-vurder", null, noEnv), { model: "claude-sonnet-5", effort: "high" });
+  assertEquals(chooseModel("svar", null, noEnv), { model: "claude-sonnet-5", effort: "medium" });
+  assertEquals(chooseModel("dm-vurder", null, noEnv), { model: "claude-sonnet-5", effort: "medium" });
   assertEquals(chooseModel("tolk-resultat", null, noEnv), { model: "claude-sonnet-5", effort: "medium" });
 });
 
@@ -16,8 +16,8 @@ Deno.test("fast tier never emits effort — it errors on Haiku 4.5", () => {
 });
 
 Deno.test("quality tiers move the model", () => {
-  assertEquals(chooseModel("svar", "balanced", noEnv), { model: "claude-sonnet-5", effort: "high" });
-  assertEquals(chooseModel("svar", "best", noEnv), { model: "claude-opus-5", effort: "xhigh" });
+  assertEquals(chooseModel("svar", "balanced", noEnv), { model: "claude-sonnet-5", effort: "medium" });
+  assertEquals(chooseModel("svar", "best", noEnv), { model: "claude-opus-5", effort: "high" });
 });
 
 Deno.test("env override beats the user's quality selection", () => {
@@ -27,7 +27,7 @@ Deno.test("env override beats the user's quality selection", () => {
 
 Deno.test("an env override keeps the effort the tier would have given", () => {
   const env = (k: string) => (k === "ANTHROPIC_MODEL" ? "claude-opus-4-8" : undefined);
-  assertEquals(chooseModel("svar", "best", env), { model: "claude-opus-4-8", effort: "xhigh" });
+  assertEquals(chooseModel("svar", "best", env), { model: "claude-opus-4-8", effort: "high" });
   assertEquals(chooseModel("tolk-resultat", null, env), { model: "claude-opus-4-8", effort: "medium" });
 });
 
@@ -112,7 +112,7 @@ Deno.test("quality from the body reaches the choice", () => {
   const c = resolveLlm(reqWith({ "x-anthropic-key": "sk-ant-user01" }), { quality: "best" },
     "svar", () => undefined) as LlmChoice;
   assertEquals(c.model, "claude-opus-5");
-  assertEquals(c.effort, "xhigh");
+  assertEquals(c.effort, "high");
 });
 
 Deno.test("a junk quality value falls back to the per-call default", () => {
@@ -160,9 +160,9 @@ Deno.test("byok key wins over the personal password", () => {
 });
 
 // ── svar-kallstedet (samlet pipeline 2026-08-28) ──────────────────────────
-Deno.test("svar: default sonnet-5 high; SVAR_MODEL vinner over ANTHROPIC_MODEL", () => {
+Deno.test("svar: default sonnet-5 medium; SVAR_MODEL vinner over ANTHROPIC_MODEL", () => {
   assertEquals(chooseModel("svar", null, () => undefined),
-    { model: "claude-sonnet-5", effort: "high" });
+    { model: "claude-sonnet-5", effort: "medium" });
   const env = (k: string) =>
     k === "SVAR_MODEL" ? "pinned-svar" : k === "ANTHROPIC_MODEL" ? "pinned-generelt" : undefined;
   assertEquals(chooseModel("svar", null, env).model, "pinned-svar");
@@ -170,5 +170,5 @@ Deno.test("svar: default sonnet-5 high; SVAR_MODEL vinner over ANTHROPIC_MODEL",
 
 Deno.test("svar: kvalitet flytter modellen som for andre kallsteder", () => {
   assertEquals(chooseModel("svar", "best", () => undefined),
-    { model: "claude-opus-5", effort: "xhigh" });
+    { model: "claude-opus-5", effort: "high" });
 });

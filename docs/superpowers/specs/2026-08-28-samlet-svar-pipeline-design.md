@@ -128,11 +128,20 @@ før.
 Én meny — dagens Rask/Balansert/Best — styrer BÅDE modell/effort OG
 løkkebudsjett. Ingen meny-matrise:
 
-| Nivå | Modell/effort (som i dag) | Verktøykall | run_code |
+| Nivå | Modell/effort | Verktøykall | run_code |
 |---|---|---|---|
 | Rask | claude-haiku-4-5, uten effort | 8 | 3 |
-| Balansert | claude-sonnet-5, high | 12 | 4 |
-| Best («Grundig») | claude-opus-5, xhigh | 20 | 6 |
+| Balansert | claude-sonnet-5, medium | 12 | 4 |
+| Best («Grundig») | claude-opus-5, high | 20 | 6 |
+
+REVIDERT UNDER IMPLEMENTERING (2026-08-28, målt): Netlify kutter HVER
+edge-invokasjon hardt ved ~60 s — også med aktiv strøm (bevist med
+diagnose-endepunkt: ren tick-strøm kuttet ved 60.2 s; vanlige Functions har
+samme 60 s-tak, kun background-functions går forbi med 15 min). Tenkefasen
+strømmer ingenting, så effort high/xhigh kunne alene sprenge taket
+(«Error in input stream»). Derfor medium/high i stedet for high/xhigh, pluss
+en 50 s-frist per tur som gir FORKLART feilmelding i stedet for kuttet
+forbindelse. Dypere effort krever background-transporten (utsatt, se under).
 
 Balansert-tallene er askstats felt-testede deep-verdier. Env-overstyringene
 består; `DATA_SVAR_MODEL` omdøpes til `SVAR_MODEL` (data-svar dør). UI-teksten
@@ -198,7 +207,10 @@ run_code→run_result mot en mocket SSE-strøm.
 
 ## Utsatt
 
-Ruter-pass, dybdemeny, get_pack/kildepakker, lokale modeller, safestat-port av
+**Background-transport for dype turer**: kjør turene i en Netlify
+background-function (15 min-budsjett) med deltaer til Blobs og lettvekts
+polling — fjerner 60 s-taket og kan gjenopprette effort xhigh. Ruter-pass,
+dybdemeny, get_pack/kildepakker, lokale modeller, safestat-port av
 løkka (annet vern-regime), og **ekstern-data-verktøyene i løkka**
 (websøk/search_catalog/table_metadata/probe): de løser askstats finn-data-
 problem, ikke microdatas. `_lib/tools/`-koden beholdes og kan gjeninnføres som

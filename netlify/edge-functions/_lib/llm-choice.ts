@@ -29,16 +29,21 @@ export function coerceQuality(u: unknown): Quality | null {
 // Kvalitetsnivåene. «fast» har med vilje ingen effort — se regel 1.
 const TIERS: Record<Quality, ModelChoice> = {
   fast: { model: "claude-haiku-4-5" },
-  balanced: { model: "claude-sonnet-5", effort: "high" },
-  best: { model: "claude-opus-5", effort: "xhigh" },
+  // Plattformtaket (målt 2026-08-28): Netlify kutter HVER invokasjon hardt
+  // ved 60 s — også med aktiv strøm. Tenkefasen strømmer ingenting, så
+  // effort high/xhigh kan alene sprenge taket på store prompter. medium/high
+  // holder turene under 60 s; dypere effort krever background-transporten
+  // (roadmap) som har 15 min-budsjett.
+  balanced: { model: "claude-sonnet-5", effort: "medium" },
+  best: { model: "claude-opus-5", effort: "high" },
 };
 
 // Per kallsted når brukeren ikke har valgt noe. tolk-resultat tolker output
 // som ALLEREDE er beregnet — den trenger ikke samme dybde som kodegenerering.
 const DEFAULTS: Record<CallSite, ModelChoice> = {
-  "dm-vurder": { model: "claude-sonnet-5", effort: "high" },
+  "dm-vurder": { model: "claude-sonnet-5", effort: "medium" },
   "tolk-resultat": { model: "claude-sonnet-5", effort: "medium" },
-  "svar": { model: "claude-sonnet-5", effort: "high" },
+  "svar": { model: "claude-sonnet-5", effort: "medium" },
 };
 
 /** Env-navnet som overstyrer modellen for dette kallstedet, i prioritert rekkefølge. */

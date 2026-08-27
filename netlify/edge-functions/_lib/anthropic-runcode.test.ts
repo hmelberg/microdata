@@ -176,3 +176,19 @@ Deno.test("server-verktøy (variabel_info) kjøres fortsatt i løkka, streamet",
   assertEquals(calls, ["variabel_info:NUDB_BU"]);
   assert(ev.some((e) => e.type === "done"));
 });
+
+Deno.test("tur-deadline gir ren error-event i stedet for kuttet strøm", async () => {
+  // En oppstrøm som aldri leverer noe: deadline (injisert kort) skal vinne.
+  const evig = new ReadableStream<Uint8Array>({ start() { /* aldri data */ } });
+  const ev = await samle(runAgenticStream({
+    ...BASE,
+    executeTool: () => Promise.resolve("x"),
+    deps: {
+      fetchImpl: (() => Promise.resolve(new Response(evig, { status: 200 }))) as typeof fetch,
+      turnDeadlineMs: 80,
+    },
+  }));
+  const err = ev.find((e) => e.type === "error");
+  if (!err) throw new Error("error-event mangler: " + JSON.stringify(ev.map((e) => e.type)));
+  if (!String(err.message).includes("plattformtaket")) throw new Error("feil melding: " + err.message);
+});

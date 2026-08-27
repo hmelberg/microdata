@@ -65,6 +65,9 @@ export interface RetryDeps {
   sleep?: (ms: number) => Promise<void>;
   retries?: number;
   timeoutMs?: number;
+  // Hard frist for ÉN streamet tur (default 50 s — under Netlifys målte
+  // 60s-kutt per invokasjon), injiserbar for tester.
+  turnDeadlineMs?: number;
 }
 
 /**
@@ -483,13 +486,27 @@ async function streamOneTurn(
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  // Plattformtaket: Netlify kutter invokasjonen hardt ved ~60 s (målt, også
+  // med aktiv strøm). Turen får derfor en egen frist litt under taket, slik
+  // at brukeren får en FORKLART feil i stedet for en kuttet forbindelse.
+  const deadline = Date.now() + (deps.turnDeadlineMs ?? 50_000);
   try {
     while (true) {
       let timer: number | undefined;
+      const budsjett = Math.min(STREAM_IDLE_MS, deadline - Date.now());
+      if (budsjett <= 0) {
+        throw new Error(
+          "Svaret overskred plattformtaket (60 s per kall). Prøv kvalitetsnivået Rask, eller still spørsmålet enklere.",
+        );
+      }
       const r = await Promise.race([
         reader.read(),
         new Promise<never>((_, rej) => {
-          timer = setTimeout(() => rej(new Error("Anthropic-strømmen stallet (> 120 s uten data)")), STREAM_IDLE_MS);
+          timer = setTimeout(() => rej(new Error(
+            Date.now() + 1 >= deadline
+              ? "Svaret overskred plattformtaket (60 s per kall). Prøv kvalitetsnivået Rask, eller still spørsmålet enklere."
+              : "Anthropic-strømmen stallet (> 120 s uten data)",
+          )), budsjett);
         }),
       ]).finally(() => clearTimeout(timer));
       if (r.done) break;
