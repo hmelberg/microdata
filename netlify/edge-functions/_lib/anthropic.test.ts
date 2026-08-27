@@ -245,3 +245,59 @@ Deno.test("runAgenticStream: API error surfaces as error event", async () => {
   }));
   assertEquals(events.at(-1)?.type, "error");
 });
+
+// ── apiBase + effort (multi-provider-runden 2026-08-27) ───────────────────
+import { streamAnthropic } from "./anthropic.ts";
+
+/** Fanger url + parset body fra ETT kall, og svarer med en tom SSE-strøm. */
+function captureBody() {
+  const seen: { url: string; body: Record<string, unknown> } = { url: "", body: {} };
+  const fetchImpl = ((url: string | URL | Request, init?: RequestInit) => {
+    seen.url = String(url);
+    seen.body = JSON.parse(String(init?.body ?? "{}"));
+    return Promise.resolve(
+      new Response(new ReadableStream({ start: (c) => c.close() }), { status: 200 }),
+    );
+  }) as typeof fetch;
+  return { seen, deps: { fetchImpl, sleep: () => Promise.resolve() } };
+}
+
+Deno.test("effort is nested under output_config, never top-level", async () => {
+  const { seen, deps } = captureBody();
+  await streamAnthropic({ apiKey: "k", model: "claude-sonnet-5", prompt: "p", effort: "high" }, deps);
+  assertEquals(seen.body.output_config, { effort: "high" });
+  assertEquals(seen.body.effort, undefined);
+});
+
+Deno.test("no output_config at all when effort is unset (it errors on Haiku 4.5)", async () => {
+  const { seen, deps } = captureBody();
+  await streamAnthropic({ apiKey: "k", model: "claude-haiku-4-5", prompt: "p" }, deps);
+  assertEquals("output_config" in seen.body, false);
+});
+
+Deno.test("apiBase redirects the POST to the gateway's /messages", async () => {
+  const { seen, deps } = captureBody();
+  await streamAnthropic({ apiKey: "k", model: "m", prompt: "p", apiBase: "https://gw.example/v1" }, deps);
+  assertEquals(seen.url, "https://gw.example/v1/messages");
+});
+
+Deno.test("without apiBase the POST still goes to the real Anthropic endpoint", async () => {
+  const { seen, deps } = captureBody();
+  await streamAnthropic({ apiKey: "k", model: "m", prompt: "p" }, deps);
+  assertEquals(seen.url, "https://api.anthropic.com/v1/messages");
+});
+
+Deno.test("messageAnthropic carries effort and apiBase the same way", async () => {
+  const { seen, deps } = captureBody();
+  const fetchImpl = ((url: string | URL | Request, init?: RequestInit) => {
+    seen.url = String(url);
+    seen.body = JSON.parse(String(init?.body ?? "{}"));
+    return Promise.resolve(Response.json({ content: [{ type: "text", text: "x" }], usage: {} }));
+  }) as typeof fetch;
+  await messageAnthropic(
+    { apiKey: "k", model: "m", prompt: "p", effort: "medium", apiBase: "https://gw.example/v1" },
+    { ...deps, fetchImpl },
+  );
+  assertEquals(seen.url, "https://gw.example/v1/messages");
+  assertEquals(seen.body.output_config, { effort: "medium" });
+});

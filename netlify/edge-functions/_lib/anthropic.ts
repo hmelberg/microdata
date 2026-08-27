@@ -15,6 +15,14 @@ export interface AnthropicStreamOptions {
   // Cache TTL for the system block. "1h" needs the extended-cache-ttl beta
   // header; "5m" (default) is GA. Ignored when `system` is unset.
   cacheTtl?: "5m" | "1h";
+  // Anthropic-kompatibel gateway (multi-provider-runden 2026-08-27): POST går
+  // til `${apiBase}/messages` i stedet for api.anthropic.com. Konvensjonen er
+  // «alt før endepunktnavnet», lik providers/config.ts.
+  apiBase?: string;
+  // output_config.effort — NØSTET, aldri toppnivå, og ingen beta-header.
+  // Utelates helt når den er unset: effort FEILER på Haiku 4.5, som er
+  // nøyaktig modellen picker-passet og «fast»-nivået bruker (llm-choice.ts).
+  effort?: string;
 }
 
 export interface StreamEvent {
@@ -25,6 +33,11 @@ export interface StreamEvent {
   cacheReadTokens?: number;
   cacheCreationTokens?: number;
   message?: string;
+}
+
+/** Endepunktet for dette kallet: brukerens gateway, ellers Anthropic selv. */
+function apiTarget(apiBase?: string): string {
+  return apiBase ? `${apiBase.replace(/\/+$/, "")}/messages` : ANTHROPIC_API;
 }
 
 const ANTHROPIC_TIMEOUT_MS = 30_000;
@@ -83,6 +96,7 @@ export async function fetchWithRetry(
 
 export async function streamAnthropic(
   opts: AnthropicStreamOptions,
+  deps: RetryDeps = {},
 ): Promise<ReadableStream<Uint8Array>> {
   const useLongTtl = opts.cacheTtl === "1h";
   const headers: Record<string, string> = {
@@ -100,6 +114,7 @@ export async function streamAnthropic(
     stream: true,
     messages: [{ role: "user", content: opts.prompt }],
   };
+  if (opts.effort) requestBody.output_config = { effort: opts.effort };
   if (opts.system) {
     requestBody.system = [
       {
@@ -112,11 +127,11 @@ export async function streamAnthropic(
     ];
   }
 
-  const upstream = await fetchWithRetry(ANTHROPIC_API, {
+  const upstream = await fetchWithRetry(apiTarget(opts.apiBase), {
     method: "POST",
     headers,
     body: JSON.stringify(requestBody),
-  });
+  }, deps);
 
   if (!upstream.ok || !upstream.body) {
     // Log the upstream detail server-side, but do NOT echo it to the client
@@ -164,6 +179,7 @@ export async function messageAnthropic(
     stream: false,
     messages: [{ role: "user", content: opts.prompt }],
   };
+  if (opts.effort) requestBody.output_config = { effort: opts.effort };
   if (opts.system) {
     requestBody.system = [
       {
@@ -175,7 +191,7 @@ export async function messageAnthropic(
   }
 
   const resp = await fetchWithRetry(
-    ANTHROPIC_API,
+    apiTarget(opts.apiBase),
     { method: "POST", headers, body: JSON.stringify(requestBody) },
     deps,
   );
