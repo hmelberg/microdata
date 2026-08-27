@@ -461,6 +461,13 @@
 
       function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+      // Nett/HTTP-feil skal navngi endepunkt og fase (js/ai-transport.js);
+      // brukerens egen Avbryt (AbortError) skal aldri pakkes inn.
+      function rethrowDescribed(e, endpoint, phase, hop) {
+        if (e && e.name === 'AbortError') throw e;
+        throw new Error(AiTransport.describeError(e, { endpoint: endpoint, phase: phase, hop: hop }));
+      }
+
       function detectLang(text) {
         // Crude: if it has Norwegian chars or common NO words, treat as 'no', else 'en'.
         if (/[æøåÆØÅ]/.test(text)) return 'no';
@@ -537,13 +544,13 @@
       async function runFastQuery(text, lang, scriptContext, thinkingNode, signal) {
         const headers = edgeAuthHeaders();
         const t0 = Date.now();
-        const resp = await fetch('/api/kode-svar', {
+        const resp = await AiTransport.postWithRetry('/api/kode-svar', {
           method: 'POST',
           headers,
           body: JSON.stringify(Object.assign(
             { question: text, lang, script: scriptContext || '' }, edgeBodyExtras())),
           signal,
-        });
+        }).catch((e) => rethrowDescribed(e, 'kode-svar', 'request'));
         if (resp.status === 401) {
           throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
         }
@@ -564,7 +571,7 @@
         let _lastRender = 0;
         let inputTokens = 0, outputTokens = 0, cacheRead = 0, cacheCreate = 0;
         while (true) {
-          const { value, done } = await reader.read();
+          const { value, done } = await reader.read().catch((e) => rethrowDescribed(e, 'kode-svar', 'stream'));
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
           let nl;
@@ -633,10 +640,10 @@
       // parsing; factored out so the repair round can call it again.
       async function streamKodeSvarV2(payload, bubble, signal) {
         const headers = edgeAuthHeaders();
-        const resp = await fetch('/api/kode-svar-v2', {
+        const resp = await AiTransport.postWithRetry('/api/kode-svar-v2', {
           method: 'POST', headers,
           body: JSON.stringify(Object.assign({}, payload, edgeBodyExtras())), signal,
-        });
+        }).catch((e) => rethrowDescribed(e, 'kode-svar-v2', 'request'));
         if (resp.status === 401) {
           throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
         }
@@ -649,7 +656,7 @@
         let inputTokens = 0, outputTokens = 0, cacheRead = 0, cacheCreate = 0;
         let firstByte = false;
         while (true) {
-          const { value, done } = await reader.read();
+          const { value, done } = await reader.read().catch((e) => rethrowDescribed(e, 'kode-svar-v2', 'stream'));
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
           let nl;
@@ -813,7 +820,7 @@
       // inn i en assistent-boble. Speiler runFastQuery, men mot /api/tolk-resultat.
       async function runInterpretQuery(payload, thinkingNode, signal) {
         const headers = edgeAuthHeaders();
-        const resp = await fetch('/api/tolk-resultat', {
+        const resp = await AiTransport.postWithRetry('/api/tolk-resultat', {
           method: 'POST',
           headers,
           body: JSON.stringify(Object.assign({
@@ -823,7 +830,7 @@
             ui_lang: (window.M2PY_LANG === 'en') ? 'en' : 'no',
           }, edgeBodyExtras())),
           signal,
-        });
+        }).catch((e) => rethrowDescribed(e, 'tolk-resultat', 'request'));
         if (resp.status === 401) {
           throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
         }
@@ -838,7 +845,7 @@
         const decoder = new TextDecoder();
         let buffer = '', accumulated = '', _lastRender = 0;
         while (true) {
-          const { value, done } = await reader.read();
+          const { value, done } = await reader.read().catch((e) => rethrowDescribed(e, 'tolk-resultat', 'stream'));
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
           let nl;
@@ -955,7 +962,7 @@
         const includeScript = dom.aiIncludeScript.checked && dom.scriptInput && dom.scriptInput.value.trim();
         for (let hop = 0; ; hop++) {
           if (hop > 40) throw new Error(T('Avbrutt: svaret ble ikke ferdig etter 40 fortsettelses-runder.'));
-          const resp = await fetch('/api/data-svar', {
+          const resp = await AiTransport.postWithRetry('/api/data-svar', {
             method: 'POST',
             headers: edgeAuthHeaders(),
             body: JSON.stringify(Object.assign({
@@ -965,7 +972,7 @@
               repair: repair ? { script: repair.script, error: repair.error, round } : undefined,
               resume: resume || undefined,
             }, edgeBodyExtras())),
-          });
+          }).catch((e) => rethrowDescribed(e, 'data-svar', 'request', hop));
           if (resp.status === 401) {
             throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
           }
@@ -976,7 +983,7 @@
           await consumeSse(resp, (ev) => {
             if (ev.type === 'continue') { cont = { state: ev.state, probed: ev.probed }; return; }
             handleWebEvent(ev);
-          });
+          }).catch((e) => rethrowDescribed(e, 'data-svar', 'stream', hop));
           if (!cont) break;
           resume = cont;
         }

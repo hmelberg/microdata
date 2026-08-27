@@ -1053,7 +1053,8 @@
         const headers = (window.mdAiAuthHeaders && window.mdAiAuthHeaders()) ||
           { 'Content-Type': 'application/json', 'X-Anthropic-Key': anthropicKey };
         const extras = (window.mdAiBodyExtras && window.mdAiBodyExtras()) || {};
-        const resp = await fetch('/api/dm-vurder', {
+        const post = (window.AiTransport && window.AiTransport.postWithRetry) || fetch;
+        const resp = await post('/api/dm-vurder', {
           method: 'POST',
           headers,
           body: JSON.stringify(Object.assign(extras, {
@@ -9838,6 +9839,7 @@ def _run_microdata_chunk(_code):
   <script src="js/data-loader.js"></script>
   <script src="js/duckdb-native.js"></script>
   <script src="js/ai-credential.js"></script>
+  <script src="js/ai-transport.js"></script>
   <script src="js/ai-chat.js"></script>
   <script src="js/github-storage.js"></script>
 
