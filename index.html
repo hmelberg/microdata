@@ -296,10 +296,35 @@
         <button type="button" class="ai-modal-btn" id="aiCfgByokRemove" data-i18n>Fjern nøkkel</button>
       </div>
 
-      <div style="margin-bottom:18px;">
+      <div style="margin-bottom:14px;">
+        <label for="aiCfgProviderType" data-i18n>AI-leverandør</label>
+        <select id="aiCfgProviderType"></select>
+      </div>
+
+      <div id="aiCfgAnthropicSection" style="margin-bottom:18px;">
         <label for="aiCfgAnthropicKey" data-i18n>Anthropic API-nøkkel</label>
         <input type="password" id="aiCfgAnthropicKey" placeholder="sk-ant-…" autocomplete="off">
         <div class="ai-modal-help" data-i18n-html>Lag en API-nøkkel på <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> og lim den inn her. Nøkkelen lagres kun i denne nettleseren; forespørsler går via appens server, men nøkkelen lagres eller logges ikke der. Forbruk belastes din egen Anthropic-konto. Gir også tilgang til Web-knappen i python/r/duckdb-modus.</div>
+      </div>
+
+      <div id="aiCfgProviderFields" style="display:none; margin-bottom:18px;">
+        <label for="aiCfgProviderUrl" data-i18n>API-base (URL)</label>
+        <input type="text" id="aiCfgProviderUrl" placeholder="https://api.mistral.ai/v1" autocomplete="off">
+        <label for="aiCfgProviderModel" style="margin-top:8px; display:block;" data-i18n>Modell</label>
+        <input type="text" id="aiCfgProviderModel" placeholder="mistral-large-latest" autocomplete="off">
+        <label for="aiCfgLlmKey" style="margin-top:8px; display:block;" data-i18n>API-nøkkel</label>
+        <input type="password" id="aiCfgLlmKey" autocomplete="off">
+        <div class="ai-modal-help" data-i18n>Nøkkelen lagres kun i denne nettleseren. Forespørselen — og nøkkelen — sendes til API-basen du oppgir her, ikke til Anthropic. To ting er verdt å vite: prompt-caching finnes bare hos Anthropic, så den store variabelkatalogen i kodegenerering betales til full pris ved hver forespørsel; og variabelvelgeren i kodegenerering bruker samme modell som selve genereringen, siden en egen leverandør bare har én modell konfigurert.</div>
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <label for="aiCfgQuality" data-i18n>Kvalitet</label>
+        <select id="aiCfgQuality">
+          <option value="fast" data-i18n>Rask — billigst, enklere svar</option>
+          <option value="balanced" data-i18n>Balansert — anbefalt</option>
+          <option value="best" data-i18n>Best — dyrest, grundigst</option>
+        </select>
+        <div class="ai-modal-help" data-i18n>Styrer modell og hvor mye modellen tenker. Gjelder alle AI-funksjonene. Med egen leverandør er det modellen du har oppgitt over som brukes; kvalitetsvalget justerer da bare tenkedybden der leverandøren støtter det.</div>
       </div>
 
       <div class="ai-modal-actions" style="margin-top:14px;">
@@ -1021,11 +1046,16 @@
           cancelBtn.disabled = true;
           return;
         }
-        const headers = { 'Content-Type': 'application/json', 'X-Anthropic-Key': anthropicKey };
+        // Multi-provider-runden 2026-08-27: headere og leverandør/kvalitet
+        // kommer fra ai-chat.js, ellers ville personvern-vurderingen vært den
+        // ene AI-knappen som alltid gikk til Anthropic uansett innstilling.
+        const headers = (window.mdAiAuthHeaders && window.mdAiAuthHeaders()) ||
+          { 'Content-Type': 'application/json', 'X-Anthropic-Key': anthropicKey };
+        const extras = (window.mdAiBodyExtras && window.mdAiBodyExtras()) || {};
         const resp = await fetch('/api/dm-vurder', {
           method: 'POST',
           headers,
-          body: JSON.stringify({
+          body: JSON.stringify(Object.assign(extras, {
             script,
             kontekst: options.kontekst || '',
             ui_lang: window.M2PY_LANG === 'en' ? 'en' : 'no',
@@ -1033,7 +1063,7 @@
             detaljnivå: options.detaljnivå || 'kort',
             ønsker_revidert_script: options.ønsker_revidert_script || false,
             bruk_scrub: options.bruk_scrub || false,
-          }),
+          })),
           signal: controller.signal,
         });
         if (resp.status === 401) {

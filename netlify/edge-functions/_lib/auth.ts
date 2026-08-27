@@ -60,6 +60,18 @@ export function extractByokKey(request: Request): string | null {
 }
 
 /**
+ * Custom-provider key from the X-Llm-Key header (spec 2026-08-27-multi-
+ * provider-byok §5). Format-agnostic (providers differ) but sane: printable
+ * ASCII, 8–250 chars. Same BYOK trust position as extractByokKey: the user
+ * brings their own credentials and billing. Never logged or cached.
+ */
+export function extractLlmKey(request: Request): string | null {
+  const raw = (request.headers.get("x-llm-key") ?? "").trim();
+  if (raw.length < 8 || raw.length > 250) return null;
+  return /^[\x21-\x7E]+$/.test(raw) ? raw : null;
+}
+
+/**
  * Map an upstream Anthropic failure to a client response. With BYOK, a 401
  * from Anthropic means the user's own key is invalid — surface that directly
  * instead of a generic 502 (the anthropic.ts helpers throw
@@ -83,6 +95,17 @@ export interface GateOptions {
    * become effectively anonymous).
    */
   allowByok?: boolean;
+  /**
+   * Accept a well-formed X-Llm-Key in place of token/admin auth — only for
+   * endpoints that require AND consume a full custom-provider config. Unlike
+   * allowByok, an X-Llm-Key alone proves NOTHING (it is provider-agnostic and
+   * never validated by this gate) — the handler MUST additionally reject any
+   * X-Llm-Key-authenticated request that lacks a complete parsed `provider`
+   * body, or it would fall through to the server's own env-configured API key
+   * as an anonymous bypass. In this repo that check lives in resolveLlm
+   * (_lib/llm-choice.ts); never set this flag on a handler that skips it.
+   */
+  allowLlmKey?: boolean;
 }
 
 export interface GateDeps {
@@ -175,11 +198,12 @@ export async function runGate(
   context?: IpContext,
 ): Promise<Response | null> {
   const byokKey = opts.allowByok ? extractByokKey(request) : null;
+  const llmKey = opts.allowLlmKey ? extractLlmKey(request) : null;
   const { presentedToken, failure } = await runBaseChecks(
     request,
     opts,
     deps.checkRateLimit,
-    /* requireToken */ byokKey === null, context,
+    /* requireToken */ byokKey === null && llmKey === null, context,
   );
   if (failure) return failure;
 
@@ -187,7 +211,7 @@ export async function runGate(
   // and rate-limit checks above still ran; the handler uses the key upstream.
   // Deliberate server-side precedence: when both a valid BYOK header and a
   // Bearer token are present, BYOK wins and the token is never validated.
-  if (byokKey !== null) return null;
+  if (byokKey !== null || llmKey !== null) return null;
 
   // 5. auth: cheap shared-token (constant-time) -> positive cache -> Anvil
   const now = deps.now();
@@ -305,17 +329,18 @@ export async function runAdminGate(
   context?: IpContext,
 ): Promise<Response | null> {
   const byokKey = opts.allowByok ? extractByokKey(request) : null;
+  const llmKey = opts.allowLlmKey ? extractLlmKey(request) : null;
   const { presentedToken, failure } = await runBaseChecks(
     request,
     opts,
     deps.checkRateLimit,
-    /* requireToken */ byokKey === null, context,
+    /* requireToken */ byokKey === null && llmKey === null, context,
   );
   if (failure) return failure;
 
   // BYOK: the user's own Anthropic key replaces account auth. Method, body
   // and rate-limit checks above still ran; the handler uses the key upstream.
-  if (byokKey !== null) return null;
+  if (byokKey !== null || llmKey !== null) return null;
 
   const now = deps.now();
   let info: UserInfo | null = null;

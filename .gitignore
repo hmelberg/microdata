@@ -25,8 +25,12 @@ Notater og mulige issues.md
 .DS_Store
 Thumbs.db
 
-# Local env
+# Local env — hele .env-familien, MEN .env.example skal spores.
+# (.env.local o.l. var utenfor gitignore fram til 2026-08-27; Netlify-CLI og
+# de fleste verktøy leser dem, så en hemmelighet der ville blitt committet.)
 .env
+.env.*
+!.env.example
 .venv/
 venv/
 .netlify/

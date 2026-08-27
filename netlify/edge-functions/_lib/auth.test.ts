@@ -2,6 +2,7 @@ import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   clientIp,
   extractByokKey,
+  extractLlmKey,
   type GateDeps,
   runGate,
   timingSafeEqual,
@@ -15,6 +16,7 @@ function req(opts: {
   ip?: string;
   xff?: string;
   byok?: string;
+  llm?: string;
 } = {}): Request {
   const headers = new Headers();
   if (opts.token !== undefined) headers.set("authorization", `Bearer ${opts.token}`);
@@ -24,6 +26,7 @@ function req(opts: {
   if (opts.ip) headers.set("x-nf-client-connection-ip", opts.ip);
   if (opts.xff) headers.set("x-forwarded-for", opts.xff);
   if (opts.byok !== undefined) headers.set("x-anthropic-key", opts.byok);
+  if (opts.llm !== undefined) headers.set("x-llm-key", opts.llm);
   return new Request("https://example.test/", {
     method: opts.method ?? "POST",
     headers,
@@ -311,4 +314,32 @@ Deno.test("runGate: allowByok, valid BYOK header AND invalid Bearer token both p
   const resp = await runGate(request, { endpoint: "t", maxBodyBytes: 100, allowByok: true }, deps);
   assertEquals(resp, null);
   assertEquals(deps.calls.validate, 0); // BYOK short-circuits before token validation
+});
+
+// ── extractLlmKey (multi-provider-runden 2026-08-27) ──────────────────────
+// Format-agnostisk men avgrenset: leverandørene har ulike nøkkelformater, så
+// vi kan ikke kreve et prefiks — men lengde og printbar ASCII holder søppel
+// (og header-smugling via kontrolltegn) ute.
+
+Deno.test("extractLlmKey accepts a plausible provider key", () => {
+  assertEquals(extractLlmKey(req({ llm: "sk-abcdefgh" })), "sk-abcdefgh");
+  assertEquals(extractLlmKey(req({ llm: "  sk-trimmed-me  " })), "sk-trimmed-me");
+});
+
+Deno.test("extractLlmKey rejects out-of-range lengths", () => {
+  assertEquals(extractLlmKey(req({ llm: "short7x" })), null);
+  assertEquals(extractLlmKey(req({ llm: "a".repeat(251) })), null);
+  assertEquals(extractLlmKey(req({ llm: "a".repeat(250) })), "a".repeat(250));
+});
+
+Deno.test("extractLlmKey rejects non-ASCII and embedded spaces", () => {
+  assertEquals(extractLlmKey(req({ llm: "abcdefgh\u00e5" })), null);
+  assertEquals(extractLlmKey(req({ llm: "abcd efgh" })), null);
+  // Kontrolltegn (NUL o.l.) testes IKKE her: Headers.set avviser dem som
+  // ugyldig header-verdi, så de kan ikke nå extractLlmKey via en ekte
+  // forespørsel i det hele tatt. Regexen dekker dem uansett.
+});
+
+Deno.test("extractLlmKey returns null when the header is absent", () => {
+  assertEquals(extractLlmKey(req({})), null);
 });

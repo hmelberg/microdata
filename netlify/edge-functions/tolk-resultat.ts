@@ -1,8 +1,13 @@
 import { detectLanguage } from "./_lib/parse-script-context.ts";
 import { streamAnthropic } from "./_lib/anthropic.ts";
 import { extractByokKey, gate, upstreamErrorResponse, type IpContext } from "./_lib/auth.ts";
+import { resolveLlm } from "./_lib/llm-choice.ts";
+import { streamProvider } from "./_lib/providers/single.ts";
 
 interface RequestBody {
+  // multi-provider-runden 2026-08-27: valgfri egen leverandør + kvalitetsnivå.
+  provider?: unknown;
+  quality?: unknown;
   script?: string;
   output: string;
   språk?: "auto" | "microdata" | "python" | "r";
@@ -74,7 +79,7 @@ function languageInstruction(requested: string, detected: string): string {
 }
 
 export default async (request: Request, context: IpContext): Promise<Response> => {
-  const gateResp = await gate(request, { endpoint: "tolk-resultat", maxBodyBytes: 120_000, allowByok: true }, context);
+  const gateResp = await gate(request, { endpoint: "tolk-resultat", maxBodyBytes: 120_000, allowByok: true, allowLlmKey: true }, context);
   if (gateResp) return gateResp;
 
   let body: RequestBody;
@@ -88,12 +93,8 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   }
 
   const byokKey = extractByokKey(request);
-  const apiKey = byokKey ?? Deno.env.get("ANTHROPIC_API_KEY");
-  const model = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-4-6";
-  if (!apiKey) {
-    console.error("ANTHROPIC_API_KEY is not set");
-    return new Response("Server configuration error", { status: 500 });
-  }
+  const choice = resolveLlm(request, body, "tolk-resultat");
+  if (choice instanceof Response) return choice;
 
   // Truncate defensively so a huge output can't blow the prompt.
   const MAX_CHARS = 30_000;
@@ -115,14 +116,17 @@ section headings as: «Hva analysen gjorde» → «What the analysis did»,
     .replaceAll("{{OUTPUT}}", () => output);
 
   try {
-    const stream = await streamAnthropic({
-      apiKey,
-      model,
+    const opts = {
+      apiKey: choice.apiKey,
+      model: choice.model,
       prompt,
       maxTokens: 1800,
       system: TOLK_SYSTEM,
-      cacheTtl: "1h",
-    });
+      cacheTtl: "1h" as const,
+    };
+    const stream = choice.provider
+      ? await streamProvider(choice.provider, opts, choice)
+      : await streamAnthropic({ ...opts, effort: choice.effort });
     return new Response(stream, {
       headers: {
         "Content-Type": "text/event-stream",

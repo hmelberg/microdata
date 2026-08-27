@@ -1,3 +1,5 @@
+import { flushSseBuffer, parseSseFrames } from "./sse-frames.ts";
+
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 
@@ -13,6 +15,14 @@ export interface AnthropicStreamOptions {
   // Cache TTL for the system block. "1h" needs the extended-cache-ttl beta
   // header; "5m" (default) is GA. Ignored when `system` is unset.
   cacheTtl?: "5m" | "1h";
+  // Anthropic-kompatibel gateway (multi-provider-runden 2026-08-27): POST går
+  // til `${apiBase}/messages` i stedet for api.anthropic.com. Konvensjonen er
+  // «alt før endepunktnavnet», lik providers/config.ts.
+  apiBase?: string;
+  // output_config.effort — NØSTET, aldri toppnivå, og ingen beta-header.
+  // Utelates helt når den er unset: effort FEILER på Haiku 4.5, som er
+  // nøyaktig modellen picker-passet og «fast»-nivået bruker (llm-choice.ts).
+  effort?: string;
 }
 
 export interface StreamEvent {
@@ -23,6 +33,11 @@ export interface StreamEvent {
   cacheReadTokens?: number;
   cacheCreationTokens?: number;
   message?: string;
+}
+
+/** Endepunktet for dette kallet: brukerens gateway, ellers Anthropic selv. */
+function apiTarget(apiBase?: string): string {
+  return apiBase ? `${apiBase.replace(/\/+$/, "")}/messages` : ANTHROPIC_API;
 }
 
 const ANTHROPIC_TIMEOUT_MS = 30_000;
@@ -81,6 +96,7 @@ export async function fetchWithRetry(
 
 export async function streamAnthropic(
   opts: AnthropicStreamOptions,
+  deps: RetryDeps = {},
 ): Promise<ReadableStream<Uint8Array>> {
   const useLongTtl = opts.cacheTtl === "1h";
   const headers: Record<string, string> = {
@@ -98,6 +114,7 @@ export async function streamAnthropic(
     stream: true,
     messages: [{ role: "user", content: opts.prompt }],
   };
+  if (opts.effort) requestBody.output_config = { effort: opts.effort };
   if (opts.system) {
     requestBody.system = [
       {
@@ -110,11 +127,11 @@ export async function streamAnthropic(
     ];
   }
 
-  const upstream = await fetchWithRetry(ANTHROPIC_API, {
+  const upstream = await fetchWithRetry(apiTarget(opts.apiBase), {
     method: "POST",
     headers,
     body: JSON.stringify(requestBody),
-  });
+  }, deps);
 
   if (!upstream.ok || !upstream.body) {
     // Log the upstream detail server-side, but do NOT echo it to the client
@@ -162,6 +179,7 @@ export async function messageAnthropic(
     stream: false,
     messages: [{ role: "user", content: opts.prompt }],
   };
+  if (opts.effort) requestBody.output_config = { effort: opts.effort };
   if (opts.system) {
     requestBody.system = [
       {
@@ -173,7 +191,7 @@ export async function messageAnthropic(
   }
 
   const resp = await fetchWithRetry(
-    ANTHROPIC_API,
+    apiTarget(opts.apiBase),
     { method: "POST", headers, body: JSON.stringify(requestBody) },
     deps,
   );
@@ -213,65 +231,38 @@ function transformAnthropicStream(
   return new ReadableStream({
     async start(controller) {
       const reader = upstream.getReader();
+      // One payload handler, used for both the streaming reads and the
+      // end-of-stream drain. These two paths used to be a verbatim
+      // copy-paste of each other (framing AND event handling duplicated),
+      // so a fix to one silently missed the other; framing now lives in
+      // sse-frames.ts and the event vocabulary lives here, once.
+      const handlePayload = (payload: string) => {
+        try {
+          const obj = JSON.parse(payload);
+          if (obj.type === "content_block_delta" && obj.delta?.type === "text_delta") {
+            const out: StreamEvent = { type: "text", text: obj.delta.text };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(out)}\n\n`));
+          } else if (obj.type === "message_start" && obj.message?.usage) {
+            inputTokens = obj.message.usage.input_tokens ?? 0;
+            cacheReadTokens = obj.message.usage.cache_read_input_tokens ?? 0;
+            cacheCreationTokens = obj.message.usage.cache_creation_input_tokens ?? 0;
+          } else if (obj.type === "message_delta" && obj.usage) {
+            outputTokens = obj.usage.output_tokens ?? outputTokens;
+          }
+        } catch (_e) {
+          // ignore non-JSON event data
+        }
+      };
       try {
         while (true) {
           const { value, done } = await reader.read();
           if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          let nlIdx;
-          while ((nlIdx = buffer.indexOf("\n\n")) >= 0) {
-            const event = buffer.slice(0, nlIdx);
-            buffer = buffer.slice(nlIdx + 2);
-            const dataLine = event.split("\n").find((l) => l.startsWith("data:"));
-            if (!dataLine) continue;
-            const payload = dataLine.slice(5).trim();
-            if (!payload || payload === "[DONE]") continue;
-            try {
-              const obj = JSON.parse(payload);
-              if (obj.type === "content_block_delta" && obj.delta?.type === "text_delta") {
-                const out: StreamEvent = { type: "text", text: obj.delta.text };
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(out)}\n\n`));
-              } else if (obj.type === "message_start" && obj.message?.usage) {
-                inputTokens = obj.message.usage.input_tokens ?? 0;
-                cacheReadTokens = obj.message.usage.cache_read_input_tokens ?? 0;
-                cacheCreationTokens = obj.message.usage.cache_creation_input_tokens ?? 0;
-              } else if (obj.type === "message_delta" && obj.usage) {
-                outputTokens = obj.usage.output_tokens ?? outputTokens;
-              }
-            } catch (_e) {
-              // ignore non-JSON event data
-            }
-          }
+          const parsed = parseSseFrames(decoder.decode(value, { stream: true }), buffer);
+          buffer = parsed.buffer;
+          parsed.payloads.forEach(handlePayload);
         }
         // Drain any residual buffer content not yet terminated by \n\n
-        if (buffer.trim()) {
-          buffer += "\n\n";
-          let nlIdx;
-          while ((nlIdx = buffer.indexOf("\n\n")) >= 0) {
-            const event = buffer.slice(0, nlIdx);
-            buffer = buffer.slice(nlIdx + 2);
-            const dataLine = event.split("\n").find((l) => l.startsWith("data:"));
-            if (!dataLine) continue;
-            const payload = dataLine.slice(5).trim();
-            if (!payload || payload === "[DONE]") continue;
-            try {
-              const obj = JSON.parse(payload);
-              if (obj.type === "content_block_delta" && obj.delta?.type === "text_delta") {
-                const out: StreamEvent = { type: "text", text: obj.delta.text };
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(out)}\n\n`));
-              } else if (obj.type === "message_start" && obj.message?.usage) {
-                inputTokens = obj.message.usage.input_tokens ?? 0;
-                cacheReadTokens = obj.message.usage.cache_read_input_tokens ?? 0;
-                cacheCreationTokens = obj.message.usage.cache_creation_input_tokens ?? 0;
-              } else if (obj.type === "message_delta" && obj.usage) {
-                outputTokens = obj.usage.output_tokens ?? outputTokens;
-              }
-            } catch (_e) {
-              // ignore non-JSON event data
-            }
-          }
-        }
+        flushSseBuffer(buffer).forEach(handlePayload);
         const done: StreamEvent = {
           type: "done",
           inputTokens,
@@ -318,6 +309,10 @@ export interface AgenticOptions {
   turnsPerCall?: number;
   continueExtra?: () => Record<string, unknown>;
   deps?: RetryDeps;
+  // Speiler AnthropicStreamOptions (multi-provider-runden 2026-08-27):
+  // anthropic-kompatibel gateway, og output_config.effort NØSTET.
+  apiBase?: string;
+  effort?: string;
 }
 
 // Everything the loop needs to pick up where a previous invocation stopped.
@@ -327,6 +322,26 @@ export interface AgenticResumeState {
   messages: Record<string, unknown>[];
   turn: number;
   clientCalls: number;
+  // Feltene under bæres av det ORDRETT kopierte leverandørlaget
+  // (_lib/providers/agentic.ts, fra askstat) — de er valgfrie og rører ikke
+  // den anthropic-native løkka under. pdfVern er BEVISST utelatt: askstat
+  // trenger det for API-ets eget websøk, og providers/ refererer det ikke.
+  //
+  // prevResponseId: openai-responses holder samtaletilstanden server-side —
+  // bare id-en rundtures, og meldingsarrayet bærer da kun siste tool-results.
+  prevResponseId?: string;
+  runCalls?: number;
+  // getPackCalls: askstats get_pack-teller. microdata har ikke det verktøyet,
+  // så telleren er inert her — den står fordi den kopierte fila refererer den,
+  // og et avvik ville brutt cherry-pick-veien mellom søsterrepoene.
+  getPackCalls?: number;
+  // pending: hvilket klientutført verktøy vi venter svar på over et resume-hopp.
+  pending?: {
+    results: { tool_use_id: string; content: string }[];
+    awaitingId: string;
+    name?: string;
+    expectedId?: string;
+  };
   usage: {
     inputTokens: number;
     outputTokens: number;
@@ -394,7 +409,7 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
           }, HEARTBEAT_MS);
           let resp: Response;
           try {
-            resp = await fetchWithRetry(ANTHROPIC_API, {
+            resp = await fetchWithRetry(apiTarget(opts.apiBase), {
               method: "POST",
               headers,
               body: JSON.stringify({
@@ -404,6 +419,7 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
                 system,
                 tools: opts.tools,
                 messages: state.messages,
+                ...(opts.effort ? { output_config: { effort: opts.effort } } : {}),
               }),
             }, deps);
           } finally {

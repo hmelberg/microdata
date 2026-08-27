@@ -17,11 +17,28 @@ data-minimization/privacy review, and result interpretation).
 
 This is the **public, lite** version: no login, no accounts, no protected/
 sensitive data sources, and no server-side remote execution. The AI features
-work only via a user-supplied Anthropic API key (BYOK), pasted into the
-Settings dialog and stored only in the browser's `localStorage` — our Netlify
-edge functions relay each request straight to Anthropic and don't store the
-key or the request content. See `personvern.html` for the full privacy
-statement.
+work only via a user-supplied API key (BYOK), pasted into the Settings dialog
+and stored only in the browser's `localStorage` — our Netlify edge functions
+relay each request straight to the chosen provider and don't store the key or
+the request content.
+
+The provider is the user's choice. Three protocol types cover the cloud
+market: `anthropic-compat` (Anthropic and compatible gateways),
+`openai-compat` (`/chat/completions` — Mistral, Groq, DeepSeek, OpenRouter,
+vLLM, …) and `openai-responses` (OpenAI). A Quality selector
+(Fast/Balanced/Best) maps to model + reasoning effort. **Local models
+(Ollama, LM Studio) are not supported**: the edge function runs in the cloud
+and cannot reach the user's machine, and `ssrf.ts` deliberately blocks
+`localhost` — see the deferred section of
+`docs/superpowers/specs/2026-08-27-multi-provider-byok-design.md`.
+
+Power-user localStorage switches (no UI by design, set them directly):
+`md_ai_autorun=1` skips the run-confirmation for generated scripts, and
+`md_access_token=<password>` sends the shared `M2PY_ACCESS_TOKEN` as a Bearer
+token so the AI features work against the server's own key without a personal
+one.
+
+See `personvern.html` for the full privacy statement.
 
 ## Layout
 
@@ -34,7 +51,8 @@ statement.
 | `protect.py` | `scrub-*` data-protection verbs (noise, swap, k-anon, risk, …) — a local disclosure-control toolkit you can call on your own scripts; no server involved. |
 | `mockdata_export.py`, `static_source.py`, `build_static_data.py` | Static synthetic-data build (Parquet/DuckDB) + the static data source. |
 | `py2m/`, `r2m/` | Python→microdata and R→microdata translators (each with its own runner + tests). |
-| `netlify/edge-functions/` | The AI endpoints (`dm-vurder`, `kode-svar`, `kode-svar-v2`, `tolk-resultat`, `data-svar`, `hent`) + shared `_lib/`. All accept a BYOK Anthropic key (`X-Anthropic-Key`) — no account/token required. |
+| `netlify/edge-functions/` | The AI endpoints (`dm-vurder`, `kode-svar`, `kode-svar-v2`, `tolk-resultat`, `data-svar`, `hent`) + shared `_lib/`. All accept a BYOK Anthropic key (`X-Anthropic-Key`) or a custom-provider key
+(`X-Llm-Key` plus a complete `provider` body) — no account/token required. |
 | `manual_scripts/` | End-to-end example scripts run as a smoke suite. |
 | `tests/` | pytest suite (engine, regressions, equivalence, mock-data, performance). |
 
