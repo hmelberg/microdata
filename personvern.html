@@ -68,21 +68,22 @@
   <p>Microdata Script Runner er et hobbyprosjekt drevet av Hans Olav Melberg som hjelper brukere å skrive og kjøre kode mot microdata.no-syntaks, Python og R direkte i nettleseren. Denne versjonen krever <strong>ingen innlogging og ingen konto</strong>. Skriptet ditt, datasettene du laster inn og kjøreresultatene forblir i nettleseren din — de sendes aldri til noen server, med mindre du selv bruker AI-assistenten.</p>
 
   <h2>2. Hva skjer når du bruker AI-assistenten?</h2>
-  <p>AI-funksjonene (kodeforslag, tolkning av resultater, dataminimeringsvurdering, web-søk) krever at du limer inn din egen Anthropic API-nøkkel under AI-innstillinger. Da gjelder:</p>
+  <p>AI-funksjonene (kodeforslag, tolkning av resultater, dataminimeringsvurdering, web-søk) krever at du limer inn din egen API-nøkkel under AI-innstillinger. Du velger selv <strong>hvilken leverandør</strong> nøkkelen gjelder: Anthropic er standardvalget, men du kan i stedet oppgi OpenAI, Mistral eller en hvilken som helst annen tjeneste med et OpenAI-kompatibelt API. Da gjelder:</p>
   <ul>
-    <li><strong>Nøkkelen</strong> lagres kun lokalt i nettleseren din (<code>localStorage</code>) og sendes som header (<code>X-Anthropic-Key</code>) til vår server, som videresender den direkte til Anthropic for den ene forespørselen. Vi lagrer eller logger ikke nøkkelen.</li>
-    <li><strong>Spørsmålet og skriptutdraget du sender</strong> videresendes til Anthropic for å generere et svar. Vi lagrer ikke innholdet i disse forespørslene på egen server.</li>
+    <li><strong>Nøkkelen</strong> lagres kun lokalt i nettleseren din (<code>localStorage</code>) og sendes som header (<code>X-Anthropic-Key</code> eller <code>X-Llm-Key</code>) til vår server, som videresender den direkte til <em>den leverandøren du har valgt</em> for den ene forespørselen. Vi lagrer eller logger ikke nøkkelen.</li>
+    <li><strong>Spørsmålet og skriptutdraget du sender</strong> videresendes til den samme leverandøren for å generere et svar. Vi lagrer ikke innholdet i disse forespørslene på egen server.</li>
+    <li><strong>Har du valgt en annen leverandør enn Anthropic</strong>, går forespørselen — og nøkkelen — til den API-adressen du selv har oppgitt i innstillingene, og behandles etter <em>den</em> tjenestens vilkår og personvernregler. Vi har ingen avtale med, og ingen kontroll over, en leverandør du velger på denne måten.</li>
     <li><strong>IP-adressen din</strong> brukes midlertidig til enkel hastighetsbegrensning (rate limiting) for å hindre misbruk, og slettes fortløpende.</li>
-    <li>Forbruket (tokens/kostnad) belastes din egen Anthropic-konto — vi ser eller lagrer ikke betalingsinformasjon.</li>
+    <li>Forbruket (tokens/kostnad) belastes din egen konto hos leverandøren du har valgt — vi ser eller lagrer ikke betalingsinformasjon.</li>
   </ul>
 
   <h2>3. Informasjonskapsler og lokal lagring</h2>
-  <p>Appen bruker kun <code>localStorage</code> i din egen nettleser til å huske dine innstillinger (f.eks. Anthropic-nøkkel, valgt modus, tema). Ingenting av dette sendes til oss med mindre du aktivt bruker AI-funksjonene.</p>
+  <p>Appen bruker kun <code>localStorage</code> i din egen nettleser til å huske dine innstillinger (f.eks. API-nøkkel, valgt AI-leverandør og modell, kvalitetsnivå, valgt modus, tema). Ingenting av dette sendes til oss med mindre du aktivt bruker AI-funksjonene.</p>
 
   <h2>4. Deling med tredjepart</h2>
   <p>Vi selger eller leier ikke ut data. Når du bruker AI-funksjonene, deles spørsmålet/skriptet med:</p>
   <ul>
-    <li>Anthropic (AI-tjeneste, USA) — for å generere svaret</li>
+    <li>AI-leverandøren du har valgt i innstillingene — for å generere svaret. Uten eget valg er dette Anthropic (USA); har du oppgitt en annen leverandør, er det den, på API-adressen du selv har fylt inn.</li>
     <li>Netlify (hosting av appen og serverfunksjonene)</li>
   </ul>
 

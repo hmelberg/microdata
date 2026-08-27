@@ -625,7 +625,7 @@ summarize kjonn
     <p>An experimental side panel with an AI assistant that can answer questions about microdata syntax, suggest variables, and generate or revise scripts. Opened with the star icon at the top right or <kbd>Ctrl</kbd>+<kbd>I</kbd>.</p>
 
     <div class="callout">
-      <strong>Requires your own Anthropic API key.</strong> Click the gear icon in the AI panel and paste in a key from <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. The key is stored only locally in the browser (localStorage) and sent as an <code>X-Anthropic-Key</code> header straight through to Anthropic for each request.
+      <strong>Requires your own API key.</strong> Click the gear icon in the AI panel and paste in a key. Anthropic is the default (create a key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>), but you can instead pick OpenAI, Mistral or any other service with an OpenAI-compatible API from the provider dropdown. The key is stored only locally in the browser (localStorage) and sent as an <code>X-Anthropic-Key</code> or <code>X-Llm-Key</code> header straight through to the provider you selected, for each request. The Quality selector (Fast/Balanced/Best) controls the model and how hard it thinks.
     </div>
 
     <h3>What the assistant can do</h3>

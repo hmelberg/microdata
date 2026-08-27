@@ -625,7 +625,7 @@ summarize kjonn
     <p>Et eksperimentelt sidepanel med en AI-assistent som kan svare på spørsmål om microdata-syntaks, foreslå variabler og generere eller revidere skript. Åpnes med stjerne-ikonet øverst til høyre eller <kbd>Ctrl</kbd>+<kbd>I</kbd>.</p>
 
     <div class="callout">
-      <strong>Krever egen Anthropic API-nøkkel.</strong> Klikk tannhjul-ikonet i AI-panelet og lim inn en nøkkel fra <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. Nøkkelen lagres kun lokalt i nettleseren (localStorage) og sendes som <code>X-Anthropic-Key</code>-header direkte videre til Anthropic for hver forespørsel.
+      <strong>Krever egen API-nøkkel.</strong> Klikk tannhjul-ikonet i AI-panelet og lim inn en nøkkel. Standard er Anthropic (lag en nøkkel på <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>), men du kan i stedet velge OpenAI, Mistral eller en annen tjeneste med OpenAI-kompatibelt API i leverandør-nedtrekkslista. Nøkkelen lagres kun lokalt i nettleseren (localStorage) og sendes som <code>X-Anthropic-Key</code>- eller <code>X-Llm-Key</code>-header direkte videre til den leverandøren du har valgt, for hver forespørsel. Kvalitet-velgeren (Rask/Balansert/Best) styrer modell og hvor grundig modellen tenker.
     </div>
 
     <h3>Hva assistenten kan gjøre</h3>

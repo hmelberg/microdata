@@ -68,21 +68,22 @@
   <p>Microdata Script Runner is a hobby project run by Hans Olav Melberg that helps users write and run code against microdata.no syntax, Python, and R directly in the browser. This version requires <strong>no login and no account</strong>. Your script, any datasets you load, and the run results stay in your browser — they are never sent to any server unless you choose to use the AI assistant.</p>
 
   <h2>2. What happens when you use the AI assistant?</h2>
-  <p>The AI features (code suggestions, interpreting results, data-minimization assessment, web search) require you to paste your own Anthropic API key under AI settings. When you do:</p>
+  <p>The AI features (code suggestions, interpreting results, data-minimization assessment, web search) require you to paste your own API key under AI settings. You choose <strong>which provider</strong> that key belongs to: Anthropic is the default, but you may instead supply OpenAI, Mistral, or any other service with an OpenAI-compatible API. When you do:</p>
   <ul>
-    <li><strong>The key</strong> is stored only locally in your browser (<code>localStorage</code>) and sent as a header (<code>X-Anthropic-Key</code>) to our server, which forwards it directly to Anthropic for that one request. We do not store or log the key.</li>
-    <li><strong>The question and script excerpt you send</strong> is forwarded to Anthropic to generate a response. We do not store the content of these requests on our own server.</li>
+    <li><strong>The key</strong> is stored only locally in your browser (<code>localStorage</code>) and sent as a header (<code>X-Anthropic-Key</code> or <code>X-Llm-Key</code>) to our server, which forwards it directly to <em>the provider you selected</em> for that one request. We do not store or log the key.</li>
+    <li><strong>The question and script excerpt you send</strong> is forwarded to that same provider to generate a response. We do not store the content of these requests on our own server.</li>
+    <li><strong>If you chose a provider other than Anthropic</strong>, the request — and the key — goes to the API address you entered in settings, and is handled under <em>that</em> service's terms and privacy policy. We have no agreement with, and no control over, a provider you select this way.</li>
     <li><strong>Your IP address</strong> is used briefly for simple rate limiting to prevent abuse, and is not retained.</li>
-    <li>Usage (tokens/cost) is billed to your own Anthropic account — we do not see or store payment information.</li>
+    <li>Usage (tokens/cost) is billed to your own account with the provider you selected — we do not see or store payment information.</li>
   </ul>
 
   <h2>3. Cookies and local storage</h2>
-  <p>The app only uses <code>localStorage</code> in your own browser to remember your settings (e.g. Anthropic key, chosen mode, theme). None of this is sent to us unless you actively use the AI features.</p>
+  <p>The app only uses <code>localStorage</code> in your own browser to remember your settings (e.g. API key, chosen AI provider and model, quality level, chosen mode, theme). None of this is sent to us unless you actively use the AI features.</p>
 
   <h2>4. Sharing with third parties</h2>
   <p>We do not sell or rent out data. When you use the AI features, your question/script is shared with:</p>
   <ul>
-    <li>Anthropic (AI service, USA) — to generate the response</li>
+    <li>The AI provider you selected in settings — to generate the response. With no explicit choice this is Anthropic (USA); if you supplied a different provider, it is that one, at the API address you entered.</li>
     <li>Netlify (hosting for the app and server functions)</li>
   </ul>
 
