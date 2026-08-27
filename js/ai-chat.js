@@ -65,6 +65,10 @@
         return customProviderReady() || !!state.anthropicKey || !!state.accessToken;
       }
 
+      const md = (window.markdownit ? window.markdownit({ breaks: true, linkify: true }) : null);
+
+      const $ = (id) => document.getElementById(id);
+      const dom = {};
       function cacheDom() {
         ['aiToggleBtn','aiSidebar','aiCloseBtn','aiSettingsBtn','aiClearBtn',
          'aiThread','aiInput','aiSendFastBtn','aiAbortBtn',
