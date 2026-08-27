@@ -185,3 +185,17 @@ Deno.test("byok key wins over the personal password", () => {
   ) as LlmChoice;
   assertEquals(c.apiKey, "sk-ant-user");
 });
+
+// ── svar-kallstedet (samlet pipeline 2026-08-28) ──────────────────────────
+Deno.test("svar: default sonnet-5 high; SVAR_MODEL vinner over ANTHROPIC_MODEL", () => {
+  assertEquals(chooseModel("svar", null, () => undefined),
+    { model: "claude-sonnet-5", effort: "high" });
+  const env = (k: string) =>
+    k === "SVAR_MODEL" ? "pinned-svar" : k === "ANTHROPIC_MODEL" ? "pinned-generelt" : undefined;
+  assertEquals(chooseModel("svar", null, env).model, "pinned-svar");
+});
+
+Deno.test("svar: kvalitet flytter modellen som for andre kallsteder", () => {
+  assertEquals(chooseModel("svar", "best", () => undefined),
+    { model: "claude-opus-5", effort: "xhigh" });
+});

@@ -20,7 +20,7 @@ export type CallSite =
   | "picker"
   | "dm-vurder"
   | "tolk-resultat"
-  | "data-svar";
+  | "data-svar" | "svar";
 
 export interface ModelChoice {
   model: string;
@@ -48,12 +48,14 @@ const DEFAULTS: Record<CallSite, ModelChoice> = {
   "dm-vurder": { model: "claude-sonnet-5", effort: "high" },
   "tolk-resultat": { model: "claude-sonnet-5", effort: "medium" },
   "data-svar": { model: "claude-sonnet-5", effort: "high" },
+  "svar": { model: "claude-sonnet-5", effort: "high" },
 };
 
 /** Env-navnet som overstyrer modellen for dette kallstedet, i prioritert rekkefølge. */
 function envKeysFor(site: CallSite): string[] {
   if (site === "picker") return ["PICKER_MODEL"];
   if (site === "data-svar") return ["DATA_SVAR_MODEL", "ANTHROPIC_MODEL"];
+  if (site === "svar") return ["SVAR_MODEL", "ANTHROPIC_MODEL"];
   return ["ANTHROPIC_MODEL"];
 }
 
