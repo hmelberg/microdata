@@ -8912,6 +8912,18 @@ options(width = 200)
     // run has settled before inspecting #outputArea for a `pre.error` node.
     window.mdIsScriptRunning = function () { return scriptRunInProgress; };
 
+    // Motor-høsteren for run_code-løkka (samlet svar-pipeline 2026-08-28):
+    // suksess-output leses fra motor-sannheten `lastOutput` (topp-nivå let,
+    // settes ved kjøringsslutt i alle motorveiene), feil fra pre.error via
+    // textContent — som er layout-UAVHENGIG og virker også når panelet er
+    // skjult (askstat-lærdommen KODESAK A gjaldt innerText, aldri textContent).
+    window.mdRunHarvest = function () {
+      var outputArea = document.getElementById('outputArea');
+      var errEl = outputArea && outputArea.querySelector('pre.error');
+      if (errEl) return { ok: false, output: errEl.textContent || '' };
+      return { ok: true, output: (typeof lastOutput === 'string' ? lastOutput : '') };
+    };
+
     // Dashboard-kontrakten (spec 2026-07-09 §2): kjør en chunk i ved-
     // varende scope og returner resultatet — python via _exec_pyodide_
     // block/_g (samme maskineri som forklar), R via shelter.captureR.
@@ -9838,6 +9850,7 @@ def _run_microdata_chunk(_code):
   <script src="js/enc-crypto.js"></script>
   <script src="js/data-loader.js"></script>
   <script src="js/duckdb-native.js"></script>
+  <script src="js/run-result.js"></script>
   <script src="js/ai-credential.js"></script>
   <script src="js/ai-transport.js"></script>
   <script src="js/ai-chat.js"></script>
