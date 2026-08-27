@@ -278,12 +278,8 @@
           placeholder="Spør om noe... (Enter = send, Shift+Enter = ny linje)"></textarea>
         <button type="button" class="ai-abort-btn" id="aiAbortBtn" style="display:none;" data-i18n data-i18n-title data-i18n-aria title="Avbryt pågående svar" aria-label="Avbryt">⏹ Avbryt</button>
         <button type="button" class="ai-send-fast-btn" id="aiSendFastBtn" data-i18n-title
-          title="Send spørsmål til AI (AI-modus velges i menyen)"
+          title="Send: AI-en skriver script, kjører dem i emulatoren og svarer basert på resultatene"
           aria-label="Send">Send</button>
-        <button type="button" class="ai-send-fast-btn ai-send-v2-btn" id="aiSendV2Btn" data-i18n-title
-          title="Eksperimentell: 2-stegs variabelvalg + auto-retting (kan være tregere)"
-          aria-label="Send (eksperimentell)">Send⚗︎</button>
-        <button type="button" class="ai-send-fast-btn ai-send-web-btn" id="aiSendWebBtn" style="display:none;" data-i18n-title title="Web: finn åpne data og generer script (krever admin eller egen Anthropic-nøkkel; python/r/duckdb-modus)" aria-label="Send (web)">Web</button>
       </div>
     </div>
   </aside>
@@ -325,7 +321,14 @@
           <option value="balanced" data-i18n>Balansert — anbefalt</option>
           <option value="best" data-i18n>Best — dyrest, grundigst</option>
         </select>
-        <div class="ai-modal-help" data-i18n>Styrer modell og hvor mye modellen tenker. Gjelder alle AI-funksjonene. Med egen leverandør er det modellen du har oppgitt over som brukes; kvalitetsvalget justerer da bare tenkedybden der leverandøren støtter det.</div>
+        <div class="ai-modal-help" data-i18n>Styrer modell, tenkedybde OG hvor grundig svar-løpet får jobbe: antall verktøykall/kjøringer er Rask 8/3 · Balansert 12/4 · Best 20/6. Med egen leverandør er det modellen du har oppgitt over som brukes; kvalitetsvalget justerer da tenkedybde og rundebudsjett.</div>
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <label for="aiCfgInstructions" data-i18n>Egne instruksjoner (valgfritt)</label>
+        <textarea id="aiCfgInstructions" rows="3" style="width:100%;resize:vertical;"
+          data-i18n-placeholder placeholder="F.eks.: «Svar kort», «bruk alltid nynorsk», «forklar kommandoene linje for linje» …"></textarea>
+        <div class="ai-modal-help" data-i18n>Sendes med hvert AI-spørsmål som dine faste regler (inntil 4000 tegn). Lagres kun i denne nettleseren.</div>
       </div>
 
       <div class="ai-modal-actions" style="margin-top:14px;">

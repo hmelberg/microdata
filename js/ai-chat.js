@@ -65,29 +65,14 @@
         return customProviderReady() || !!state.anthropicKey || !!state.accessToken;
       }
 
-      // Web mode requires a user-supplied Anthropic key (BYOK — the agentic
-      // search then runs on the user's own account), and only makes sense in
-      // python/r/duckdb editor modes (no `# connect`/`# load` story for
-      // microdata). Surfaced only via its own send button
-      // (syncWebBtnVisibility() shows/hides #aiSendWebBtn).
-      function webModeEligible() {
-        const hasByok = hasAiCredentials();
-        const mode = (typeof activeEditorMode !== 'undefined' && activeEditorMode) ? activeEditorMode : 'microdata';
-        return hasByok && (mode === 'python' || mode === 'r' || mode === 'duckdb');
-      }
-
-      const md = (window.markdownit ? window.markdownit({ breaks: true, linkify: true }) : null);
-
-      const $ = (id) => document.getElementById(id);
-      const dom = {};
       function cacheDom() {
         ['aiToggleBtn','aiSidebar','aiCloseBtn','aiSettingsBtn','aiClearBtn',
-         'aiThread','aiInput','aiSendFastBtn','aiSendV2Btn','aiSendWebBtn','aiAbortBtn',
+         'aiThread','aiInput','aiSendFastBtn','aiAbortBtn',
          'aiIncludeScript',
          'aiSettingsBackdrop','aiCfgAnthropicKey','aiCfgSave','aiCfgCancel',
          'aiCfgByokStored','aiCfgByokRemove',
          'aiCfgProviderType','aiCfgAnthropicSection','aiCfgProviderFields',
-         'aiCfgProviderUrl','aiCfgProviderModel','aiCfgLlmKey','aiCfgQuality',
+         'aiCfgProviderUrl','aiCfgProviderModel','aiCfgLlmKey','aiCfgQuality','aiCfgInstructions',
          'sidebarRight','sidebarOpenTab','scriptInput'
         ].forEach(id => { dom[id] = $(id); });
         dom.containers = document.querySelectorAll('.container');
@@ -144,7 +129,7 @@
           btn.addEventListener('click', () => {
             dom.aiInput.value = btn.dataset.q;
             autoresize();
-            sendMessage();
+            sendSvarMessage();
           });
         });
       }
@@ -468,71 +453,6 @@
         throw new Error(AiTransport.describeError(e, { endpoint: endpoint, phase: phase, hop: hop }));
       }
 
-      function detectLang(text) {
-        // Crude: if it has Norwegian chars or common NO words, treat as 'no', else 'en'.
-        if (/[æøåÆØÅ]/.test(text)) return 'no';
-        const noWords = /\b(hva|hvordan|kjør|skript|gjør|finnes|vis|inntekt|kjønn|kommune|alder)\b/i;
-        if (noWords.test(text)) return 'no';
-        const enWords = /\b(what|how|show|run|script|does|find|income|gender|age)\b/i;
-        if (enWords.test(text)) return 'en';
-        return (window.M2PY_LANG === 'en') ? 'en' : 'no';
-      }
-
-      async function sendMessage(useV2) {
-        if (state.sending) return;
-        const text = dom.aiInput.value.trim();
-        if (!text) return;
-        // Gate on credentials: nothing configured yet → open Settings.
-        // hasAiCredentials(), ikke state.anthropicKey: en bruker med egen
-        // leverandør (eller tilgangspassord) har fullgod legitimasjon.
-        if (!hasAiCredentials()) {
-          openSettings();
-          return;
-        }
-        state.sending = true;
-        if (dom.aiSendFastBtn) dom.aiSendFastBtn.disabled = true;
-        if (dom.aiSendWebBtn) dom.aiSendWebBtn.disabled = true;
-
-        // Clear empty state on first message
-        if (state.history.length === 0) dom.aiThread.innerHTML = '';
-
-        appendUserMessage(text);
-        state.history.push({ role: 'user', text });
-        dom.aiInput.value = '';
-        autoresize();
-
-        const thinkingNode = appendThinking();
-        const lang = detectLang(text);
-
-        const includeScript = dom.aiIncludeScript.checked && dom.scriptInput && dom.scriptInput.value.trim();
-
-        // Single-shot, no-repair edge function. Streams markdown; the result
-        // is validated locally via Pyodide+m2py (see runFastQuery).
-        const ctrl = new AbortController();
-        state.abortCtrl = ctrl;
-        if (dom.aiAbortBtn) dom.aiAbortBtn.style.display = '';
-        try {
-          const meta = useV2
-            ? await runFastQueryV2(text, lang, includeScript ? scrubScript(dom.scriptInput.value) : '', thinkingNode, ctrl.signal)
-            : await runFastQuery(text, lang, includeScript ? scrubScript(dom.scriptInput.value) : '', thinkingNode, ctrl.signal);
-          state.history.push({ role: 'assistant', meta });
-        } catch (e) {
-          if (e.name !== 'AbortError') appendError(thinkingNode, '✗ ' + e.message);
-        } finally {
-          state.abortCtrl = null;
-          if (dom.aiAbortBtn) dom.aiAbortBtn.style.display = 'none';
-          state.sending = false;
-          if (dom.aiSendFastBtn) dom.aiSendFastBtn.disabled = false;
-          if (dom.aiSendWebBtn) dom.aiSendWebBtn.disabled = false;
-          dom.aiInput.focus();
-        }
-      }
-
-      // ── Fast path: stream from the /api/kode-svar edge function (single-shot,
-      //    no repair), render markdown live, then validate the emitted script
-      //    locally in Pyodide+m2py and show a pass/⚠ badge. Returns meta.
-      // Render markdown inn i boblen under streaming (faller tilbake til ren
-      // tekst hvis markdown-it mangler eller parsing feiler på ufullstendig md).
       function streamRenderMd(bubble, textMd) {
         if (md) {
           try { bubble.innerHTML = md.render(textMd || ''); return; }
@@ -541,283 +461,6 @@
         bubble.textContent = textMd || '';
       }
 
-      async function runFastQuery(text, lang, scriptContext, thinkingNode, signal) {
-        const headers = edgeAuthHeaders();
-        const t0 = Date.now();
-        const resp = await AiTransport.postWithRetry('/api/kode-svar', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(Object.assign(
-            { question: text, lang, script: scriptContext || '' }, edgeBodyExtras())),
-          signal,
-        }).catch((e) => rethrowDescribed(e, 'kode-svar', 'request'));
-        if (resp.status === 401) {
-          throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
-        }
-        if (!resp.ok || !resp.body) {
-          throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()));
-        }
-
-        // Render incrementally into an assistant bubble.
-        thinkingNode.innerHTML = '';
-        const bubble = document.createElement('div');
-        bubble.className = 'ai-bubble';
-        thinkingNode.appendChild(bubble);
-
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let accumulated = '';
-        let _lastRender = 0;
-        let inputTokens = 0, outputTokens = 0, cacheRead = 0, cacheCreate = 0;
-        while (true) {
-          const { value, done } = await reader.read().catch((e) => rethrowDescribed(e, 'kode-svar', 'stream'));
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          let nl;
-          while ((nl = buffer.indexOf('\n\n')) >= 0) {
-            const event = buffer.slice(0, nl);
-            buffer = buffer.slice(nl + 2);
-            const dataLine = event.split('\n').find(l => l.startsWith('data:'));
-            if (!dataLine) continue;
-            let obj;
-            try { obj = JSON.parse(dataLine.slice(5).trim()); }
-            catch (_) { continue; }   // ignore non-JSON keep-alive lines
-            if (obj.type === 'text') {
-              accumulated += obj.text;
-              // Render markdown live (lett strupet) i stedet for rå tekst.
-              const _now = Date.now();
-              if (_now - _lastRender > 70) {
-                _lastRender = _now;
-                streamRenderMd(bubble, accumulated);
-                scrollToBottom();
-              }
-            } else if (obj.type === 'done') {
-              inputTokens = obj.inputTokens || 0;
-              outputTokens = obj.outputTokens || 0;
-              cacheRead = obj.cacheReadTokens || 0;
-              cacheCreate = obj.cacheCreationTokens || 0;
-            } else if (obj.type === 'error') {
-              throw new Error(obj.message || T('Ukjent feil fra server'));
-            }
-          }
-        }
-
-        // Final markdown render + code-block action buttons (reuse existing).
-        if (md) {
-          try { bubble.innerHTML = md.render(accumulated || ''); }
-          catch (_) { bubble.textContent = accumulated; }
-        } else {
-          bubble.textContent = accumulated;
-        }
-        attachCodeBlockActions(bubble);
-        bubble._rawMd = accumulated;
-
-        const meta = {
-          intent: 'raskt',
-          model: 'kode-svar',
-          latency_ms: Date.now() - t0,
-          tokens: { input: inputTokens, output: outputTokens, cacheRead, cacheCreate },
-        };
-        appendMeta(thinkingNode, meta);
-        attachResponseInsertBar(thinkingNode, accumulated);
-
-        // Valider første microdata-kodeblokk lokalt (ikke-blokkerende).
-        // Vi viser ingen «validert»-tekst ved suksess (støy) — kun advarsler ved feil.
-        const script = extractFirstMicrodataBlock(accumulated);
-        if (script) {
-          validateMicrodataLocal(script).then(vr => {
-            if (vr.skipped || vr.passed) return;
-            const warn = renderValidationWarnings(vr);
-            if (warn) bubble.appendChild(warn);
-          }).catch(() => {});
-        }
-        return meta;
-      }
-
-      // One streaming request to /api/kode-svar-v2. Renders markdown live into
-      // `bubble`. Returns { accumulated, tokens }. Mirrors runFastQuery's stream
-      // parsing; factored out so the repair round can call it again.
-      async function streamKodeSvarV2(payload, bubble, signal) {
-        const headers = edgeAuthHeaders();
-        const resp = await AiTransport.postWithRetry('/api/kode-svar-v2', {
-          method: 'POST', headers,
-          body: JSON.stringify(Object.assign({}, payload, edgeBodyExtras())), signal,
-        }).catch((e) => rethrowDescribed(e, 'kode-svar-v2', 'request'));
-        if (resp.status === 401) {
-          throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
-        }
-        if (!resp.ok || !resp.body) {
-          throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()));
-        }
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '', accumulated = '', _lastRender = 0;
-        let inputTokens = 0, outputTokens = 0, cacheRead = 0, cacheCreate = 0;
-        let firstByte = false;
-        while (true) {
-          const { value, done } = await reader.read().catch((e) => rethrowDescribed(e, 'kode-svar-v2', 'stream'));
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          let nl;
-          while ((nl = buffer.indexOf('\n\n')) >= 0) {
-            const event = buffer.slice(0, nl);
-            buffer = buffer.slice(nl + 2);
-            const dataLine = event.split('\n').find(l => l.startsWith('data:'));
-            if (!dataLine) continue;
-            let obj;
-            try { obj = JSON.parse(dataLine.slice(5).trim()); } catch (_) { continue; }
-            if (obj.type === 'text') {
-              if (!firstByte) { firstByte = true; bubble.textContent = ''; }
-              accumulated += obj.text;
-              const _now = Date.now();
-              if (_now - _lastRender > 70) {
-                _lastRender = _now;
-                streamRenderMd(bubble, accumulated);
-                scrollToBottom();
-              }
-            } else if (obj.type === 'done') {
-              inputTokens = obj.inputTokens || 0;
-              outputTokens = obj.outputTokens || 0;
-              cacheRead = obj.cacheReadTokens || 0;
-              cacheCreate = obj.cacheCreationTokens || 0;
-            } else if (obj.type === 'error') {
-              throw new Error(obj.message || T('Ukjent feil fra server'));
-            }
-          }
-        }
-        return { accumulated, tokens: { input: inputTokens, output: outputTokens, cacheRead, cacheCreate } };
-      }
-
-      // Concatenate all fenced code-block bodies (any language) so name-grounding
-      // can scan the #micro import inside a python/r answer without prose noise.
-      function extractAllCode(md) {
-        if (!md) return '';
-        const re = /```\w*\s*\n([\s\S]*?)```/g;
-        let m, out = [];
-        while ((m = re.exec(md)) !== null) out.push(m[1]);
-        return out.join('\n');
-      }
-
-      // Collect db/NAME (or alias/NAME) tokens whose NAME is not in the loaded
-      // catalog — the cheapest, most damaging failure (invented variable names).
-      function findUnknownVarNames(script) {
-        if (!script || typeof microdataVariableNames === 'undefined' || !microdataVariableNames.length) return [];
-        const known = new Set(microdataVariableNames);
-        const re = /\b[a-zA-Z_]\w*\/([A-Z][A-Z0-9_]+)\b/g;
-        const bad = new Set();
-        let m;
-        while ((m = re.exec(script)) !== null) {
-          if (!known.has(m[1])) bad.add(m[1]);
-        }
-        return Array.from(bad);
-      }
-
-      // Turn a validation result + unknown-name list into a compact error string
-      // for the repair prompt. Returns '' when there is nothing to fix.
-      function buildRepairErrors(vr, unknownNames) {
-        const parts = [];
-        if (unknownNames && unknownNames.length) {
-          parts.push('Ukjente variabelnavn (finnes ikke i katalogen): ' + unknownNames.join(', '));
-        }
-        if (vr && !vr.skipped && !vr.passed && Array.isArray(vr.errors)) {
-          for (const e of vr.errors) {
-            const tok = e.token ? (e.token + ': ') : '';
-            parts.push('- ' + tok + (e.message || e.kind || 'feil'));
-          }
-        }
-        return parts.join('\n');
-      }
-
-      async function runFastQueryV2(text, lang, scriptContext, thinkingNode, signal) {
-        const t0 = Date.now();
-        thinkingNode.innerHTML = '';
-        const bubble = document.createElement('div');
-        bubble.className = 'ai-bubble';
-        bubble.textContent = T('Finner relevante variabler…');
-        thinkingNode.appendChild(bubble);
-
-        const mode = (typeof activeEditorMode !== 'undefined' && activeEditorMode) ? activeEditorMode : 'microdata';
-        const payload = { question: text, lang, script: scriptContext || '', mode };
-        const { accumulated, tokens } = await streamKodeSvarV2(payload, bubble, signal);
-
-        // Final render + actions (reuse v1 helpers).
-        if (md) { try { bubble.innerHTML = md.render(accumulated || ''); } catch (_) { bubble.textContent = accumulated; } }
-        else { bubble.textContent = accumulated; }
-        attachCodeBlockActions(bubble);
-        bubble._rawMd = accumulated;
-
-        const meta = { intent: 'raskt-v2', model: 'kode-svar-v2', latency_ms: Date.now() - t0, tokens };
-        appendMeta(thinkingNode, meta);
-        attachResponseInsertBar(thinkingNode, accumulated);
-
-        if (mode === 'microdata') {
-          // Validate; on failure, attempt ONE repair round, then badge.
-          let script = extractFirstMicrodataBlock(accumulated);
-          let repaired = false;
-          let finalBubble = bubble;
-          while (script) {
-            let vr;
-            try { vr = await validateMicrodataLocal(script); } catch (_) { vr = { skipped: true }; }
-            const unknown = findUnknownVarNames(script);
-            const hasErrors = (!vr.skipped && !vr.passed) || unknown.length > 0;
-            if (!hasErrors || repaired) {
-              if (hasErrors) {
-                const warn = renderValidationWarnings(
-                  vr.skipped ? { passed: false, errors: unknown.map(n => ({ kind: 'unknown_variable', token: n, message: 'finnes ikke i katalogen' })) } : vr
-                );
-                if (warn) finalBubble.appendChild(warn);
-              }
-              break;
-            }
-            // One repair round: new bubble, re-call with prior script + errors.
-            repaired = true;
-            const note = document.createElement('div');
-            note.className = 'ai-thinking';
-            note.textContent = T('Retter feil og prøver på nytt…');
-            thinkingNode.appendChild(note);
-            const repairBubble = document.createElement('div');
-            repairBubble.className = 'ai-bubble';
-            thinkingNode.appendChild(repairBubble);
-            const errStr = buildRepairErrors(vr, unknown);
-            let r2;
-            try {
-              r2 = await streamKodeSvarV2(
-                { question: text, lang, script: scriptContext || '', mode, prior_script: script, errors: errStr },
-                repairBubble, signal,
-              );
-            } catch (e) {
-              note.remove();
-              repairBubble.textContent = '✗ ' + (e && e.message ? e.message : String(e));
-              break;
-            }
-            note.remove();
-            if (md) { try { repairBubble.innerHTML = md.render(r2.accumulated || ''); } catch (_) { repairBubble.textContent = r2.accumulated; } }
-            else { repairBubble.textContent = r2.accumulated; }
-            attachCodeBlockActions(repairBubble);
-            repairBubble._rawMd = r2.accumulated;
-            attachResponseInsertBar(thinkingNode, r2.accumulated);
-            finalBubble = repairBubble;
-            meta.tokens.input += r2.tokens.input; meta.tokens.output += r2.tokens.output;
-            meta.tokens.cacheRead += r2.tokens.cacheRead; meta.tokens.cacheCreate += r2.tokens.cacheCreate;
-            script = extractFirstMicrodataBlock(r2.accumulated);
-          }
-        } else {
-          // Python/R: no m2py repair. Ground variable names in the #micro block only.
-          const unknown = findUnknownVarNames(extractAllCode(accumulated));
-          if (unknown.length) {
-            const warn = renderValidationWarnings({
-              passed: false,
-              errors: unknown.map(n => ({ kind: 'unknown_variable', token: n, message: 'finnes ikke i katalogen' })),
-            });
-            if (warn) bubble.appendChild(warn);
-          }
-        }
-        return meta;
-      }
-
-      // Tolk resultater: strøm en tolkning av output (kommandoer + resultater)
-      // inn i en assistent-boble. Speiler runFastQuery, men mot /api/tolk-resultat.
       async function runInterpretQuery(payload, thinkingNode, signal) {
         const headers = edgeAuthHeaders();
         const resp = await AiTransport.postWithRetry('/api/tolk-resultat', {
@@ -902,7 +545,7 @@
       //     with resume:{state, probed} to keep going (Netlify CPU cap per request)
       //   {type:'error', message}
       // Consume one SSE response, dispatching parsed events to onEvent. Mirrors the
-      // inline reader loops in runFastQuery/streamKodeSvarV2/runInterpretQuery above
+      // inline reader-loopen i runInterpretQuery over
       // (not factored out into a shared helper there, to avoid touching working code);
       // this is the equivalent for the new Web-mode path.
       async function consumeSse(resp, onEvent) {
@@ -927,13 +570,15 @@
         }
       }
 
-      // One question/repair round-trip to /api/data-svar. Renders progress lines
-      // live, streams markdown into a bubble (reusing streamRenderMd — the same
-      // throttled live-markdown renderer runFastQuery/runFastQueryV2 use), and
-      // appends a ✅/⚠️ source list once the `sources` event arrives. thinkingNode
-      // is the wrap created by appendThinking() — the "assistant bubble" container
-      // pattern already used everywhere else in this file (see runFastQuery et al.).
-      async function runWebAnswer(question, thinkingNode, repair, round) {
+
+      // ── Samlet pipeline: /api/svar — agentisk løp med run_code i emulatoren ──
+      // (spec 2026-08-28). run_code-rundturen: server emitterer
+      // {type:'run_code', script} + continue; vi setter scriptet SYNLIG inn i
+      // editoren, kjører (første gang bak samme bekreftelse som før,
+      // md_ai_autorun=1 hopper over), høster motor-side (mdRunHarvest) og
+      // re-POSTer RunResult.format(...) i run_result. Byte-kontrakten
+      // (OK./FEIL-prefiks) klassifiseres server-side av run-disiplin.ts.
+      async function runSvar(question, thinkingNode, signal) {
         const t0 = Date.now();
         thinkingNode.innerHTML = '';
         const progressBox = document.createElement('div');
@@ -943,52 +588,16 @@
         bubble.className = 'ai-bubble';
         thinkingNode.appendChild(bubble);
 
-        if (!hasAiCredentials()) throw new Error(T('Web-modus krever egen API-nøkkel.'));
-        const mode = (typeof activeEditorMode !== 'undefined' && activeEditorMode) ? activeEditorMode : 'python';
-
-        // Continuation protocol: Netlify caps CPU per edge invocation, so the
-        // server runs ONE API turn per POST and hands back
-        // {type:'continue', state, probed} when it isn't finished; we
-        // immediately re-POST with `resume` until the final answer arrives.
-        // The progress box lives across hops, so the user sees one seamless run.
+        const em = (typeof activeEditorMode !== 'undefined' && activeEditorMode) ? activeEditorMode : 'microdata';
+        const mode = (em === 'python' || em === 'r') ? em : 'microdata';
         let markdown = '';
-        let sources = null;
         let _lastRender = 0;
         let resume = null;
-        // Editor context only rides along when the user ticked "Inkluder
-        // skript fra editor" — matches sendMessage() above (~435).
-        // data-svar-prompt.ts's script?.trim() check drops the section
-        // cleanly when omitted, so gating it here can't break the repair loop.
+        let runResult = null;
+        let confirmed = false;
         const includeScript = dom.aiIncludeScript.checked && dom.scriptInput && dom.scriptInput.value.trim();
-        for (let hop = 0; ; hop++) {
-          if (hop > 40) throw new Error(T('Avbrutt: svaret ble ikke ferdig etter 40 fortsettelses-runder.'));
-          const resp = await AiTransport.postWithRetry('/api/data-svar', {
-            method: 'POST',
-            headers: edgeAuthHeaders(),
-            body: JSON.stringify(Object.assign({
-              question,
-              mode,
-              script: includeScript ? scrubScript(dom.scriptInput.value) : undefined,
-              repair: repair ? { script: repair.script, error: repair.error, round } : undefined,
-              resume: resume || undefined,
-            }, edgeBodyExtras())),
-          }).catch((e) => rethrowDescribed(e, 'data-svar', 'request', hop));
-          if (resp.status === 401) {
-            throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
-          }
-          if (resp.status === 403) throw new Error(T('Web-modus krever egen Anthropic-nøkkel.'));
-          if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()));
 
-          let cont = null;
-          await consumeSse(resp, (ev) => {
-            if (ev.type === 'continue') { cont = { state: ev.state, probed: ev.probed }; return; }
-            handleWebEvent(ev);
-          }).catch((e) => rethrowDescribed(e, 'data-svar', 'stream', hop));
-          if (!cont) break;
-          resume = cont;
-        }
-
-        function handleWebEvent(ev) {
+        function handleSvarEvent(ev) {
           if (ev.type === 'progress') {
             const last = progressBox.lastElementChild;
             if (ev.replace && last && last.dataset.replace === '1') {
@@ -997,7 +606,7 @@
               const line = document.createElement('div');
               line.className = 'ai-progress-line';
               if (ev.replace) line.dataset.replace = '1';
-              line.textContent = '⏳ ' + ev.text;
+              line.textContent = (ev.text && (ev.text.startsWith('▶') || ev.text.startsWith('⚠️'))) ? ev.text : '⏳ ' + ev.text;
               progressBox.appendChild(line);
             }
             scrollToBottom();
@@ -1006,11 +615,9 @@
             const _now = Date.now();
             if (_now - _lastRender > 70) {
               _lastRender = _now;
-              streamRenderMd(bubble, markdown);   // existing live markdown renderer
+              streamRenderMd(bubble, markdown);
               scrollToBottom();
             }
-          } else if (ev.type === 'sources') {
-            sources = ev.sources;
           } else if (ev.type === 'error') {
             let msg = ev.message || 'ukjent feil';
             // 401 fra oppstrøms betyr brukerens EGEN nøkkel er avvist —
@@ -1023,48 +630,107 @@
           }
         }
 
+        for (let hop = 0; ; hop++) {
+          if (hop > 40) throw new Error(T('Avbrutt: svaret ble ikke ferdig etter 40 fortsettelses-runder.'));
+          const resp = await AiTransport.postWithRetry('/api/svar', {
+            method: 'POST',
+            headers: edgeAuthHeaders(),
+            body: JSON.stringify(Object.assign({
+              question,
+              mode,
+              script: includeScript ? scrubScript(dom.scriptInput.value) : undefined,
+              instructions: lsGet('md_ai_instructions') || undefined,
+              resume: resume || undefined,
+              run_result: runResult == null ? undefined : runResult,
+            }, edgeBodyExtras())),
+            signal,
+          }).catch((e) => rethrowDescribed(e, 'svar', 'request', hop));
+          runResult = null;
+          if (resp.status === 401) {
+            throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
+          }
+          if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()));
+
+          let cont = null, pendingRun = null;
+          await consumeSse(resp, (ev) => {
+            if (ev.type === 'continue') { cont = { state: ev.state, run_ok_calls: ev.run_ok_calls }; return; }
+            if (ev.type === 'run_code') { pendingRun = ev.script || ''; return; }
+            handleSvarEvent(ev);
+          }).catch((e) => rethrowDescribed(e, 'svar', 'stream', hop));
+
+          if (pendingRun != null) {
+            if (signal && signal.aborted) {
+              throw Object.assign(new Error('Stopped'), { name: 'AbortError' });
+            }
+            insertScriptIntoEditor(pendingRun);
+            if (!confirmed) {
+              const ok = await confirmAutoRun();
+              if (!ok) {
+                handleSvarEvent({ type: 'progress', text: T('Kjøring avslått — scriptet står i editoren.') });
+                break;
+              }
+              confirmed = true;
+            }
+            handleSvarEvent({ type: 'progress', text: '▶ ' + T('Kjører scriptet i emulatoren …') });
+            const err = await runScriptAndCaptureError();
+            const h = (typeof window.mdRunHarvest === 'function') ? window.mdRunHarvest() : { ok: !err, output: err || '' };
+            const res = (err || !h.ok) ? { ok: false, output: err || h.output } : h;
+            runResult = RunResult.format(res);
+            if (!res.ok) {
+              // FEIL-linja (askstat-spec 2026-08-15 §1): kjørefeil skal være
+              // synlige for MENNESKER i prosessloggen, ikke bare for modellen.
+              const fl = String(res.output || '').split('\n')[0].slice(0, 160);
+              if (fl) handleSvarEvent({ type: 'progress', text: '⚠️ ' + T('Kjøring feilet: ') + fl });
+            }
+            resume = cont;   // run_code ender alltid invokasjonen med en continue
+            continue;
+          }
+          if (!cont) break;
+          resume = cont;
+        }
+
         streamRenderMd(bubble, markdown);
         attachCodeBlockActions(bubble);
         bubble._rawMd = markdown;
         attachResponseInsertBar(thinkingNode, markdown);
-
-        if (sources && sources.length) {
-          const list = document.createElement('div');
-          list.className = 'ai-sources';
-          list.innerHTML = '<b>' + T('Kilder:') + '</b> ' + sources.map(s =>
-            (s.ok ? '✅ ' : '⚠️ ') +
-            '<a href="' + escapeHtml(s.url) + '" target="_blank" rel="noopener">' +
-            escapeHtml(s.url.replace(/^https?:\/\//, '').slice(0, 60)) + '</a>' +
-            (s.viaProxy ? ' (via proxy)' : '')
-          ).join(' · ');
-          thinkingNode.appendChild(list);
-        }
         return { markdown, latency: Date.now() - t0 };
       }
 
-      // Pull the first fenced code block matching the current editor mode's
-      // language out of a Web-mode answer (```python / ```r / ```sql — see
-      // MODE_PY/MODE_R/MODE_DUCK svarformat in data-svar-prompt.ts). Falls back
-      // to the first fenced block of any language so an odd/missing tag doesn't
-      // silently drop a real script.
-      const WEB_FENCE_LANGS = { python: ['python', 'py'], r: ['r'], duckdb: ['sql', 'duckdb'] };
-      function extractWebScriptBlock(textMd, mode) {
-        if (!textMd) return '';
-        const wanted = WEB_FENCE_LANGS[mode] || WEB_FENCE_LANGS.python;
-        const re = /```(\w*)\s*\n([\s\S]*?)```/g;
-        let m, fallback = '';
-        while ((m = re.exec(textMd)) !== null) {
-          const lang = (m[1] || '').toLowerCase();
-          const body = (m[2] || '').trim();
-          if (!body) continue;
-          if (wanted.indexOf(lang) >= 0) return body;
-          if (!fallback) fallback = body;
+      // Send-flyten: legitimasjonsport, brukerboble, thinking-node, abort —
+      // så hele svaret via runSvar.
+      async function sendSvarMessage() {
+        if (state.sending) return;
+        const text = dom.aiInput.value.trim();
+        if (!text) return;
+        if (!hasAiCredentials()) {
+          openSettings();
+          return;
         }
-        return fallback;
+        state.sending = true;
+        if (dom.aiSendFastBtn) dom.aiSendFastBtn.disabled = true;
+        if (state.history.length === 0) dom.aiThread.innerHTML = '';
+        appendUserMessage(text);
+        state.history.push({ role: 'user', text });
+        dom.aiInput.value = '';
+        autoresize();
+        const thinkingNode = appendThinking();
+        const ctrl = new AbortController();
+        state.abortCtrl = ctrl;
+        if (dom.aiAbortBtn) dom.aiAbortBtn.style.display = '';
+        try {
+          const meta = await runSvar(text, thinkingNode, ctrl.signal);
+          state.history.push({ role: 'assistant', meta });
+        } catch (e) {
+          if (e.name !== 'AbortError') appendError(thinkingNode, '✗ ' + (e && e.message ? e.message : String(e)));
+        } finally {
+          state.abortCtrl = null;
+          if (dom.aiAbortBtn) dom.aiAbortBtn.style.display = 'none';
+          state.sending = false;
+          if (dom.aiSendFastBtn) dom.aiSendFastBtn.disabled = false;
+          dom.aiInput.focus();
+        }
       }
 
-      // Replace the editor content with the generated script (mirrors the
-      // existing "Sett inn" response-action button in attachResponseInsertBar).
       function insertScriptIntoEditor(script) {
         if (!dom.scriptInput) return;
         dom.scriptInput.value = script;
@@ -1191,210 +857,6 @@
         });
       }
 
-      // Auto-run + repair loop (max 3 rounds): extract → insert → confirm →
-      // run → on failure, POST the script+error back as `repair` and try
-      // again. Only the FIRST run of an answer waits on user confirmation
-      // (S2 above) — once the user has opted in for this answer, repair-round
-      // re-runs proceed automatically, since the user already agreed to run
-      // scripts for this question.
-      async function webAnswerWithRepair(question, thinkingNode) {
-        const mode = (typeof activeEditorMode !== 'undefined' && activeEditorMode) ? activeEditorMode : 'python';
-        let round = 0, lastError = null, script = null, confirmed = false;
-        let result = await runWebAnswer(question, thinkingNode, null, 0);
-        while (true) {
-          script = extractWebScriptBlock(result.markdown, mode);
-          if (!script) return;   // prose-only answer (e.g. honest "fant ikke data") — already rendered, nothing to run
-          insertScriptIntoEditor(script);
-          if (!confirmed) {
-            const ok = await confirmAutoRun();
-            if (!ok) return;   // user declined — script stays in the editor, nothing runs
-            confirmed = true;
-          }
-          try {
-            lastError = await runScriptAndCaptureError();
-            if (!lastError) return;   // success
-          } catch (e) { lastError = (e && e.message) ? e.message : String(e); }
-          round++;
-          if (round > 3) {
-            const giveUp = document.createElement('div');
-            giveUp.className = 'ai-msg ai-msg-assistant';
-            giveUp.innerHTML = '<div class="ai-bubble ai-error"></div>';
-            giveUp.querySelector('.ai-bubble').textContent =
-              T('Kunne ikke få scriptet til å kjøre etter 3 reparasjonsrunder. Siste feil:\n\n{err}\n\nScriptet står i editoren — juster gjerne manuelt.', { err: lastError });
-            dom.aiThread.appendChild(giveUp);
-            scrollToBottom();
-            return;
-          }
-          const roundNote = document.createElement('div');
-          roundNote.className = 'ai-msg ai-msg-assistant';
-          roundNote.innerHTML = '<div class="ai-bubble ai-repair-note"></div>';
-          roundNote.querySelector('.ai-bubble').textContent =
-            T('⚙️ Reparasjonsrunde {round} — retter: {err}', { round: round, err: String(lastError).slice(0, 120) });
-          dom.aiThread.appendChild(roundNote);
-          scrollToBottom();
-          const repairNode = appendThinking();
-          try {
-            result = await runWebAnswer(question, repairNode, { script, error: lastError }, round);
-          } catch (e) {
-            // A thrown error here (401, SSE `error` event, network drop) must land
-            // in THIS round's own bubble (repairNode) — not bubble up to
-            // sendWebMessage's outer catch, which would target thinkingNode
-            // (round 0) and wipe out the already-rendered first answer. Stop the
-            // loop on failure; the previous answer(s) stay intact.
-            appendError(repairNode, '✗ ' + ((e && e.message) ? e.message : String(e)));
-            return;
-          }
-        }
-      }
-
-      // Full send flow for Web mode: auth gate, user bubble, thinking node,
-      // then the answer+auto-run+repair loop. Mirrors sendMessage()'s
-      // boilerplate (see above) but dispatches to runWebAnswer/webAnswerWithRepair
-      // instead of the fast API path.
-      async function sendWebMessage() {
-        if (state.sending) return;
-        const text = dom.aiInput.value.trim();
-        if (!text) return;
-        if (!hasAiCredentials()) {
-          openSettings();
-          return;
-        }
-        state.sending = true;
-        if (dom.aiSendFastBtn) dom.aiSendFastBtn.disabled = true;
-        if (dom.aiSendWebBtn) dom.aiSendWebBtn.disabled = true;
-        if (state.history.length === 0) dom.aiThread.innerHTML = '';
-        appendUserMessage(text);
-        state.history.push({ role: 'user', text });
-        dom.aiInput.value = '';
-        autoresize();
-        const thinkingNode = appendThinking();
-        try {
-          await webAnswerWithRepair(text, thinkingNode);
-          state.history.push({ role: 'assistant', meta: { intent: 'web' } });
-        } catch (e) {
-          appendError(thinkingNode, '✗ ' + ((e && e.message) ? e.message : String(e)));
-        } finally {
-          state.sending = false;
-          if (dom.aiSendFastBtn) dom.aiSendFastBtn.disabled = false;
-          if (dom.aiSendWebBtn) dom.aiSendWebBtn.disabled = false;
-          dom.aiInput.focus();
-        }
-      }
-
-      // Pull the first ```microdata / ``` code block that looks like a
-      // microdata script out of streamed markdown.
-      function extractFirstMicrodataBlock(textMd) {
-        if (!textMd) return '';
-        const re = /```(\w*)\s*\n([\s\S]*?)```/g;
-        let m;
-        while ((m = re.exec(textMd)) !== null) {
-          const lang = (m[1] || '').toLowerCase();
-          const body = (m[2] || '').trim();
-          if (lang === 'python' || lang === 'py' || lang === 'r') continue;
-          if (/\b(require|create-dataset|import\s+\w+\/|use\s+\w)/.test(body)) return body;
-          if (lang === 'microdata') return body;
-        }
-        return '';
-      }
-
-      // Run the script through a throwaway m2py interpreter on synthetic data
-      // (disclosure control off, so only structural/runtime errors surface).
-      // Returns {passed, errors:[{kind,message}]} or {skipped:true}.
-      async function validateMicrodataLocal(script) {
-        let py;
-        try { py = await loadPyodideAndM2py(); }
-        catch (_) { return { skipped: true }; }
-        if (!py) return { skipped: true };
-        const base = window.location.href.replace(/[^/]+$/, '');
-        const catalogJson = (typeof microdataCatalog !== 'undefined' && microdataCatalog && microdataCatalog.variables)
-          ? JSON.stringify(microdataCatalog.variables) : null;
-        const pyCode =
-          'import json, sys\n' +
-          '_script = ' + JSON.stringify(script) + '\n' +
-          '_catalog_json = ' + (catalogJson !== null ? JSON.stringify(catalogJson) : 'None') + '\n' +
-          '_base = ' + JSON.stringify(base) + '\n' +
-          '_m = sys.modules.get("m2py")\n' +
-          '_prev_dc = getattr(_m, "M2PY_DISCLOSURE_CONTROL", "0") if _m is not None else "0"\n' +
-          '_out = json.dumps({"passed": False, "errors": [{"kind": "runtime", "message": "validator unavailable"}]})\n' +
-          'try:\n' +
-          '    if _m is not None:\n' +
-          '        _m.M2PY_DISCLOSURE_CONTROL = "0"\n' +
-          '    from m2py import MicroInterpreter\n' +
-          '    _cat = json.loads(_catalog_json) if _catalog_json else None\n' +
-          '    _vi = MicroInterpreter(catalog=_cat, metadata_base_url=_base)\n' +
-          '    try:\n' +
-          '        _vi.data_engine.default_rows = 200\n' +
-          '    except Exception:\n' +
-          '        pass\n' +
-          '    _err = None\n' +
-          '    try:\n' +
-          '        if hasattr(_vi, "run_script_async"):\n' +
-          '            _err = "ASYNC"\n' +
-          '        else:\n' +
-          '            _vi.run_script(_script)\n' +
-          '    except Exception as _ex:\n' +
-          '        _err = f"{type(_ex).__name__}: {_ex}"\n' +
-          '    if _err == "ASYNC":\n' +
-          '        _out = json.dumps({"async": True})\n' +
-          '    elif _err is None:\n' +
-          '        _out = json.dumps({"passed": True, "errors": []})\n' +
-          '    else:\n' +
-          '        _out = json.dumps({"passed": False, "errors": [{"kind": "runtime", "message": _err}]})\n' +
-          'except Exception as _ex2:\n' +
-          '    _out = json.dumps({"skipped": True, "error": f"{type(_ex2).__name__}: {_ex2}"})\n' +
-          'finally:\n' +
-          '    if _m is not None:\n' +
-          '        _m.M2PY_DISCLOSURE_CONTROL = _prev_dc\n' +
-          '_out\n';
-        let raw;
-        try { raw = await py.runPythonAsync(pyCode); }
-        catch (_) { return { skipped: true }; }
-        let parsed;
-        try { parsed = JSON.parse(raw); } catch (_) { return { skipped: true }; }
-        if (parsed.skipped) return { skipped: true };
-        // Async interpreter variant — run via the async API and re-check.
-        if (parsed.async) {
-          return await validateMicrodataLocalAsync(py, script, catalogJson, base);
-        }
-        return parsed;
-      }
-
-      async function validateMicrodataLocalAsync(py, script, catalogJson, base) {
-        const setup =
-          'import json, sys\n' +
-          '_script = ' + JSON.stringify(script) + '\n' +
-          '_catalog_json = ' + (catalogJson !== null ? JSON.stringify(catalogJson) : 'None') + '\n' +
-          '_base = ' + JSON.stringify(base) + '\n' +
-          '_m = sys.modules.get("m2py")\n' +
-          'globals()["_prev_dc"] = getattr(_m, "M2PY_DISCLOSURE_CONTROL", "0") if _m is not None else "0"\n' +
-          'if _m is not None:\n' +
-          '    _m.M2PY_DISCLOSURE_CONTROL = "0"\n' +
-          'from m2py import MicroInterpreter\n' +
-          '_cat = json.loads(_catalog_json) if _catalog_json else None\n' +
-          '_vi = MicroInterpreter(catalog=_cat, metadata_base_url=_base)\n' +
-          'try:\n' +
-          '    _vi.data_engine.default_rows = 200\n' +
-          'except Exception:\n' +
-          '    pass\n' +
-          'globals()["_vi"] = _vi\n';
-        try { await py.runPythonAsync(setup); } catch (_) { return { skipped: true }; }
-        let raw;
-        try {
-          raw = await py.runPythonAsync(
-            '_err = None\n' +
-            'try:\n' +
-            '    await _vi.run_script_async(_script)\n' +
-            'except Exception as _ex:\n' +
-            '    _err = f"{type(_ex).__name__}: {_ex}"\n' +
-            'finally:\n' +
-            '    if _m is not None:\n' +
-            '        _m.M2PY_DISCLOSURE_CONTROL = _prev_dc\n' +
-            'json.dumps({"passed": _err is None, "errors": [] if _err is None else [{"kind": "runtime", "message": _err}]})\n'
-          );
-        } catch (_) { return { skipped: true }; }
-        try { return JSON.parse(raw); } catch (_) { return { skipped: true }; }
-      }
-
       function autoresize() {
         const ta = dom.aiInput;
         ta.style.height = 'auto';
@@ -1469,6 +931,7 @@
         if (dom.aiCfgProviderModel) dom.aiCfgProviderModel.value = cfg ? cfg.model : (pr.model || '');
         if (dom.aiCfgLlmKey) dom.aiCfgLlmKey.value = state.llmKey;
         if (dom.aiCfgQuality) dom.aiCfgQuality.value = aiQuality();
+        if (dom.aiCfgInstructions) dom.aiCfgInstructions.value = lsGet('md_ai_instructions');
         syncProviderFields();
         refreshUserPanel();
         dom.aiSettingsBackdrop.classList.add('open');
@@ -1520,10 +983,13 @@
         try {
           var q = dom.aiCfgQuality ? dom.aiCfgQuality.value : 'balanced';
           localStorage.setItem(LS_KEY_QUALITY, (q === 'fast' || q === 'best') ? q : 'balanced');
+          // Egne instruksjoner (4000-cap — samme grense som serverens
+          // coerceUserInstructions; tom verdi rydder nøkkelen helt bort).
+          var instr = dom.aiCfgInstructions ? dom.aiCfgInstructions.value.trim().slice(0, 4000) : '';
+          if (instr) localStorage.setItem('md_ai_instructions', instr);
+          else localStorage.removeItem('md_ai_instructions');
         } catch (e) {}
 
-        // Legitimasjonen påvirker Web-knappens synlighet (webModeEligible).
-        if (window.mdSyncWebBtnVisibility) window.mdSyncWebBtnVisibility();
         closeSettings();
       }
 
@@ -1574,23 +1040,10 @@
           });
         }
 
-        // Send is routed by the URL (urlHasMicro): "micro" → microdata AI
-        // (kode-svar); otherwise the agentic data-svar flow (search data → script
-        // in the active mode's language → run → revise).
-        function sendCurrent() {
-          if (window.NotebookLinks && window.NotebookLinks.urlHasMicro(location.href)) {
-            // v2-flyten (2-stegs variabelvalg + auto-retting) gir best svar;
-            // den gamle enstegsflyten nås ikke lenger fra UI.
-            sendMessage(true);
-          } else {
-            sendWebMessage();
-          }
-        }
+        // Samlet pipeline (spec 2026-08-28): Send går ALLTID til /api/svar —
+        // ingen URL-ruting, ingen fast/web-splitt.
+        function sendCurrent() { sendSvarMessage(); }
         if (dom.aiSendFastBtn) dom.aiSendFastBtn.addEventListener('click', sendCurrent);
-        // Send⚗︎ er nå bakt inn i Send (micro-URL → v2); knappen holdes skjult.
-        if (dom.aiSendV2Btn) { dom.aiSendV2Btn.style.display = 'none'; dom.aiSendV2Btn.addEventListener('click', () => sendMessage(true)); }
-        // The old Web button is subsumed by the URL-routed Send; keep it hidden.
-        if (dom.aiSendWebBtn) { dom.aiSendWebBtn.style.display = 'none'; dom.aiSendWebBtn.addEventListener('click', () => { sendWebMessage(); }); }
         if (dom.aiAbortBtn) dom.aiAbortBtn.addEventListener('click', () => { if (state.abortCtrl) state.abortCtrl.abort(); });
         dom.aiInput.addEventListener('input', autoresize);
         dom.aiInput.addEventListener('keydown', (e) => {
@@ -1600,15 +1053,9 @@
           }
         });
 
-        // Shows/hides the dedicated Web send button: admin + python/r/duckdb only.
-        // Called after login/user fetch (refreshUserPanel), on editor-mode changes
-        // (see switchEditorMode() in index.html), and once here at init.
-        function syncWebBtnVisibility() {
-          // The Web button is subsumed by the URL-routed Send; keep it hidden.
-          if (dom.aiSendWebBtn) dom.aiSendWebBtn.style.display = 'none';
-        }
-        window.mdSyncWebBtnVisibility = syncWebBtnVisibility;
-        syncWebBtnVisibility();
+        // Historisk søm: index.html kaller denne ved modusbytte. Web-knappen
+        // finnes ikke lenger (samlet pipeline) — bevisst no-op.
+        window.mdSyncWebBtnVisibility = function () {};
 
         // Keyboard shortcut Ctrl+I
         document.addEventListener('keydown', (e) => {
@@ -1640,7 +1087,7 @@
           setOpen(true);
           dom.aiInput.value = question;
           autoresize();
-          sendMessage();
+          sendSvarMessage();
         };
 
         // Offentlig: åpne AI-panelet og tolk resultatene (output) fra forrige kjøring.
@@ -1656,8 +1103,7 @@
           const thinkingNode = appendThinking();
           state.sending = true;
           if (dom.aiSendFastBtn) dom.aiSendFastBtn.disabled = true;
-          if (dom.aiSendWebBtn) dom.aiSendWebBtn.disabled = true;
-          const ctrl = new AbortController();
+            const ctrl = new AbortController();
           state.abortCtrl = ctrl;
           if (dom.aiAbortBtn) dom.aiAbortBtn.style.display = '';
           runInterpretQuery(payload, thinkingNode, ctrl.signal)
@@ -1667,8 +1113,7 @@
               if (dom.aiAbortBtn) dom.aiAbortBtn.style.display = 'none';
               state.sending = false;
               if (dom.aiSendFastBtn) dom.aiSendFastBtn.disabled = false;
-              if (dom.aiSendWebBtn) dom.aiSendWebBtn.disabled = false;
-              if (dom.aiInput) dom.aiInput.focus();
+                    if (dom.aiInput) dom.aiInput.focus();
             });
         };
       }
