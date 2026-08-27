@@ -302,6 +302,26 @@ export interface AgenticResumeState {
   messages: Record<string, unknown>[];
   turn: number;
   clientCalls: number;
+  // Feltene under bæres av det ORDRETT kopierte leverandørlaget
+  // (_lib/providers/agentic.ts, fra askstat) — de er valgfrie og rører ikke
+  // den anthropic-native løkka under. pdfVern er BEVISST utelatt: askstat
+  // trenger det for API-ets eget websøk, og providers/ refererer det ikke.
+  //
+  // prevResponseId: openai-responses holder samtaletilstanden server-side —
+  // bare id-en rundtures, og meldingsarrayet bærer da kun siste tool-results.
+  prevResponseId?: string;
+  runCalls?: number;
+  // getPackCalls: askstats get_pack-teller. microdata har ikke det verktøyet,
+  // så telleren er inert her — den står fordi den kopierte fila refererer den,
+  // og et avvik ville brutt cherry-pick-veien mellom søsterrepoene.
+  getPackCalls?: number;
+  // pending: hvilket klientutført verktøy vi venter svar på over et resume-hopp.
+  pending?: {
+    results: { tool_use_id: string; content: string }[];
+    awaitingId: string;
+    name?: string;
+    expectedId?: string;
+  };
   usage: {
     inputTokens: number;
     outputTokens: number;
