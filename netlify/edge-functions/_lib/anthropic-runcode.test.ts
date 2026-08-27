@@ -1,6 +1,6 @@
-// microdata-EGEN testfil (ikke i askstat): run_code-graften i den native
-// runAgenticStream-løkka — porteringen 2026-08-28 av askstats pending-
-// mekanikk inn i microdatas (ikke-strømmende) løkkevariant.
+// microdata-EGEN testfil (ikke i askstat): run_code-graften OG streaming-
+// turene i den native runAgenticStream-løkka. SSE-hjelperne (sseUpstream/
+// streamedTextTurn/streamedToolTurn) er kopiert fra askstats anthropic.test.ts.
 import { assert, assertEquals, assertStringIncludes } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { type AgenticResumeState, runAgenticStream } from "./anthropic.ts";
 
@@ -12,11 +12,53 @@ async function samle(stream: ReadableStream<Uint8Array>): Promise<SseEvent[]> {
     .map((l) => JSON.parse(l.slice(6)));
 }
 
-function apiSvar(content: unknown[], stop: string): Response {
-  return new Response(JSON.stringify({
-    content, stop_reason: stop,
-    usage: { input_tokens: 1, output_tokens: 1 },
-  }), { status: 200 });
+function sseUpstream(events: unknown[]): ReadableStream<Uint8Array> {
+  const enc = new TextEncoder();
+  return new ReadableStream({
+    start(c) {
+      for (const e of events) {
+        c.enqueue(enc.encode(`event: x\ndata: ${JSON.stringify(e)}\n\n`));
+      }
+      c.close();
+    },
+  });
+}
+
+function streamedTextTurn(text: string) {
+  return [
+    { type: "message_start", message: { usage: { input_tokens: 10, cache_read_input_tokens: 2, cache_creation_input_tokens: 1 } } },
+    { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+    ...text.split(" ").map((w, i) => ({
+      type: "content_block_delta", index: 0,
+      delta: { type: "text_delta", text: (i ? " " : "") + w },
+    })),
+    { type: "content_block_stop", index: 0 },
+    { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 5 } },
+    { type: "message_stop" },
+  ];
+}
+
+function streamedToolTurn(toolName: string, id: string, inputJson: string, ledetekst = "Jeg kjører analysen.") {
+  return [
+    { type: "message_start", message: { usage: { input_tokens: 8 } } },
+    { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+    { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: ledetekst } },
+    { type: "content_block_stop", index: 0 },
+    { type: "content_block_start", index: 1, content_block: { type: "tool_use", id, name: toolName, input: {} } },
+    { type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: inputJson.slice(0, 8) } },
+    { type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: inputJson.slice(8) } },
+    { type: "content_block_stop", index: 1 },
+    { type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 7 } },
+    { type: "message_stop" },
+  ];
+}
+
+function sseFetch(turns: unknown[][], bodies?: string[]): typeof fetch {
+  let call = 0;
+  return ((_u: string, init?: RequestInit) => {
+    if (bodies && init) bodies.push(String(init.body));
+    return Promise.resolve(new Response(sseUpstream(turns[call++]), { status: 200 }));
+  }) as unknown as typeof fetch;
 }
 
 const BASE = {
@@ -28,18 +70,12 @@ const BASE = {
 
 Deno.test("run_code-kall → run_code-event + continue med pending, executeTool røres ikke", async () => {
   let executed = 0;
-  const bodies: string[] = [];
-  const fetchImpl = ((_u: string, init: RequestInit) => {
-    bodies.push(String(init.body));
-    return Promise.resolve(apiSvar(
-      [{ type: "tool_use", id: "toolu_1", name: "run_code", input: { script: "summarize x" } }],
-      "tool_use",
-    ));
-  }) as typeof fetch;
   const ev = await samle(runAgenticStream({
     ...BASE,
     executeTool: () => { executed++; return Promise.resolve("aldri"); },
-    deps: { fetchImpl },
+    deps: { fetchImpl: sseFetch([
+      streamedToolTurn("run_code", "toolu_1", JSON.stringify({ script: "summarize x" })),
+    ]) },
   }));
   const rc = ev.find((e) => e.type === "run_code");
   assert(rc, "run_code-event mangler: " + JSON.stringify(ev));
@@ -53,12 +89,21 @@ Deno.test("run_code-kall → run_code-event + continue med pending, executeTool 
   assertEquals(executed, 0);
 });
 
+Deno.test("text-deltaer forwardes live som delta-events; scratch-tur før tool_use får turn_discard", async () => {
+  const ev = await samle(runAgenticStream({
+    ...BASE,
+    executeTool: () => Promise.resolve("x"),
+    deps: { fetchImpl: sseFetch([
+      streamedToolTurn("run_code", "toolu_1", JSON.stringify({ script: "s" }), "Tenker høyt først."),
+    ]) },
+  }));
+  const deltas = ev.filter((e) => e.type === "delta").map((e) => e.text).join("");
+  assertStringIncludes(deltas, "Tenker høyt først.");
+  assert(ev.some((e) => e.type === "turn_discard"), "turn_discard mangler: " + JSON.stringify(ev.map(e => e.type)));
+});
+
 Deno.test("resume med pending + runResult flettes inn som tool_result før neste tur", async () => {
   const bodies: string[] = [];
-  const fetchImpl = ((_u: string, init: RequestInit) => {
-    bodies.push(String(init.body));
-    return Promise.resolve(apiSvar([{ type: "text", text: "Svar." }], "end_turn"));
-  }) as typeof fetch;
   const resume: AgenticResumeState = {
     messages: [{ role: "user", content: "q" }],
     turn: 1, clientCalls: 0, runCalls: 1,
@@ -69,11 +114,12 @@ Deno.test("resume med pending + runResult flettes inn som tool_result før neste
     ...BASE,
     executeTool: () => Promise.resolve("x"),
     resume, runResult: "OK. OUTPUT (truncated):\n42",
-    deps: { fetchImpl },
+    deps: { fetchImpl: sseFetch([streamedTextTurn("Svar.")], bodies) },
   }));
   assertStringIncludes(bodies[0], "OK. OUTPUT (truncated)");
   assertStringIncludes(bodies[0], "toolu_1");
-  assert(ev.some((e) => e.type === "text" && e.text === "Svar."));
+  const deltas = ev.filter((e) => e.type === "delta").map((e) => e.text).join("");
+  assertEquals(deltas, "Svar.");
   assert(ev.some((e) => e.type === "done"));
 });
 
@@ -88,7 +134,7 @@ Deno.test("resume med pending UTEN run_result er en feil, aldri stille videre", 
     ...BASE,
     executeTool: () => Promise.resolve("x"),
     resume,
-    deps: { fetchImpl: (() => Promise.resolve(apiSvar([], "end_turn"))) as typeof fetch },
+    deps: { fetchImpl: sseFetch([streamedTextTurn("aldri")]) },
   }));
   const err = ev.find((e) => e.type === "error");
   assert(err, "error-event mangler");
@@ -96,15 +142,7 @@ Deno.test("resume med pending UTEN run_result er en feil, aldri stille videre", 
 });
 
 Deno.test("kjørebudsjett brukt opp → tool_result-beskjed i stedet for ny pending", async () => {
-  let kall = 0;
   const bodies: string[] = [];
-  const fetchImpl = ((_u: string, init: RequestInit) => {
-    bodies.push(String(init.body));
-    kall++;
-    return Promise.resolve(kall === 1
-      ? apiSvar([{ type: "tool_use", id: "toolu_9", name: "run_code", input: { script: "s" } }], "tool_use")
-      : apiSvar([{ type: "text", text: "Ferdig." }], "end_turn"));
-  }) as typeof fetch;
   const ev = await samle(runAgenticStream({
     ...BASE,
     executeTool: () => Promise.resolve("x"),
@@ -115,8 +153,26 @@ Deno.test("kjørebudsjett brukt opp → tool_result-beskjed i stedet for ny pend
       usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 },
     },
     turnsPerCall: 2,
-    deps: { fetchImpl },
+    deps: { fetchImpl: sseFetch([
+      streamedToolTurn("run_code", "toolu_9", JSON.stringify({ script: "s" })),
+      streamedTextTurn("Ferdig."),
+    ], bodies) },
   }));
   assertEquals(ev.some((e) => e.type === "run_code"), false);
   assertStringIncludes(bodies[1], "Kjøre-budsjettet er brukt opp");
+});
+
+Deno.test("server-verktøy (variabel_info) kjøres fortsatt i løkka, streamet", async () => {
+  const calls: string[] = [];
+  const ev = await samle(runAgenticStream({
+    ...BASE,
+    executeTool: (name, input) => { calls.push(`${name}:${input.navn}`); return Promise.resolve("detaljer"); },
+    turnsPerCall: 2,
+    deps: { fetchImpl: sseFetch([
+      streamedToolTurn("variabel_info", "toolu_2", JSON.stringify({ navn: "NUDB_BU" })),
+      streamedTextTurn("Svar med detaljer."),
+    ]) },
+  }));
+  assertEquals(calls, ["variabel_info:NUDB_BU"]);
+  assert(ev.some((e) => e.type === "done"));
 });

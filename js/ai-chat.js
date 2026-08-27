@@ -614,7 +614,7 @@
               progressBox.appendChild(line);
             }
             scrollToBottom();
-          } else if (ev.type === 'text') {
+          } else if (ev.type === 'delta' || ev.type === 'text') {
             markdown += ev.text;
             const _now = Date.now();
             if (_now - _lastRender > 70) {
@@ -622,6 +622,11 @@
               streamRenderMd(bubble, markdown);
               scrollToBottom();
             }
+          } else if (ev.type === 'turn_discard') {
+            // Streamet tekst i en verktøy-tur var kladd (tenking før kjøring)
+            // — den skal ikke bli stående som del av svaret.
+            markdown = '';
+            streamRenderMd(bubble, '');
           } else if (ev.type === 'error') {
             let msg = ev.message || 'ukjent feil';
             // 401 fra oppstrøms betyr brukerens EGEN nøkkel er avvist —

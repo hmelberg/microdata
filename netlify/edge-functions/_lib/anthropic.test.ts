@@ -122,18 +122,59 @@ async function collectSse(stream: ReadableStream<Uint8Array>): Promise<Record<st
     .map((l) => JSON.parse(l.slice(6)));
 }
 
-function apiTurns(turns: Record<string, unknown>[]): typeof fetch {
-  let i = 0;
-  return ((_u: string | URL | Request, _init?: RequestInit) =>
-    Promise.resolve(new Response(JSON.stringify(turns[i++]), { status: 200 }))) as typeof fetch;
+// ── Streaming-turer (portert fra askstats anthropic.test.ts 2026-08-28) ──
+function sseUpstream(events: unknown[]): ReadableStream<Uint8Array> {
+  const enc = new TextEncoder();
+  return new ReadableStream({
+    start(c) {
+      for (const e of events) {
+        c.enqueue(enc.encode(`event: x\ndata: ${JSON.stringify(e)}\n\n`));
+      }
+      c.close();
+    },
+  });
+}
+
+function streamedTextTurn(text: string) {
+  return [
+    { type: "message_start", message: { usage: { input_tokens: 10, cache_read_input_tokens: 2, cache_creation_input_tokens: 1 } } },
+    { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+    ...text.split(" ").map((w, i) => ({
+      type: "content_block_delta", index: 0,
+      delta: { type: "text_delta", text: (i ? " " : "") + w },
+    })),
+    { type: "content_block_stop", index: 0 },
+    { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 5 } },
+    { type: "message_stop" },
+  ];
+}
+
+function streamedToolTurn(toolName: string, id: string, inputJson: string) {
+  return [
+    { type: "message_start", message: { usage: { input_tokens: 8 } } },
+    { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+    { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Jeg sjekker kilden." } },
+    { type: "content_block_stop", index: 0 },
+    { type: "content_block_start", index: 1, content_block: { type: "tool_use", id, name: toolName, input: {} } },
+    { type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: inputJson.slice(0, 8) } },
+    { type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: inputJson.slice(8) } },
+    { type: "content_block_stop", index: 1 },
+    { type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 7 } },
+    { type: "message_stop" },
+  ];
+}
+
+function sseFetch(turns: unknown[][]): typeof fetch {
+  let call = 0;
+  return (() =>
+    Promise.resolve(new Response(sseUpstream(turns[call++]), { status: 200 }))
+  ) as unknown as typeof fetch;
 }
 
 Deno.test("runAgenticStream: tool round-trip then final text", async () => {
-  const fetchImpl = apiTurns([
-    { stop_reason: "tool_use", usage: { input_tokens: 10, output_tokens: 5 },
-      content: [{ type: "tool_use", id: "tu1", name: "probe", input: { url: "https://x/d.csv" } }] },
-    { stop_reason: "end_turn", usage: { input_tokens: 20, output_tokens: 15 },
-      content: [{ type: "text", text: "Her er scriptet." }] },
+  const fetchImpl = sseFetch([
+    streamedToolTurn("probe", "tu1", JSON.stringify({ url: "https://x/d.csv" })),
+    streamedTextTurn("Her er scriptet."),
   ]);
   const calls: string[] = [];
   const events = await collectSse(runAgenticStream({
@@ -144,26 +185,42 @@ Deno.test("runAgenticStream: tool round-trip then final text", async () => {
     deps: { fetchImpl },
   }));
   assertEquals(calls, ["probe:https://x/d.csv"]);
-  // Turn labels (replace:true) interleave with the tool label; the substantive
-  // sequence is: turn-1 label, tool label, turn-2 label, text, done.
-  assertEquals(events.map((e) => e.type), ["progress", "progress", "progress", "text", "done"]);
-  assertEquals(events[0].replace, true);
-  assertEquals(events[1].replace, undefined);
-  assertEquals(events[2].replace, true);
-  assertEquals(events[3].text, "Her er scriptet.");
-  assertEquals(events[4].inputTokens, 30);
-  assertEquals(events[4].outputTokens, 20);
+  // Turn 1 ends in tool_use — its "Jeg sjekker kilden." text was scratch work,
+  // discarded via turn_discard. Turn 2's deltas (after turn_discard) are the
+  // real final answer; no separate "text" event exists anymore.
+  assertEquals(events.some((e) => e.type === "text"), false);
+  assertEquals(events.some((e) => e.type === "turn_discard"), true);
+  const discardIdx = events.findIndex((e) => e.type === "turn_discard");
+  const finalDeltas = events.slice(discardIdx + 1)
+    .filter((e) => e.type === "delta").map((e) => e.text).join("");
+  assertEquals(finalDeltas, "Her er scriptet.");
+  const done = events.at(-1)!;
+  assertEquals(done.type, "done");
+  assertEquals(done.inputTokens, 18); // 8 (tool turn) + 10 (final turn)
+  assertEquals(done.outputTokens, 12); // 7 (tool turn) + 5 (final turn)
 });
 
 Deno.test("runAgenticStream: hosted web_search/web_fetch surface as progress labels", async () => {
-  const fetchImpl = apiTurns([
-    { stop_reason: "pause_turn", usage: { input_tokens: 1, output_tokens: 1 },
-      content: [{ type: "server_tool_use", id: "s1", name: "web_search", input: { query: "utdanning lønn norge" } }] },
-    { stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 },
-      content: [
-        { type: "server_tool_use", id: "s2", name: "web_fetch", input: { url: "https://ssb.no/x" } },
-        { type: "text", text: "svar" },
-      ] },
+  const fetchImpl = sseFetch([
+    [
+      { type: "message_start", message: { usage: { input_tokens: 1 } } },
+      { type: "content_block_start", index: 0, content_block: { type: "server_tool_use", id: "s1", name: "web_search", input: {} } },
+      { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify({ query: "utdanning lønn norge" }) } },
+      { type: "content_block_stop", index: 0 },
+      { type: "message_delta", delta: { stop_reason: "pause_turn" }, usage: { output_tokens: 1 } },
+      { type: "message_stop" },
+    ],
+    [
+      { type: "message_start", message: { usage: { input_tokens: 1 } } },
+      { type: "content_block_start", index: 0, content_block: { type: "server_tool_use", id: "s2", name: "web_fetch", input: {} } },
+      { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify({ url: "https://ssb.no/x" }) } },
+      { type: "content_block_stop", index: 0 },
+      { type: "content_block_start", index: 1, content_block: { type: "text", text: "" } },
+      { type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "svar" } },
+      { type: "content_block_stop", index: 1 },
+      { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 1 } },
+      { type: "message_stop" },
+    ],
   ]);
   const events = await collectSse(runAgenticStream({
     apiKey: "k", model: "m", system: "s", userContent: "q", tools: [],
@@ -177,14 +234,8 @@ Deno.test("runAgenticStream: hosted web_search/web_fetch surface as progress lab
 });
 
 Deno.test("runAgenticStream: budget exhausts into forced generation", async () => {
-  const toolTurn = {
-    stop_reason: "tool_use", usage: { input_tokens: 1, output_tokens: 1 },
-    content: [{ type: "tool_use", id: "t", name: "probe", input: {} }],
-  };
-  const finalTurn = {
-    stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 },
-    content: [{ type: "text", text: "ferdig" }],
-  };
+  const toolTurn = streamedToolTurn("probe", "t", JSON.stringify({}));
+  const finalTurn = streamedTextTurn("ferdig");
   let toolResults: string[] = [];
   const events = await collectSse(runAgenticStream({
     apiKey: "k", model: "m", system: "s", userContent: "q",
@@ -197,7 +248,7 @@ Deno.test("runAgenticStream: budget exhausts into forced generation", async () =
         for (const c of lastUser.content) if (c.type === "tool_result") toolResults.push(String(c.content));
       }
       const turn = body.messages.length >= 7 ? finalTurn : toolTurn; // 3 tool rounds then final
-      return Promise.resolve(new Response(JSON.stringify(turn), { status: 200 }));
+      return Promise.resolve(new Response(sseUpstream(turn), { status: 200 }));
     }) as typeof fetch },
   }));
   // third call is over budget (max 2) -> its result is the budget message
@@ -206,11 +257,9 @@ Deno.test("runAgenticStream: budget exhausts into forced generation", async () =
 });
 
 Deno.test("runAgenticStream: default one turn per call — continue carries state, resume finishes", async () => {
-  const fetchImpl = apiTurns([
-    { stop_reason: "tool_use", usage: { input_tokens: 10, output_tokens: 5 },
-      content: [{ type: "tool_use", id: "tu1", name: "probe", input: { url: "https://x/d.csv" } }] },
-    { stop_reason: "end_turn", usage: { input_tokens: 20, output_tokens: 15 },
-      content: [{ type: "text", text: "ferdig svar" }] },
+  const fetchImpl = sseFetch([
+    streamedToolTurn("probe", "tu1", JSON.stringify({ url: "https://x/d.csv" })),
+    streamedTextTurn("ferdig svar"),
   ]);
   const base = {
     apiKey: "k", model: "m", system: "s", userContent: "q", tools: [],
@@ -229,11 +278,12 @@ Deno.test("runAgenticStream: default one turn per call — continue carries stat
   assertEquals((cont.probed as { url: string }[])[0].url, "https://x/d.csv");
   // Invocation 2: resumes from the state and finishes; usage summed across both.
   const ev2 = await collectSse(runAgenticStream({ ...base, resume: st as never }));
-  assertEquals(ev2.filter((e) => e.type === "text")[0].text, "ferdig svar");
+  const deltas = ev2.filter((e) => e.type === "delta").map((e) => e.text).join("");
+  assertEquals(deltas, "ferdig svar");
   const done = ev2.at(-1)!;
   assertEquals(done.type, "done");
-  assertEquals(done.inputTokens, 30);
-  assertEquals(done.outputTokens, 20);
+  assertEquals(done.inputTokens, 18); // 8 (turn 1, tool) + 10 (turn 2, final)
+  assertEquals(done.outputTokens, 12); // 7 (turn 1, tool) + 5 (turn 2, final)
 });
 
 Deno.test("runAgenticStream: API error surfaces as error event", async () => {
