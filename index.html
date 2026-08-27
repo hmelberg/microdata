@@ -1021,11 +1021,16 @@
           cancelBtn.disabled = true;
           return;
         }
-        const headers = { 'Content-Type': 'application/json', 'X-Anthropic-Key': anthropicKey };
+        // Multi-provider-runden 2026-08-27: headere og leverandør/kvalitet
+        // kommer fra ai-chat.js, ellers ville personvern-vurderingen vært den
+        // ene AI-knappen som alltid gikk til Anthropic uansett innstilling.
+        const headers = (window.mdAiAuthHeaders && window.mdAiAuthHeaders()) ||
+          { 'Content-Type': 'application/json', 'X-Anthropic-Key': anthropicKey };
+        const extras = (window.mdAiBodyExtras && window.mdAiBodyExtras()) || {};
         const resp = await fetch('/api/dm-vurder', {
           method: 'POST',
           headers,
-          body: JSON.stringify({
+          body: JSON.stringify(Object.assign(extras, {
             script,
             kontekst: options.kontekst || '',
             ui_lang: window.M2PY_LANG === 'en' ? 'en' : 'no',
@@ -1033,7 +1038,7 @@
             detaljnivå: options.detaljnivå || 'kort',
             ønsker_revidert_script: options.ønsker_revidert_script || false,
             bruk_scrub: options.bruk_scrub || false,
-          }),
+          })),
           signal: controller.signal,
         });
         if (resp.status === 401) {

@@ -4,6 +4,21 @@
     (function aiModule() {
       var T = window.t || function (s, p) { return p ? s.replace(/\{(\w+)\}/g, function (m, k) { return k in p ? p[k] : m; }) : s; };
       const LS_KEY_ANTHROPIC = 'md_anthropic_key';   // BYOK: brukerens egen Anthropic-nøkkel
+      // Multi-provider-runden 2026-08-27. Egen leverandør = {type, base_url,
+      // model} + nøkkel; kvalitet = fast|balanced|best. Lagres i klartekst i
+      // localStorage, akkurat som Anthropic-nøkkelen over — bevisst: appen har
+      // ingen konto å kryptere mot, og js/keys.js (askstats nøkkellager) er
+      // sammenvevd med å injisere kildenøkler i BRUKERSKRIPT, som microdata
+      // ikke gjør og ikke skal begynne med.
+      const LS_KEY_PROVIDER = 'md_llm_provider';
+      const LS_KEY_LLM = 'md_llm_key';
+      const LS_KEY_QUALITY = 'md_ai_quality';
+      // Skjult kraftbruker-vei (ingen UI, samme konvensjon som md_ai_autorun):
+      //   localStorage.setItem('md_access_token', '<delt passord>')
+      // Serverens M2PY_ACCESS_TOKEN har alltid vært implementert i auth.ts,
+      // men hadde ingen klientvei i det hele tatt — data-loader.js sin
+      // authToken-parameter hadde ingen kaller. Nå har den én.
+      const LS_KEY_ACCESS = 'md_access_token';
 
       // key(<literal>) i scriptet er en hemmelighet — maskeres før scriptet
       // sendes til AI-endepunkter (spec 2026-07-05 §5). key(ask) beholdes.
@@ -16,7 +31,39 @@
         sending: false,
         history: [],   // {role, html|text, raw}
         get anthropicKey() { return localStorage.getItem(LS_KEY_ANTHROPIC) || ''; },
+        get llmKey() { return lsGet(LS_KEY_LLM); },
+        get accessToken() { return lsGet(LS_KEY_ACCESS); },
       };
+
+      function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+
+      /** {type, base_url, model} eller null. Korrupt JSON → null (ignoreres). */
+      function providerConfig() {
+        var raw = lsGet(LS_KEY_PROVIDER);
+        if (!raw) return null;
+        var p = null;
+        try { p = JSON.parse(raw); } catch (e) { return null; }
+        return (p && p.type && p.base_url && p.model) ? p : null;
+      }
+
+      /** En egen leverandør teller bare når BÅDE config og nøkkel foreligger. */
+      function customProviderReady() { return !!(providerConfig() && state.llmKey); }
+
+      function aiQuality() {
+        var q = lsGet(LS_KEY_QUALITY);
+        return (q === 'fast' || q === 'balanced' || q === 'best') ? q : 'balanced';
+      }
+
+      /**
+       * Har brukeren i det hele tatt legitimasjon? Tre veier gir tilgang:
+       * egen leverandør, egen Anthropic-nøkkel, eller det skjulte
+       * tilgangspassordet. Alle knappe-portene bruker denne — aldri
+       * state.anthropicKey direkte, ellers ville en leverandørbruker sett
+       * knappene som deaktiverte.
+       */
+      function hasAiCredentials() {
+        return customProviderReady() || !!state.anthropicKey || !!state.accessToken;
+      }
 
       // Web mode requires a user-supplied Anthropic key (BYOK — the agentic
       // search then runs on the user's own account), and only makes sense in
@@ -24,7 +71,7 @@
       // microdata). Surfaced only via its own send button
       // (syncWebBtnVisibility() shows/hides #aiSendWebBtn).
       function webModeEligible() {
-        const hasByok = !!state.anthropicKey;
+        const hasByok = hasAiCredentials();
         const mode = (typeof activeEditorMode !== 'undefined' && activeEditorMode) ? activeEditorMode : 'microdata';
         return hasByok && (mode === 'python' || mode === 'r' || mode === 'duckdb');
       }
@@ -390,10 +437,24 @@
         dom.aiThread.scrollTop = dom.aiThread.scrollHeight;
       }
 
-      // Headers for edge-funksjonene (/api/*): kun BYOK Anthropic-nøkkel.
+      // Headers for edge-funksjonene (/api/*). Presedens, og den er bevisst:
+      // egen leverandør > egen Anthropic-nøkkel > delt tilgangspassord.
+      // Serversiden speiler dette (auth.ts: BYOK/llm-key slår Bearer-token).
       function edgeAuthHeaders() {
-        if (state.anthropicKey) return { 'X-Anthropic-Key': state.anthropicKey, 'Content-Type': 'application/json' };
-        return { 'Content-Type': 'application/json' };
+        const h = { 'Content-Type': 'application/json' };
+        if (customProviderReady()) { h['X-Llm-Key'] = state.llmKey; return h; }
+        if (state.anthropicKey) { h['X-Anthropic-Key'] = state.anthropicKey; return h; }
+        if (state.accessToken) { h['Authorization'] = 'Bearer ' + state.accessToken; return h; }
+        return h;
+      }
+
+      /**
+       * Feltene hvert /api/*-kall skal bære. Ett sted, slik at et nytt
+       * kallsted ikke kan glemme dem: uten `provider` faller serveren tilbake
+       * til Anthropic, og uten `quality` til per-kallsted-defaulten.
+       */
+      function edgeBodyExtras() {
+        return { provider: providerConfig() || undefined, quality: aiQuality() };
       }
 
       function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -412,8 +473,10 @@
         if (state.sending) return;
         const text = dom.aiInput.value.trim();
         if (!text) return;
-        // Gate on BYOK: no Anthropic key configured yet → open Settings to add one.
-        if (!state.anthropicKey) {
+        // Gate on credentials: nothing configured yet → open Settings.
+        // hasAiCredentials(), ikke state.anthropicKey: en bruker med egen
+        // leverandør (eller tilgangspassord) har fullgod legitimasjon.
+        if (!hasAiCredentials()) {
           openSettings();
           return;
         }
@@ -475,11 +538,12 @@
         const resp = await fetch('/api/kode-svar', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ question: text, lang, script: scriptContext || '' }),
+          body: JSON.stringify(Object.assign(
+            { question: text, lang, script: scriptContext || '' }, edgeBodyExtras())),
           signal,
         });
         if (resp.status === 401) {
-          throw new Error(T('Ugyldig Anthropic-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
+          throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
         }
         if (!resp.ok || !resp.body) {
           throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()));
@@ -568,10 +632,11 @@
       async function streamKodeSvarV2(payload, bubble, signal) {
         const headers = edgeAuthHeaders();
         const resp = await fetch('/api/kode-svar-v2', {
-          method: 'POST', headers, body: JSON.stringify(payload), signal,
+          method: 'POST', headers,
+          body: JSON.stringify(Object.assign({}, payload, edgeBodyExtras())), signal,
         });
         if (resp.status === 401) {
-          throw new Error(T('Ugyldig Anthropic-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
+          throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
         }
         if (!resp.ok || !resp.body) {
           throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()));
@@ -749,16 +814,16 @@
         const resp = await fetch('/api/tolk-resultat', {
           method: 'POST',
           headers,
-          body: JSON.stringify({
+          body: JSON.stringify(Object.assign({
             script: payload.script || '',
             output: payload.output || '',
             språk: payload.lang || 'auto',
             ui_lang: (window.M2PY_LANG === 'en') ? 'en' : 'no',
-          }),
+          }, edgeBodyExtras())),
           signal,
         });
         if (resp.status === 401) {
-          throw new Error(T('Ugyldig Anthropic-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
+          throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
         }
         if (!resp.ok || !resp.body) {
           throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()));
@@ -869,7 +934,7 @@
         bubble.className = 'ai-bubble';
         thinkingNode.appendChild(bubble);
 
-        if (!state.anthropicKey) throw new Error(T('Web-modus krever egen Anthropic-nøkkel.'));
+        if (!hasAiCredentials()) throw new Error(T('Web-modus krever egen API-nøkkel.'));
         const mode = (typeof activeEditorMode !== 'undefined' && activeEditorMode) ? activeEditorMode : 'python';
 
         // Continuation protocol: Netlify caps CPU per edge invocation, so the
@@ -891,16 +956,16 @@
           const resp = await fetch('/api/data-svar', {
             method: 'POST',
             headers: edgeAuthHeaders(),
-            body: JSON.stringify({
+            body: JSON.stringify(Object.assign({
               question,
               mode,
               script: includeScript ? scrubScript(dom.scriptInput.value) : undefined,
               repair: repair ? { script: repair.script, error: repair.error, round } : undefined,
               resume: resume || undefined,
-            }),
+            }, edgeBodyExtras())),
           });
           if (resp.status === 401) {
-            throw new Error(T('Ugyldig Anthropic-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
+            throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
           }
           if (resp.status === 403) throw new Error(T('Web-modus krever egen Anthropic-nøkkel.'));
           if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()));
@@ -939,8 +1004,11 @@
             sources = ev.sources;
           } else if (ev.type === 'error') {
             let msg = ev.message || 'ukjent feil';
-            if (state.anthropicKey && msg.indexOf('Anthropic API error 401') !== -1) {
-              msg = T('Ugyldig Anthropic-nøkkel. Sjekk nøkkelen i AI-innstillingene.');
+            // 401 fra oppstrøms betyr brukerens EGEN nøkkel er avvist —
+            // uansett hvilken av de tre veiene som bar den.
+            if (hasAiCredentials() &&
+                (msg.indexOf('Anthropic API error 401') !== -1 || msg.indexOf('Leverandørfeil 401') !== -1)) {
+              msg = T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.');
             }
             throw new Error(msg);
           }
@@ -1178,7 +1246,7 @@
         if (state.sending) return;
         const text = dom.aiInput.value.trim();
         if (!text) return;
-        if (!state.anthropicKey) {
+        if (!hasAiCredentials()) {
           openSettings();
           return;
         }
@@ -1446,7 +1514,7 @@
           payload = payload || {};
           if (!payload.output || !payload.output.trim()) return;
           if (state.sending) return;
-          if (!state.anthropicKey) { openSettings(); return; }
+          if (!hasAiCredentials()) { openSettings(); return; }
           setOpen(true);
           if (state.history.length === 0) dom.aiThread.innerHTML = '';
           appendUserMessage(T('Tolk resultatene fra forrige kjøring.'));
@@ -1470,6 +1538,15 @@
             });
         };
       }
+
+      // ── Sømmer for index.html ────────────────────────────────────────
+      // dm-vurder-kallet bor i index.html og bygde sine egne headere med
+      // X-Anthropic-Key hardkodet. Det ville vært den ENE AI-knappen som
+      // ignorerte leverandørvalget. Eksponert her framfor å duplisere
+      // presedens-logikken der.
+      window.mdAiAuthHeaders = edgeAuthHeaders;
+      window.mdAiBodyExtras = edgeBodyExtras;
+      window.mdAiHasCredentials = hasAiCredentials;
 
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
