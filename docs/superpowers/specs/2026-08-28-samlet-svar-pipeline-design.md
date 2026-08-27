@@ -66,13 +66,26 @@ rekonstrueres riktig, er å teste paret. `run-disiplin.ts` (klassifisering av
 kjøreresultater, påminnelses-injeksjon, run_ok-telling) porteres som COPIED der
 den ikke må tilpasses.
 
-### 2. Verktøyene
+### 2. Verktøyene — microdatas domene, ikke askstats
+
+Nøkkelinnsikt (Hans, 2026-08-28): askstats vanskelige problem er å FINNE riktige
+data. Det problemet finnes ikke her — vi vet at dataene er microdata-registeret,
+og vi har rik metadata (`variable_metadata.json`, 652 KB + `codelists/`).
+Verktøysettet speiler det:
 
 | Verktøy | Utføres | Status |
 |---|---|---|
 | `run_code` | **Klienten** (emulatoren) | NY — porteres fra askstat |
-| `search_catalog`, `table_metadata`, `probe` | Edge | Finnes (fra data-svar) |
-| websøk | Anthropic-hostet | Finnes |
+| `variabel_info` | Edge (over `variable_metadata.json` + `codelists/`, hentet samme-origin med in-isolat-cache) | NY |
+| websøk, `search_catalog`, `table_metadata`, `probe` | — | **UT av løkka** (askstats finn-data-verktøy; koden blir liggende i `_lib` — se Utsatt) |
+
+`variabel_info` gir on-demand detaljer (typer, kodeverk, gyldighetsperioder) for
+navngitte eller søkte variabler, og **erstatter v2s eget variabelvelger-pass** —
+modellen slår opp når den trenger det i stedet for at et Haiku-pass gjetter
+utvalget på forhånd. Systemprompten bærer som i dag de kuraterte referansene
+(`katalog-taksonomi-reference.md` — generert fra metadataen, `nokkelvariabler-
+reference.md`, syntaks/funksjoner) i en cachet systemblokk (1h-TTL-støtten i
+`streamAnthropic` finnes allerede); full metadata er for stor til å embeddes rått.
 
 ### 3. Kvalitetsvelgeren styrer alt («hvor grundig»)
 
@@ -88,6 +101,11 @@ løkkebudsjett. Ingen meny-matrise:
 Balansert-tallene er askstats felt-testede deep-verdier. Env-overstyringene
 består; `DATA_SVAR_MODEL` omdøpes til `SVAR_MODEL` (data-svar dør). UI-teksten
 for nivåene kan justeres til å kommunisere grundighet, ikke bare modell.
+
+UI-modellen er drawcasts (Hans, 2026-08-28): ÉN åpnebar meny som styrer flere
+ting — microdatas eksisterende AI-innstillinger (legitimasjon, leverandør,
+grundighet) er allerede den menyen; grundighetsvelgeren bor der, ikke som egen
+knapperad i chatvinduet.
 
 ### 4. Kjøring og høsting i emulatoren
 
@@ -124,7 +142,8 @@ safestat.
 - Slettes: `kode-svar.ts`, `kode-svar-v2.ts`, `data-svar.ts`, klientveiene
   `runFastQuery`/`runFastQueryV2`/`runWebAnswer`-navnet (webAnswerWithRepair-
   logikken gjenbrukes som løkkas kjøre-arm), tilhørende tester ryddes/flyttes.
-  Variabelvelger-passet fra v2 utgår: katalog-verktøyene + kjøring dekker jobben.
+  Variabelvelger-passet fra v2 utgår: `variabel_info`-verktøyet (§2) + kjøring
+  dekker jobben.
 
 ### 7. Testing
 
@@ -137,4 +156,7 @@ run_code→run_result mot en mocket SSE-strøm.
 ## Utsatt
 
 Ruter-pass, dybdemeny, get_pack/kildepakker, lokale modeller, safestat-port av
-løkka (annet vern-regime).
+løkka (annet vern-regime), og **ekstern-data-verktøyene i løkka**
+(websøk/search_catalog/table_metadata/probe): de løser askstats finn-data-
+problem, ikke microdatas. `_lib/tools/`-koden beholdes og kan gjeninnføres som
+verktøy hvis «hent eksterne data inn i script» viser seg savnet.
