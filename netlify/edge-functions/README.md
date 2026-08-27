@@ -32,7 +32,9 @@ AI-endepunkter (se `netlify.toml` for path-mapping):
    - `M2PY_ACCESS_TOKEN_PERSONAL` + `ANTHROPIC_API_KEY_PERSONAL` (valgfrie) —
      et andre passord-nivå: det personlige passordet autentiserer likt (og
      teller som admin), men forbruket går på den personlige nøkkelen i stedet
-     for den delte. Personlig passord uten personlig nøkkel er 500 med vilje.
+     for den delte, og passordet er UNNTATT ratelimiten (feilgjetninger
+     rate-limites fortsatt). Personlig passord uten personlig nøkkel er 500
+     med vilje.
    - `FRED_API_KEY` (valgfri) — server-side nøkkel `hent`/`data-svar` injiserer
      for FRED-kilder i registeret (host-matchet, aldri sendt til klienten).
    - `DATA_SVAR_MODEL` (valgfri) — override av modellen `data-svar` bruker

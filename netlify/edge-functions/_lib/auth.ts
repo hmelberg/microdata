@@ -143,6 +143,7 @@ async function runBaseChecks(
   checkRateLimit: GateDeps["checkRateLimit"],
   requireToken = true,
   context?: IpContext,
+  rateLimitExempt?: (token: string) => boolean,
 ): Promise<BaseCheckResult> {
   // 1. token presence (free) — skipped for BYOK requests, which carry the
   // user's own Anthropic key instead of an account token.
@@ -178,16 +179,24 @@ async function runBaseChecks(
     };
   }
 
-  // 4. rate-limit BEFORE the expensive Anvil validation (no amplification)
-  const rate = await checkRateLimit(opts.endpoint, clientIp(request, context));
-  if (!rate.allowed) {
-    return {
-      presentedToken,
-      failure: new Response("Rate limited", {
-        status: 429,
-        headers: { "Retry-After": String(rate.retryAfterSeconds) },
-      }),
-    };
+  // 4. rate-limit BEFORE the expensive Anvil validation (no amplification).
+  // Det PERSONLIGE passordet er helt unntatt: matchen er gratis (konstant-tid,
+  // ingen nettverk), så det finnes ingen amplifisering å bremse — og eieren
+  // skal ikke stoppes av sin egen 60/t-kvote. Feilgjetninger matcher ikke og
+  // rate-limites som før, så brute force mot passordene er fortsatt bremset.
+  const exempt = !!rateLimitExempt && presentedToken.length > 0 &&
+    rateLimitExempt(presentedToken);
+  if (!exempt) {
+    const rate = await checkRateLimit(opts.endpoint, clientIp(request, context));
+    if (!rate.allowed) {
+      return {
+        presentedToken,
+        failure: new Response("Rate limited", {
+          status: 429,
+          headers: { "Retry-After": String(rate.retryAfterSeconds) },
+        }),
+      };
+    }
   }
 
   return { presentedToken, failure: null };
@@ -219,6 +228,7 @@ export async function runGate(
     opts,
     deps.checkRateLimit,
     /* requireToken */ byokKey === null && llmKey === null, context,
+    (t) => !!deps.personalToken && timingSafeEqual(t, deps.personalToken),
   );
   if (failure) return failure;
 
@@ -354,6 +364,7 @@ export async function runAdminGate(
     opts,
     deps.checkRateLimit,
     /* requireToken */ byokKey === null && llmKey === null, context,
+    (t) => !!deps.personalToken && timingSafeEqual(t, deps.personalToken),
   );
   if (failure) return failure;
 

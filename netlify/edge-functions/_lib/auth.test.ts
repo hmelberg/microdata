@@ -365,3 +365,41 @@ Deno.test("runAdminGate: personal token is admin without calling Anvil", async (
   assertEquals(r, null);
   assertEquals(deps.calls.fetchUser, 0);
 });
+
+// ── personlig passord: ingen ratelimit (2026-08-28) ───────────────────────
+
+const denyAll = () => Promise.resolve({ allowed: false, retryAfterSeconds: 60 });
+
+Deno.test("runGate: personal token skips the rate limit entirely", async () => {
+  let rateCalls = 0;
+  const deps = makeDeps({
+    personalToken: "privat",
+    checkRateLimit: () => { rateCalls++; return denyAll(); },
+  });
+  const r = await runGate(req({ token: "privat" }), { endpoint: "kode-svar", maxBodyBytes: 1000 }, deps);
+  assertEquals(r, null);
+  assertEquals(rateCalls, 0);
+});
+
+Deno.test("runGate: shared token is still rate-limited", async () => {
+  const deps = makeDeps({ sharedToken: "delt", personalToken: "privat", checkRateLimit: denyAll });
+  const r = await runGate(req({ token: "delt" }), { endpoint: "kode-svar", maxBodyBytes: 1000 }, deps);
+  assertEquals(r?.status, 429);
+});
+
+Deno.test("runGate: wrong guesses are still rate-limited even with a personal token configured", async () => {
+  const deps = makeDeps({ personalToken: "privat", checkRateLimit: denyAll });
+  const r = await runGate(req({ token: "feil" }), { endpoint: "kode-svar", maxBodyBytes: 1000 }, deps);
+  assertEquals(r?.status, 429);
+});
+
+Deno.test("runAdminGate: personal token skips the rate limit entirely", async () => {
+  let rateCalls = 0;
+  const deps = adminDeps({
+    personalToken: "privat",
+    checkRateLimit: () => { rateCalls++; return denyAll(); },
+  });
+  const r = await runAdminGate(req({ token: "privat" }), { endpoint: "data-svar", maxBodyBytes: 1000 }, deps);
+  assertEquals(r, null);
+  assertEquals(rateCalls, 0);
+});
