@@ -50,6 +50,15 @@ endepunkt+fase-navngitte feil.
 
 ## Design
 
+### 0. Eval-tradisjonen videreføres
+
+data-svar-prompten utvikles i dag mot et evalsett
+(`docs/eval/data-svar-evalsett.md`; promptendringer kjøres mot settet før
+deploy, feilmønstre blir nye promptregler). Den nye pipeline-en får sitt eget
+evalsett fra dag én — spørsmål som dekker: rent forklaringssvar, generer-og-
+kjør, flerrunde-iterasjon etter kjørefeil, variabel-oppslag underveis, og det
+syntetiske premisset i svarformuleringen.
+
 ### 1. Endepunkt og protokoll
 
 Ny `netlify/edge-functions/svar.ts` portert fra askstats — med mikrodata-tilpasset
@@ -79,13 +88,35 @@ Verktøysettet speiler det:
 | `variabel_info` | Edge (over `variable_metadata.json` + `codelists/`, hentet samme-origin med in-isolat-cache) | NY |
 | websøk, `search_catalog`, `table_metadata`, `probe` | — | **UT av løkka** (askstats finn-data-verktøy; koden blir liggende i `_lib` — se Utsatt) |
 
-`variabel_info` gir on-demand detaljer (typer, kodeverk, gyldighetsperioder) for
-navngitte eller søkte variabler, og **erstatter v2s eget variabelvelger-pass** —
-modellen slår opp når den trenger det i stedet for at et Haiku-pass gjetter
-utvalget på forhånd. Systemprompten bærer som i dag de kuraterte referansene
-(`katalog-taksonomi-reference.md` — generert fra metadataen, `nokkelvariabler-
-reference.md`, syntaks/funksjoner) i en cachet systemblokk (1h-TTL-støtten i
-`streamAnthropic` finnes allerede); full metadata er for stor til å embeddes rått.
+**Kunnskapsgrunnlaget beholdes fra kode-svar** (verifisert mot dagens system
+2026-08-28): `buildCachedPrefix(origin, mode)` front-laster en RENDRET, beriket
+variabelkatalog (renderCatalog av `variable_metadata.json`, inntil 30 koder per
+variabel), kommune-kodelista, kommando- og funksjonsreferansen og regelblokkene
+i en per-modus cachet systemprefiks (in-isolat-cache + 1h-TTL cache_control;
+degraderer til regel-kun prompt hvis metadataen ikke kan hentes). Dette er
+felt-utprøvd og cache-billig og blir løkkas grunnlag — rå JSON (652 KB) embeddes
+ikke, og har aldri blitt det.
+
+`variabel_info` blir DETALJ-verktøyet oppå: fulle kodelister
+(`/codelists/<NAVN>.json`) og felt som katalogrenderingen utelater — v2s
+focused-blokk gjort om til verktøy, slik at det egne picker-passet utgår.
+Historisk presedens i systemet selv: Anvil-løpet hadde `lookup_variable`-tool +
+reparasjonsloop med kompakt katalog, mens kode-svar front-laster alt nettopp
+FORDI det mangler tool og loop (kommentaren i kode-svar.md). Løkka lar oss
+kombinere: front-lastet oversikt for førsteskudd-kvalitet, on-demand detalj for
+dybde.
+
+### 2b. Modus-bevissthet arves
+
+Genereringen er allerede modus-bevisst (kode-svar 2026-06-14):
+`buildCachedPrefix(origin, mode)` har microdata/python/r-varianter — python/r
+får datablokker + pakke-preamble + `#micro`-broen i stedet for
+DSL-grammatikken og kommando-referansen. Klienten sender editor-modus i dag, og
+pipeline-en viderefører det: prompten følger modusen, og `run_code` kjører
+scriptet slik editoren ville kjørt det i samme modus. Syntaksreglene har en
+dokumentert TOVEIS SYNK-kontrakt med `microdata-api/server_code/prompts.py`
+(Anvil) — nye felles-regler som løkka avdekker skal vurderes portert dit, som
+før.
 
 ### 3. Kvalitetsvelgeren styrer alt («hvor grundig»)
 
