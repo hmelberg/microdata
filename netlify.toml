@@ -69,6 +69,10 @@
   path = "/api/svar"
 
 [[edge_functions]]
+  function = "langtest"
+  path = "/api/langtest"
+
+[[edge_functions]]
   function = "dm-vurder"
   path = "/api/dm-vurder"
 
