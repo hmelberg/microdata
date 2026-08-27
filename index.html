@@ -160,6 +160,7 @@
             <button type="button" data-lang="en">English</button>
           </div>
         </div>
+        <button type="button" id="menuAiSettings" data-i18n data-i18n-title title="Legg inn eller endre API-nøkkel eller tilgangspassord, velg AI-leverandør og kvalitet">AI-nøkkel og leverandør</button>
         <button type="button" id="menuSettings" data-i18n>Innstillinger</button>
       </div>
     </div>
@@ -3208,6 +3209,13 @@
         overlay.classList.add('open');
       }
       function closeSettings() { overlay.classList.remove('open'); }
+
+      var menuAiSettingsBtn = document.getElementById('menuAiSettings');
+      if (menuAiSettingsBtn) menuAiSettingsBtn.addEventListener('click', function() {
+        var dd = document.getElementById('hamburgerDropdown');
+        if (dd) dd.classList.remove('open');
+        if (window.mdOpenAiSettings) window.mdOpenAiSettings();
+      });
 
       var menuSettingsBtn = document.getElementById('menuSettings');
       if (menuSettingsBtn) menuSettingsBtn.addEventListener('click', function() {

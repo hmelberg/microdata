@@ -301,3 +301,28 @@ Deno.test("messageAnthropic carries effort and apiBase the same way", async () =
   assertEquals(seen.url, "https://gw.example/v1/messages");
   assertEquals(seen.body.output_config, { effort: "medium" });
 });
+
+Deno.test("anthropic-workspace-id is sent only when configured", async () => {
+  const prev = Deno.env.get("ANTHROPIC_WORKSPACE_ID");
+  try {
+    Deno.env.delete("ANTHROPIC_WORKSPACE_ID");
+    let seenHeaders: Headers = new Headers();
+    const grab = ((_u: string | URL | Request, init?: RequestInit) => {
+      seenHeaders = new Headers(init?.headers);
+      return Promise.resolve(
+        new Response(new ReadableStream({ start: (c) => c.close() })),
+      );
+    }) as typeof fetch;
+    await streamAnthropic({ apiKey: "k", model: "m", prompt: "p" },
+      { fetchImpl: grab, sleep: () => Promise.resolve() });
+    assertEquals(seenHeaders.get("anthropic-workspace-id"), null);
+
+    Deno.env.set("ANTHROPIC_WORKSPACE_ID", "wrkspc_123");
+    await streamAnthropic({ apiKey: "k", model: "m", prompt: "p" },
+      { fetchImpl: grab, sleep: () => Promise.resolve() });
+    assertEquals(seenHeaders.get("anthropic-workspace-id"), "wrkspc_123");
+  } finally {
+    Deno.env.delete("ANTHROPIC_WORKSPACE_ID");
+    if (prev !== undefined) Deno.env.set("ANTHROPIC_WORKSPACE_ID", prev);
+  }
+});

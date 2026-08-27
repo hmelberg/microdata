@@ -1671,6 +1671,10 @@
       // X-Anthropic-Key hardkodet. Det ville vært den ENE AI-knappen som
       // ignorerte leverandørvalget. Eksponert her framfor å duplisere
       // presedens-logikken der.
+      // Uten denne var AI-innstillingene KUN nåbare ved å prøve en spørring
+      // uten nøkkel — man kunne ikke bytte en nøkkel man allerede hadde lagt
+      // inn (Hans, 2026-08-27).
+      window.mdOpenAiSettings = openSettings;
       window.mdAiAuthHeaders = edgeAuthHeaders;
       window.mdAiBodyExtras = edgeBodyExtras;
       window.mdAiHasCredentials = hasAiCredentials;
