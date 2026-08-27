@@ -1,6 +1,10 @@
 // /api/data-svar — Web mode: agentic discovery + generation (admin-only).
 // Spec: docs/superpowers/specs/2026-07-03-web-data-svar-design.md
 import { adminGate, extractByokKey, type IpContext } from "./_lib/auth.ts";
+import { resolveLlm } from "./_lib/llm-choice.ts";
+import { runProviderAgenticStream } from "./_lib/providers/agentic.ts";
+import { makeOpenAiCompatTurn } from "./_lib/providers/openai-compat.ts";
+import { makeOpenAiResponsesTurn } from "./_lib/providers/openai-responses.ts";
 import { type AgenticResumeState, runAgenticStream } from "./_lib/anthropic.ts";
 import { loadRegistry, renderRegistryBlock } from "./_lib/registry.ts";
 import { searchCatalog } from "./_lib/tools/search-catalog.ts";
@@ -14,6 +18,9 @@ import {
 interface RepairBody { script: string; error: string; round: number; }
 interface ResumeBody { state?: AgenticResumeState; probed?: unknown; }
 interface RequestBody {
+  // multi-provider-runden 2026-08-27: valgfri egen leverandør + kvalitetsnivå.
+  provider?: unknown;
+  quality?: unknown;
   question?: string;
   mode?: string;
   script?: string;
@@ -36,7 +43,7 @@ function validResumeState(s: AgenticResumeState | undefined): s is AgenticResume
 }
 
 export default async (request: Request, context: IpContext): Promise<Response> => {
-  const gateResp = await adminGate(request, { endpoint: "data-svar", maxBodyBytes: MAX_BODY_BYTES, allowByok: true }, context);
+  const gateResp = await adminGate(request, { endpoint: "data-svar", maxBodyBytes: MAX_BODY_BYTES, allowByok: true, allowLlmKey: true }, context);
   if (gateResp) return gateResp;
 
   let body: RequestBody;
@@ -67,12 +74,8 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   }
 
   const byokKey = extractByokKey(request);
-  const apiKey = byokKey ?? Deno.env.get("ANTHROPIC_API_KEY");
-  const model = Deno.env.get("DATA_SVAR_MODEL") ?? Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-4-6";
-  if (!apiKey) {
-    console.error("ANTHROPIC_API_KEY is not set");
-    return new Response("Server configuration error", { status: 500 });
-  }
+  const choice = resolveLlm(request, body, "data-svar");
+  if (choice instanceof Response) return choice;
 
   const origin = new URL(request.url).origin;
   let registry;
@@ -116,17 +119,45 @@ export default async (request: Request, context: IpContext): Promise<Response> =
     ? repairTurn(question, repair.script, repair.error, repair.round)
     : questionTurn(question, body.script);
 
-  const inner = runAgenticStream({
-    apiKey, model, system, userContent,
+  // Leverandør-dispatch (multi-provider-runden 2026-08-27). Samme form som
+  // askstats svar.ts: de to OpenAI-typene går gjennom det ORDRETT kopierte
+  // runProviderAgenticStream med sin egen runTurn, anthropic-compat blir i
+  // den native løkka med apiBase satt.
+  const commonOpts = {
+    system,
+    userContent,
     tools: TOOL_DEFS,
     executeTool,
     progressLabel,
-    cacheTtl: "1h",
     maxTokens: 8192,
     maxClientToolCalls: 12,
     resume: resumeState,
     continueExtra: () => ({ probed }),
-  });
+  };
+  const providerDeps = { timeoutMs: 180_000, retries: 1 };
+  let inner: ReadableStream<Uint8Array>;
+  if (choice.provider?.type === "openai-compat") {
+    inner = runProviderAgenticStream({
+      ...commonOpts,
+      deps: providerDeps,
+      runTurn: makeOpenAiCompatTurn(choice.provider),
+    });
+  } else if (choice.provider?.type === "openai-responses") {
+    inner = runProviderAgenticStream({
+      ...commonOpts,
+      deps: providerDeps,
+      runTurn: makeOpenAiResponsesTurn(choice.provider),
+    });
+  } else {
+    inner = runAgenticStream({
+      ...commonOpts,
+      apiKey: choice.apiKey,
+      model: choice.provider ? choice.provider.model : choice.model,
+      cacheTtl: "1h",
+      effort: choice.effort,
+      apiBase: choice.provider?.type === "anthropic-compat" ? choice.provider.baseUrl : undefined,
+    });
+  }
 
   const stream = injectBeforeDone(inner, () =>
     probed.length ? { type: "sources", sources: probed } : null);

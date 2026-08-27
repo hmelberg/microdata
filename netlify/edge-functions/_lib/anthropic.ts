@@ -309,6 +309,10 @@ export interface AgenticOptions {
   turnsPerCall?: number;
   continueExtra?: () => Record<string, unknown>;
   deps?: RetryDeps;
+  // Speiler AnthropicStreamOptions (multi-provider-runden 2026-08-27):
+  // anthropic-kompatibel gateway, og output_config.effort NØSTET.
+  apiBase?: string;
+  effort?: string;
 }
 
 // Everything the loop needs to pick up where a previous invocation stopped.
@@ -405,7 +409,7 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
           }, HEARTBEAT_MS);
           let resp: Response;
           try {
-            resp = await fetchWithRetry(ANTHROPIC_API, {
+            resp = await fetchWithRetry(apiTarget(opts.apiBase), {
               method: "POST",
               headers,
               body: JSON.stringify({
@@ -415,6 +419,7 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
                 system,
                 tools: opts.tools,
                 messages: state.messages,
+                ...(opts.effort ? { output_config: { effort: opts.effort } } : {}),
               }),
             }, deps);
           } finally {

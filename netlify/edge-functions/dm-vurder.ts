@@ -7,8 +7,13 @@ import {
 } from "./_lib/parse-script-context.ts";
 import { streamAnthropic } from "./_lib/anthropic.ts";
 import { extractByokKey, gate, upstreamErrorResponse, type IpContext } from "./_lib/auth.ts";
+import { resolveLlm } from "./_lib/llm-choice.ts";
+import { streamProvider } from "./_lib/providers/single.ts";
 
 interface RequestBody {
+  // multi-provider-runden 2026-08-27: valgfri egen leverandør + kvalitetsnivå.
+  provider?: unknown;
+  quality?: unknown;
   script: string;
   kontekst?: string;          // user-provided context text (free-form)
   språk?: "auto" | "microdata" | "python" | "r";
@@ -356,7 +361,7 @@ function languageInstruction(requested: string, detected: Language): string {
 
 export default async (request: Request, context: IpContext): Promise<Response> => {
   const MAX_BODY_BYTES = 50_000;
-  const gateResp = await gate(request, { endpoint: "dm-vurder", maxBodyBytes: MAX_BODY_BYTES, allowByok: true }, context);
+  const gateResp = await gate(request, { endpoint: "dm-vurder", maxBodyBytes: MAX_BODY_BYTES, allowByok: true, allowLlmKey: true }, context);
   if (gateResp) return gateResp;
 
   let body: RequestBody;
@@ -373,12 +378,8 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   }
 
   const byokKey = extractByokKey(request);
-  const apiKey = byokKey ?? Deno.env.get("ANTHROPIC_API_KEY");
-  const model = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-4-6";
-  if (!apiKey) {
-    console.error("ANTHROPIC_API_KEY is not set");
-    return new Response("Server configuration error", { status: 500 });
-  }
+  const choice = resolveLlm(request, body, "dm-vurder");
+  if (choice instanceof Response) return choice;
 
   // Detect language and parse script directives
   const detected = detectLanguage(body.script);
@@ -429,14 +430,17 @@ If the revised-script section proposes no changes, write exactly: "No changes su
     const maxTokens = wantRevisedScript ? 3500 : 2000;
     // The legal/principles block is constant across calls — send it as a cached
     // system prefix so it's billed at cache-read rates on repeat requests.
-    const stream = await streamAnthropic({
-      apiKey,
-      model,
+    const opts = {
+      apiKey: choice.apiKey,
+      model: choice.model,
       prompt,
       maxTokens,
       system: SHARED_PRINCIPLES,
-      cacheTtl: "1h",
-    });
+      cacheTtl: "1h" as const,
+    };
+    const stream = choice.provider
+      ? await streamProvider(choice.provider, opts, choice)
+      : await streamAnthropic({ ...opts, effort: choice.effort });
     return new Response(stream, {
       headers: {
         "Content-Type": "text/event-stream",

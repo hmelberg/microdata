@@ -1,5 +1,7 @@
 import { streamAnthropic } from "./_lib/anthropic.ts";
 import { extractByokKey, gate, upstreamErrorResponse, type IpContext } from "./_lib/auth.ts";
+import { resolveLlm } from "./_lib/llm-choice.ts";
+import { streamProvider } from "./_lib/providers/single.ts";
 import { abbrevType, cleanDescription, extractValidPeriod, renderLabels } from "./_lib/catalog-format.ts";
 
 // ====================================================================
@@ -14,6 +16,9 @@ import { abbrevType, cleanDescription, extractValidPeriod, renderLabels } from "
 // ====================================================================
 
 interface RequestBody {
+  // multi-provider-runden 2026-08-27: valgfri egen leverandør + kvalitetsnivå.
+  provider?: unknown;
+  quality?: unknown;
   question: string;
   lang?: "no" | "en";
   script?: string;   // optional editor script for context (read-only here)
@@ -1247,7 +1252,7 @@ export async function buildCachedPrefix(origin: string, mode: GenMode = "microda
 // ====================================================================
 
 export default async (request: Request, context: IpContext): Promise<Response> => {
-  const gateResp = await gate(request, { endpoint: "kode-svar", maxBodyBytes: 50_000, allowByok: true }, context);
+  const gateResp = await gate(request, { endpoint: "kode-svar", maxBodyBytes: 50_000, allowByok: true, allowLlmKey: true }, context);
   if (gateResp) return gateResp;
 
   let body: RequestBody;
@@ -1262,12 +1267,8 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   }
 
   const byokKey = extractByokKey(request);
-  const apiKey = byokKey ?? Deno.env.get("ANTHROPIC_API_KEY");
-  const model = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-4-6";
-  if (!apiKey) {
-    console.error("ANTHROPIC_API_KEY is not set");
-    return new Response("Server configuration error", { status: 500 });
-  }
+  const choice = resolveLlm(request, body, "kode-svar");
+  if (choice instanceof Response) return choice;
 
   const origin = new URL(request.url).origin;
   const system = await buildCachedPrefix(origin);
@@ -1286,14 +1287,17 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   ].filter((s) => s !== ``).join("\n");
 
   try {
-    const stream = await streamAnthropic({
-      apiKey,
-      model,
+    const opts = {
+      apiKey: choice.apiKey,
+      model: choice.model,
       prompt: userTurn,
       system,
-      cacheTtl: "1h",
+      cacheTtl: "1h" as const,
       maxTokens: 8192,
-    });
+    };
+    const stream = choice.provider
+      ? await streamProvider(choice.provider, opts, choice)
+      : await streamAnthropic({ ...opts, effort: choice.effort });
     return new Response(stream, {
       headers: {
         "Content-Type": "text/event-stream",

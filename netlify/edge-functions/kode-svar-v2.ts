@@ -1,5 +1,7 @@
 import { messageAnthropic, streamAnthropic } from "./_lib/anthropic.ts";
 import { extractByokKey, gate, upstreamErrorResponse, type IpContext } from "./_lib/auth.ts";
+import { resolveLlm } from "./_lib/llm-choice.ts";
+import { messageProvider, streamProvider } from "./_lib/providers/single.ts";
 import { buildCachedPrefix, coerceMode, type GenMode } from "./kode-svar.ts";
 import {
   type CatalogMeta,
@@ -20,6 +22,9 @@ import {
 // ====================================================================
 
 interface RequestBody {
+  // multi-provider-runden 2026-08-27: valgfri egen leverandør + kvalitetsnivå.
+  provider?: unknown;
+  quality?: unknown;
   question: string;
   lang?: "no" | "en";
   script?: string;
@@ -99,7 +104,7 @@ function inlineLabelCount(v: Record<string, unknown> | undefined): number {
 }
 
 export default async (request: Request, context: IpContext): Promise<Response> => {
-  const gateResp = await gate(request, { endpoint: "kode-svar-v2", maxBodyBytes: 50_000, allowByok: true }, context);
+  const gateResp = await gate(request, { endpoint: "kode-svar-v2", maxBodyBytes: 50_000, allowByok: true, allowLlmKey: true }, context);
   if (gateResp) return gateResp;
 
   let body: RequestBody;
@@ -112,13 +117,14 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   if (!question) return new Response("Missing question", { status: 400 });
 
   const byokKey = extractByokKey(request);
-  const apiKey = byokKey ?? Deno.env.get("ANTHROPIC_API_KEY");
-  const model = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-4-6";
-  const pickerModel = Deno.env.get("PICKER_MODEL") ?? "claude-haiku-4-5-20251001";
-  if (!apiKey) {
-    console.error("ANTHROPIC_API_KEY is not set");
-    return new Response("Server configuration error", { status: 500 });
-  }
+  // To kallsteder, to valg: plukkepasset er sitt eget (billig modell, ALDRI
+  // effort — det ville vært en 400 på Haiku). På leverandørveien har brukeren
+  // bare ÉN modell konfigurert, så begge passene kjører den samme; det står i
+  // innstillingenes hjelpetekst framfor å være en stille overraskelse.
+  const choice = resolveLlm(request, body, "kode-svar-v2");
+  if (choice instanceof Response) return choice;
+  const pickerChoice = resolveLlm(request, body, "picker");
+  if (pickerChoice instanceof Response) return pickerChoice;
 
   const origin = new URL(request.url).origin;
   const mode: GenMode = coerceMode(body.mode);
@@ -137,14 +143,17 @@ export default async (request: Request, context: IpContext): Promise<Response> =
       priorScript ? `\nForrige skript som feilet:\n${priorScript}` : ``,
       errors ? `\nValideringsfeil:\n${errors}` : ``,
     ].filter(Boolean);
-    const picked = await messageAnthropic({
-      apiKey,
-      model: pickerModel,
+    const pickOpts = {
+      apiKey: pickerChoice.apiKey,
+      model: pickerChoice.model,
       system: `${PICKER_INSTRUCTIONS}\n\n${nameList}`,
       prompt: pickPromptParts.join("\n"),
-      cacheTtl: "1h",
+      cacheTtl: "1h" as const,
       maxTokens: 512,
-    });
+    };
+    const picked = pickerChoice.provider
+      ? await messageProvider(pickerChoice.provider, pickOpts, pickerChoice)
+      : await messageAnthropic(pickOpts);
     const names = groundNames(parsePickerResponse(picked.text), meta, 25);
     // On-demand codelists for picked vars whose inline labels are absent/short.
     const codelists: CodelistMap = {};
@@ -175,14 +184,17 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   ].filter((s) => s !== ``).join("\n");
 
   try {
-    const stream = await streamAnthropic({
-      apiKey,
-      model,
+    const opts = {
+      apiKey: choice.apiKey,
+      model: choice.model,
       prompt: userTurn,
       system,
-      cacheTtl: "1h",
+      cacheTtl: "1h" as const,
       maxTokens: 8192,
-    });
+    };
+    const stream = choice.provider
+      ? await streamProvider(choice.provider, opts, choice)
+      : await streamAnthropic({ ...opts, effort: choice.effort });
     return new Response(stream, {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
     });
