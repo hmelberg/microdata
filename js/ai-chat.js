@@ -86,6 +86,8 @@
          'aiIncludeScript',
          'aiSettingsBackdrop','aiCfgAnthropicKey','aiCfgSave','aiCfgCancel',
          'aiCfgByokStored','aiCfgByokRemove',
+         'aiCfgProviderType','aiCfgAnthropicSection','aiCfgProviderFields',
+         'aiCfgProviderUrl','aiCfgProviderModel','aiCfgLlmKey','aiCfgQuality',
          'sidebarRight','sidebarOpenTab','scriptInput'
         ].forEach(id => { dom[id] = $(id); });
         dom.containers = document.querySelectorAll('.container');
@@ -1397,8 +1399,68 @@
         if (window.mdSyncWebBtnVisibility) window.mdSyncWebBtnVisibility();
       }
 
+      // Presets er BARE bekvemmelighet — de tre TYPENE er kontrakten, og en
+      // leverandør som ikke står her nås fortsatt via «Annen» + egen URL.
+      // Ingen vendor-liste å vedlikeholde: openai-compat er protokollen så å
+      // si alle implementerer.
+      const PROVIDER_PRESETS = [
+        { id: 'anthropic',  label: 'Anthropic',                  type: null },
+        { id: 'openai',     label: 'OpenAI',                     type: 'openai-responses', url: 'https://api.openai.com/v1',        model: 'gpt-5.6' },
+        { id: 'mistral',    label: 'Mistral',                    type: 'openai-compat',    url: 'https://api.mistral.ai/v1',        model: 'mistral-large-latest' },
+        { id: 'groq',       label: 'Groq',                       type: 'openai-compat',    url: 'https://api.groq.com/openai/v1',   model: '' },
+        { id: 'deepseek',   label: 'DeepSeek',                   type: 'openai-compat',    url: 'https://api.deepseek.com/v1',      model: 'deepseek-chat' },
+        { id: 'openrouter', label: 'OpenRouter',                 type: 'openai-compat',    url: 'https://openrouter.ai/api/v1',     model: '' },
+        { id: 'anthropic-gw', label: 'Anthropic-kompatibel gateway', type: 'anthropic-compat', url: '',                             model: '' },
+        { id: 'other',      label: 'Annen (OpenAI-kompatibel)',  type: 'openai-compat',    url: '',                                 model: '' }
+      ];
+      function presetById(id) {
+        for (var i = 0; i < PROVIDER_PRESETS.length; i++) {
+          if (PROVIDER_PRESETS[i].id === id) return PROVIDER_PRESETS[i];
+        }
+        return PROVIDER_PRESETS[0];
+      }
+      /** Hvilket preset svarer til lagret config? Matcher på type+URL. */
+      function presetForConfig(cfg) {
+        if (!cfg) return PROVIDER_PRESETS[0];
+        for (var i = 1; i < PROVIDER_PRESETS.length; i++) {
+          var pr = PROVIDER_PRESETS[i];
+          if (pr.type === cfg.type && pr.url && pr.url === cfg.base_url) return pr;
+        }
+        for (var j = 1; j < PROVIDER_PRESETS.length; j++) {
+          if (PROVIDER_PRESETS[j].type === cfg.type && !PROVIDER_PRESETS[j].url) return PROVIDER_PRESETS[j];
+        }
+        return PROVIDER_PRESETS[PROVIDER_PRESETS.length - 1];
+      }
+
+      function fillProviderSelect() {
+        var sel = dom.aiCfgProviderType;
+        if (!sel || sel.options.length) return;
+        for (var i = 0; i < PROVIDER_PRESETS.length; i++) {
+          var o = document.createElement('option');
+          o.value = PROVIDER_PRESETS[i].id;
+          o.textContent = PROVIDER_PRESETS[i].label;
+          sel.appendChild(o);
+        }
+      }
+
+      /** Vis Anthropic-feltet ELLER de tre leverandørfeltene, aldri begge. */
+      function syncProviderFields() {
+        var isAnthropic = !dom.aiCfgProviderType || dom.aiCfgProviderType.value === 'anthropic';
+        if (dom.aiCfgAnthropicSection) dom.aiCfgAnthropicSection.style.display = isAnthropic ? '' : 'none';
+        if (dom.aiCfgProviderFields) dom.aiCfgProviderFields.style.display = isAnthropic ? 'none' : '';
+      }
+
       function openSettings() {
+        fillProviderSelect();
         if (dom.aiCfgAnthropicKey) dom.aiCfgAnthropicKey.value = state.anthropicKey;
+        var cfg = providerConfig();
+        var pr = presetForConfig(cfg);
+        if (dom.aiCfgProviderType) dom.aiCfgProviderType.value = pr.id;
+        if (dom.aiCfgProviderUrl) dom.aiCfgProviderUrl.value = cfg ? cfg.base_url : (pr.url || '');
+        if (dom.aiCfgProviderModel) dom.aiCfgProviderModel.value = cfg ? cfg.model : (pr.model || '');
+        if (dom.aiCfgLlmKey) dom.aiCfgLlmKey.value = state.llmKey;
+        if (dom.aiCfgQuality) dom.aiCfgQuality.value = aiQuality();
+        syncProviderFields();
         refreshUserPanel();
         dom.aiSettingsBackdrop.classList.add('open');
       }
@@ -1407,7 +1469,37 @@
         const akey = dom.aiCfgAnthropicKey ? dom.aiCfgAnthropicKey.value.trim() : '';
         if (akey) localStorage.setItem(LS_KEY_ANTHROPIC, akey);
         else localStorage.removeItem(LS_KEY_ANTHROPIC);
-        // BYOK-nøkkelen påvirker Web-knappens synlighet (webModeEligible).
+
+        var id = dom.aiCfgProviderType ? dom.aiCfgProviderType.value : 'anthropic';
+        var pr = presetById(id);
+        if (!pr.type) {
+          // Anthropic valgt: fjern leverandøren helt, ellers ville en gammel
+          // lagret config fortsatt vunnet presedensen i edgeAuthHeaders.
+          try { localStorage.removeItem(LS_KEY_PROVIDER); localStorage.removeItem(LS_KEY_LLM); } catch (e) {}
+        } else {
+          var url = (dom.aiCfgProviderUrl ? dom.aiCfgProviderUrl.value : '').trim().replace(/\/+$/, '');
+          var model = (dom.aiCfgProviderModel ? dom.aiCfgProviderModel.value : '').trim();
+          var lkey = (dom.aiCfgLlmKey ? dom.aiCfgLlmKey.value : '').trim();
+          try {
+            if (url && model) {
+              localStorage.setItem(LS_KEY_PROVIDER, JSON.stringify({ type: pr.type, base_url: url, model: model }));
+            } else {
+              // Ufullstendig config lagres ikke: providerConfig() ville
+              // returnert null uansett, og en halvlagret leverandør er en
+              // innstilling som ser satt ut men ikke virker.
+              localStorage.removeItem(LS_KEY_PROVIDER);
+            }
+            if (lkey) localStorage.setItem(LS_KEY_LLM, lkey);
+            else localStorage.removeItem(LS_KEY_LLM);
+          } catch (e) {}
+        }
+
+        try {
+          var q = dom.aiCfgQuality ? dom.aiCfgQuality.value : 'balanced';
+          localStorage.setItem(LS_KEY_QUALITY, (q === 'fast' || q === 'best') ? q : 'balanced');
+        } catch (e) {}
+
+        // Legitimasjonen påvirker Web-knappens synlighet (webModeEligible).
         if (window.mdSyncWebBtnVisibility) window.mdSyncWebBtnVisibility();
         closeSettings();
       }
@@ -1427,6 +1519,21 @@
         dom.aiClearBtn.addEventListener('click', clearChat);
         dom.aiCfgSave.addEventListener('click', saveSettings);
         dom.aiCfgCancel.addEventListener('click', closeSettings);
+        if (dom.aiCfgProviderType) {
+          dom.aiCfgProviderType.addEventListener('change', function () {
+            // Bytt preset → fyll URL/modell, men BARE når feltet er tomt eller
+            // bar forrige presets verdi: en bruker som har skrevet sin egen
+            // URL skal ikke få den overskrevet av et uhell med nedtrekkslista.
+            var pr = presetById(dom.aiCfgProviderType.value);
+            if (pr.type && dom.aiCfgProviderUrl && !dom.aiCfgProviderUrl.value.trim()) {
+              dom.aiCfgProviderUrl.value = pr.url || '';
+            }
+            if (pr.type && dom.aiCfgProviderModel && !dom.aiCfgProviderModel.value.trim()) {
+              dom.aiCfgProviderModel.value = pr.model || '';
+            }
+            syncProviderFields();
+          });
+        }
         dom.aiSettingsBackdrop.addEventListener('click', (e) => {
           if (e.target === dom.aiSettingsBackdrop) closeSettings();
         });
