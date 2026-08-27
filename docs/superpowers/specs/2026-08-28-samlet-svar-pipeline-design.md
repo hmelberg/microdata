@@ -155,6 +155,13 @@ knapperad i chatvinduet.
 - **FEIL-linja i prosessloggen** porteres (askstat-spec 2026-08-15 §1: tre
   blinddiagnose-runder før kjørefeil ble synlige for mennesker).
 
+### 4b. Svarformat-arv fra v2
+
+v2s `SVARFORMAT_TILLEGG` («Vurderinger og forslag»: mekanisme-kandidater,
+forbehold, forslag til videre analyser) videreføres i det samlede svarformatet —
+det er den pedagogisk verdifulle delen av v2, uavhengig av picker-passet som
+utgår.
+
 ### 5. Det syntetiske premisset (må skrives nytt — kan ikke kopieres)
 
 Emulatoren kjører på syntetiske data. Systemprompten sier det eksplisitt, og
