@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { assemblePrefix, coerceMode } from "../kode-svar.ts";
+import { assemblePrefix, coerceMode } from "./prefiks.ts";
 
 const PARTS = { catalogBlock: "CATX", kommuneBlock: "KOMX", commandBlock: "CMDX", functionBlock: "FNX" };
 

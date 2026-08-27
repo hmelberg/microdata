@@ -2,7 +2,7 @@ import { messageAnthropic, streamAnthropic } from "./_lib/anthropic.ts";
 import { extractByokKey, gate, upstreamErrorResponse, type IpContext } from "./_lib/auth.ts";
 import { resolveLlm } from "./_lib/llm-choice.ts";
 import { messageProvider, streamProvider } from "./_lib/providers/single.ts";
-import { buildCachedPrefix, coerceMode, type GenMode } from "./kode-svar.ts";
+import { buildCachedPrefix, coerceMode, type GenMode } from "./_lib/prefiks.ts";
 import {
   type CatalogMeta,
   type CodelistMap,
