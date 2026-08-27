@@ -54,7 +54,7 @@ See `personvern.html` for the full privacy statement.
 | `protect.py` | `scrub-*` data-protection verbs (noise, swap, k-anon, risk, …) — a local disclosure-control toolkit you can call on your own scripts; no server involved. |
 | `mockdata_export.py`, `static_source.py`, `build_static_data.py` | Static synthetic-data build (Parquet/DuckDB) + the static data source. |
 | `py2m/`, `r2m/` | Python→microdata and R→microdata translators (each with its own runner + tests). |
-| `netlify/edge-functions/` | The AI endpoints (`dm-vurder`, `kode-svar`, `kode-svar-v2`, `tolk-resultat`, `data-svar`, `hent`) + shared `_lib/`. All accept a BYOK Anthropic key (`X-Anthropic-Key`) or a custom-provider key
+| `netlify/edge-functions/` | The AI endpoints (`svar` — the unified agentic pipeline with in-emulator `run_code`, `dm-vurder`, `tolk-resultat`, `hent`) + shared `_lib/`. All accept a BYOK Anthropic key (`X-Anthropic-Key`) or a custom-provider key
 (`X-Llm-Key` plus a complete `provider` body) — no account/token required. |
 | `manual_scripts/` | End-to-end example scripts run as a smoke suite. |
 | `tests/` | pytest suite (engine, regressions, equivalence, mock-data, performance). |

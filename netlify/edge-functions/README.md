@@ -2,23 +2,20 @@
 
 AI-endepunkter (se `netlify.toml` for path-mapping):
 
-- `dm-vurder` → `/api/dm-vurder` — personvern-/dataminimerings-vurdering av et script
-- `kode-svar` → `/api/kode-svar` — AI-assistent som genererer/forklarer microdata-kode
-- `kode-svar-v2` → `/api/kode-svar-v2` — eksperimentell 2-stegs variant: en
-  «variabel-velger»-modell (env `PICKER_MODEL`, standard rask Haiku) plukker
-  relevante variabler som vises med full kodeliste i generasjons-prompten;
-  klienten kjører én auto-rettingsrunde mot lokal Pyodide-validering. v1
-  (`kode-svar`) er urørt, og v2 degraderer til v1-lik oppførsel hvis velgeren feiler.
-- `tolk-resultat` → `/api/tolk-resultat` — tolker output fra en kjøring
-- `data-svar` → `/api/data-svar` — Web-modus (kun admin): agentisk tool-loop
-  (search_catalog/table_metadata/probe + web_search) som finner åpne data og
-  genererer python/r/duckdb-script med connect/load-direktiver. SSE-events:
-  progress/text/sources/continue/done/error. Fortsettelsesprotokoll: Netlify
+- `svar` → `/api/svar` — den samlede AI-pipelinen (spec 2026-08-28): ETT
+  agentisk løp der modellen skriver script, får dem KJØRT i emulatoren via
+  klientutført `run_code`, slår opp variabler med `variabel_info`, og svarer
+  basert på faktiske kjøringsresultater. SSE-events:
+  progress/text/run_code/continue/done/error. Fortsettelsesprotokoll: Netlify
   har CPU-tak per invokasjon, så serveren kjører én API-tur per POST og
-  avslutter med `{type:"continue", state, probed}` når den ikke er ferdig;
-  klienten re-POSTer samme body pluss `resume:{state, probed}` til svaret
-  kommer. Prompt-kilde: `prompts/data-svar.md`;
-  register: `data/data-sources.json`; evalsett: `docs/eval/data-svar-evalsett.md`.
+  avslutter med `{type:"continue", state, run_ok_calls}` når den ikke er
+  ferdig; klienten re-POSTer samme body pluss `resume` (og `run_result` etter
+  en kjøring) til svaret kommer. Kvalitetsvelgeren styrer modell/effort OG
+  rundebudsjett (8/3 · 12/4 · 20/6). Instruks: `_lib/svar-instruks.ts`;
+  prefiks: `_lib/prefiks.ts`; evalsett: `docs/eval/svar-evalsett.md`.
+  (Erstattet kode-svar/kode-svar-v2/data-svar 2026-08-28.)
+- `dm-vurder` → `/api/dm-vurder` — personvern-/dataminimerings-vurdering av et script
+- `tolk-resultat` → `/api/tolk-resultat` — tolker output fra en kjøring
 - `hent` → `/api/hent?url=…[&body=…]` — SSRF-herdet GET-proxy (kun admin).
   Injiserer API-nøkler server-side for register-kilder (host-matchet);
   `body` GET-innpakker POST-json (PxWeb v1 o.l.).
@@ -35,9 +32,9 @@ AI-endepunkter (se `netlify.toml` for path-mapping):
      for den delte, og passordet er UNNTATT ratelimiten (feilgjetninger
      rate-limites fortsatt). Personlig passord uten personlig nøkkel er 500
      med vilje.
-   - `FRED_API_KEY` (valgfri) — server-side nøkkel `hent`/`data-svar` injiserer
+   - `FRED_API_KEY` (valgfri) — server-side nøkkel `hent` injiserer
      for FRED-kilder i registeret (host-matchet, aldri sendt til klienten).
-   - `DATA_SVAR_MODEL` (valgfri) — override av modellen `data-svar` bruker
+   - `SVAR_MODEL` (valgfri) — override av modellen `/api/svar` bruker
      (standard: samme som `ANTHROPIC_MODEL`/`claude-sonnet-5`).
 
 ## Start lokal dev-server
@@ -80,7 +77,7 @@ Innholdet er norsk markdown (Klassifisering, Samlet vurdering, Observasjoner).
 
 ## Struktur
 
-- `dm-vurder.ts`, `kode-svar.ts`, `tolk-resultat.ts` — endepunktene
+- `svar.ts`, `dm-vurder.ts`, `tolk-resultat.ts` — endepunktene
 - `_lib/auth.ts` — felles request-gate (auth + rate-limit + body-guard)
 - `_lib/rate-limit.ts` — per-IP token-bucket (Netlify Blobs; failer åpent)
 - `_lib/anthropic.ts` — Anthropic streaming-klient (timeout + 429/529-retry)

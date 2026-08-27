@@ -1,3 +1,8 @@
+<!-- ENDEPUNKTET ER ERSTATTET av /api/svar (samlet svar-pipeline,
+2026-08-28) — data-svar.ts er slettet. Dokumentet BEHOLDES som kildedok/
+endringslogg og synk-anker (prompts.py-kontrakten); prefiks-delene lever
+videre i _lib/prefiks.ts og løkke-instruksen i _lib/svar-instruks.ts. -->
+
 <!-- KILDE for data-svar-edge-funksjonen (Web-modus: generelle dataspørsmål
 mot åpne kilder). TS-konstantene i _lib/data-svar-prompt.ts er render-målet;
 denne fila er kildedokument + endringslogg (samme mønster som kode-svar.md).

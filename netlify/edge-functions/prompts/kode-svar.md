@@ -1,3 +1,8 @@
+<!-- ENDEPUNKTET ER ERSTATTET av /api/svar (samlet svar-pipeline,
+2026-08-28) — kode-svar.ts er slettet. Dokumentet BEHOLDES som kildedok/
+endringslogg og synk-anker (prompts.py-kontrakten); prefiks-delene lever
+videre i _lib/prefiks.ts og løkke-instruksen i _lib/svar-instruks.ts. -->
+
 <!-- KILDE for kode-svar-edge-funksjonen (rask, enkelt-svar kode-AI).
 Reglene her er en kondensert kopi av kjernen i
 microdata-api/server_code/prompts.py (SYSTEM_PROMPT, GRAMMAR_CHEATSHEET,

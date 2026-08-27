@@ -14,13 +14,7 @@
 
 export type Quality = "fast" | "balanced" | "best";
 
-export type CallSite =
-  | "kode-svar"
-  | "kode-svar-v2"
-  | "picker"
-  | "dm-vurder"
-  | "tolk-resultat"
-  | "data-svar" | "svar";
+export type CallSite = "dm-vurder" | "tolk-resultat" | "svar";
 
 export interface ModelChoice {
   model: string;
@@ -42,19 +36,13 @@ const TIERS: Record<Quality, ModelChoice> = {
 // Per kallsted når brukeren ikke har valgt noe. tolk-resultat tolker output
 // som ALLEREDE er beregnet — den trenger ikke samme dybde som kodegenerering.
 const DEFAULTS: Record<CallSite, ModelChoice> = {
-  "kode-svar": { model: "claude-sonnet-5", effort: "high" },
-  "kode-svar-v2": { model: "claude-sonnet-5", effort: "high" },
-  "picker": { model: "claude-haiku-4-5" },
   "dm-vurder": { model: "claude-sonnet-5", effort: "high" },
   "tolk-resultat": { model: "claude-sonnet-5", effort: "medium" },
-  "data-svar": { model: "claude-sonnet-5", effort: "high" },
   "svar": { model: "claude-sonnet-5", effort: "high" },
 };
 
 /** Env-navnet som overstyrer modellen for dette kallstedet, i prioritert rekkefølge. */
 function envKeysFor(site: CallSite): string[] {
-  if (site === "picker") return ["PICKER_MODEL"];
-  if (site === "data-svar") return ["DATA_SVAR_MODEL", "ANTHROPIC_MODEL"];
   if (site === "svar") return ["SVAR_MODEL", "ANTHROPIC_MODEL"];
   return ["ANTHROPIC_MODEL"];
 }
@@ -71,12 +59,6 @@ export function chooseModel(
   quality: Quality | null,
   env: (k: string) => string | undefined,
 ): ModelChoice {
-  // picker er sitt eget spor: alltid det billige passet, aldri effort.
-  if (site === "picker") {
-    const override = env("PICKER_MODEL");
-    return { model: override || DEFAULTS.picker.model };
-  }
-
   const base = quality ? TIERS[quality] : DEFAULTS[site];
   let model = base.model;
   for (const key of envKeysFor(site)) {

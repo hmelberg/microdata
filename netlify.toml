@@ -73,14 +73,6 @@
   path = "/api/dm-vurder"
 
 [[edge_functions]]
-  function = "kode-svar"
-  path = "/api/kode-svar"
-
-[[edge_functions]]
-  function = "kode-svar-v2"
-  path = "/api/kode-svar-v2"
-
-[[edge_functions]]
   function = "tolk-resultat"
   path = "/api/tolk-resultat"
 
@@ -88,6 +80,3 @@
   function = "hent"
   path = "/api/hent"
 
-[[edge_functions]]
-  function = "data-svar"
-  path = "/api/data-svar"
