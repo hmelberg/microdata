@@ -99,7 +99,7 @@ export function chooseModel(
 //
 // askstat håndhever den i én handler; microdata har fem, så den bor her.
 
-import { extractByokKey, extractLlmKey } from "./auth.ts";
+import { extractByokKey, extractLlmKey, timingSafeEqual } from "./auth.ts";
 import { type ProviderConfig, parseProviderConfig } from "./providers/config.ts";
 
 export interface LlmChoice {
@@ -138,7 +138,27 @@ export function resolveLlm(
     );
   }
 
-  const apiKey = provider?.key ?? byokKey ?? env("ANTHROPIC_API_KEY");
+  // To passord → to servernøkler: matcher Bearer-tokenet det PERSONLIGE
+  // passordet, brukes ANTHROPIC_API_KEY_PERSONAL i stedet for den delte
+  // nøkkelen. Porten har allerede autentisert forespørselen — her klassifiseres
+  // den bare. Mangler den personlige nøkkelen er det 500, ALDRI stille
+  // fallback til den delte (feil regning er verre enn feilmelding).
+  const authHeader = request.headers.get("authorization") ?? "";
+  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+  const personalPass = env("M2PY_ACCESS_TOKEN_PERSONAL");
+  let serverKey = env("ANTHROPIC_API_KEY");
+  if (
+    !provider && !byokKey && personalPass && bearer &&
+    timingSafeEqual(bearer, personalPass)
+  ) {
+    serverKey = env("ANTHROPIC_API_KEY_PERSONAL");
+    if (!serverKey) {
+      console.error("ANTHROPIC_API_KEY_PERSONAL is not set");
+      return new Response("Server configuration error", { status: 500 });
+    }
+  }
+
+  const apiKey = provider?.key ?? byokKey ?? serverKey;
   if (!apiKey) {
     console.error("ANTHROPIC_API_KEY is not set");
     return new Response("Server configuration error", { status: 500 });

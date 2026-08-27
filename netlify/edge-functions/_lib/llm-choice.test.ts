@@ -149,3 +149,39 @@ Deno.test("picker site never gets effort even through resolveLlm", () => {
   assertEquals(c.model, "claude-haiku-4-5");
   assertEquals(c.effort, undefined);
 });
+
+// ── to passord → to servernøkler (2026-08-28) ─────────────────────────────
+const twoKeyEnv = (k: string): string | undefined =>
+  ({
+    ANTHROPIC_API_KEY: "server-key",
+    ANTHROPIC_API_KEY_PERSONAL: "personal-key",
+    M2PY_ACCESS_TOKEN: "delt-pass",
+    M2PY_ACCESS_TOKEN_PERSONAL: "privat-pass",
+  } as Record<string, string | undefined>)[k];
+
+Deno.test("personal password selects the personal server key", () => {
+  const c = resolveLlm(reqWith({ authorization: "Bearer privat-pass" }), {}, "kode-svar", twoKeyEnv) as LlmChoice;
+  assertEquals(c.apiKey, "personal-key");
+});
+
+Deno.test("shared password still selects the shared server key", () => {
+  const c = resolveLlm(reqWith({ authorization: "Bearer delt-pass" }), {}, "kode-svar", twoKeyEnv) as LlmChoice;
+  assertEquals(c.apiKey, "server-key");
+});
+
+Deno.test("personal password with no personal key is 500 — never the shared key", () => {
+  const env = (k: string): string | undefined =>
+    k === "ANTHROPIC_API_KEY" ? "server-key"
+    : k === "M2PY_ACCESS_TOKEN_PERSONAL" ? "privat-pass"
+    : undefined;
+  const r = resolveLlm(reqWith({ authorization: "Bearer privat-pass" }), {}, "kode-svar", env);
+  assertEquals((r as Response).status, 500);
+});
+
+Deno.test("byok key wins over the personal password", () => {
+  const c = resolveLlm(
+    reqWith({ "x-anthropic-key": "sk-ant-user", authorization: "Bearer privat-pass" }),
+    {}, "kode-svar", twoKeyEnv,
+  ) as LlmChoice;
+  assertEquals(c.apiKey, "sk-ant-user");
+});

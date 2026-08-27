@@ -110,6 +110,12 @@ export interface GateOptions {
 
 export interface GateDeps {
   sharedToken?: string;
+  /**
+   * Hans' private tilgangspassord (M2PY_ACCESS_TOKEN_PERSONAL). Autentiserer
+   * på lik linje med sharedToken; resolveLlm bruker i tillegg matchen til å
+   * velge ANTHROPIC_API_KEY_PERSONAL i stedet for den delte servernøkkelen.
+   */
+  personalToken?: string;
   checkRateLimit: (
     endpoint: string,
     ip: string,
@@ -187,6 +193,15 @@ async function runBaseChecks(
   return { presentedToken, failure: null };
 }
 
+/** True when the token matches the shared or the personal password. */
+function matchesConfiguredToken(
+  token: string,
+  deps: { sharedToken?: string; personalToken?: string },
+): boolean {
+  return (!!deps.sharedToken && timingSafeEqual(token, deps.sharedToken)) ||
+    (!!deps.personalToken && timingSafeEqual(token, deps.personalToken));
+}
+
 /**
  * Core gate logic with injected dependencies (testable). Returns a Response to
  * short-circuit the request, or null when the caller should proceed.
@@ -213,10 +228,11 @@ export async function runGate(
   // Bearer token are present, BYOK wins and the token is never validated.
   if (byokKey !== null || llmKey !== null) return null;
 
-  // 5. auth: cheap shared-token (constant-time) -> positive cache -> Anvil
+  // 5. auth: cheap configured passwords (constant-time) -> positive cache
+  // -> Anvil
   const now = deps.now();
   let authenticated = false;
-  if (deps.sharedToken && timingSafeEqual(presentedToken, deps.sharedToken)) {
+  if (matchesConfiguredToken(presentedToken, deps)) {
     authenticated = true;
   }
   if (!authenticated) {
@@ -271,6 +287,7 @@ export function gate(request: Request, opts: GateOptions, context?: IpContext): 
   const anvilUrl = Deno.env.get("M2PY_ANVIL_VALIDATE_URL") ?? ANVIL_DEFAULT_URL;
   return runGate(request, opts, {
     sharedToken: Deno.env.get("M2PY_ACCESS_TOKEN") ?? undefined,
+    personalToken: Deno.env.get("M2PY_ACCESS_TOKEN_PERSONAL") ?? undefined,
     checkRateLimit: defaultCheckRateLimit,
     validateToken: makeAnvilValidator(anvilUrl),
     now: () => Date.now(),
@@ -313,6 +330,8 @@ export function makeAnvilUserFetcher(
 
 export interface AdminGateDeps {
   sharedToken?: string;
+  /** Se GateDeps.personalToken — samme rolle, teller også som admin. */
+  personalToken?: string;
   checkRateLimit: GateDeps["checkRateLimit"];
   fetchUser: (token: string) => Promise<UserInfo>;
   now: () => number;
@@ -344,7 +363,7 @@ export async function runAdminGate(
 
   const now = deps.now();
   let info: UserInfo | null = null;
-  if (deps.sharedToken && timingSafeEqual(presentedToken, deps.sharedToken)) {
+  if (matchesConfiguredToken(presentedToken, deps)) {
     info = { ok: true, isAdmin: true };
   }
   if (!info) {
@@ -369,6 +388,7 @@ export function adminGate(request: Request, opts: GateOptions, context?: IpConte
   const anvilUrl = Deno.env.get("M2PY_ANVIL_VALIDATE_URL") ?? ANVIL_DEFAULT_URL;
   return runAdminGate(request, opts, {
     sharedToken: Deno.env.get("M2PY_ACCESS_TOKEN") ?? undefined,
+    personalToken: Deno.env.get("M2PY_ACCESS_TOKEN_PERSONAL") ?? undefined,
     checkRateLimit: defaultCheckRateLimit,
     fetchUser: makeAnvilUserFetcher(anvilUrl),
     now: () => Date.now(),

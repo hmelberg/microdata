@@ -34,9 +34,12 @@ and cannot reach the user's machine, and `ssrf.ts` deliberately blocks
 
 Power-user localStorage switches (no UI by design, set them directly):
 `md_ai_autorun=1` skips the run-confirmation for generated scripts, and
-`md_access_token=<password>` sends the shared `M2PY_ACCESS_TOKEN` as a Bearer
-token so the AI features work against the server's own key without a personal
-one.
+`md_access_token=<password>` sends an access password (`M2PY_ACCESS_TOKEN`,
+or `M2PY_ACCESS_TOKEN_PERSONAL` which bills the server's personal key instead
+of the shared one) as a Bearer token so the AI features work against a
+server-side key. Passwords can also be typed straight into the AI-settings
+dialog (hamburger menu) — anything not starting with `sk-ant-` is treated as
+a password.
 
 See `personvern.html` for the full privacy statement.
 

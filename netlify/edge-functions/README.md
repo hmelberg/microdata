@@ -29,10 +29,14 @@ AI-endepunkter (se `netlify.toml` for path-mapping):
 2. Sett env-vars: `cp .env.example .env`, fyll inn `ANTHROPIC_API_KEY` og
    `M2PY_ACCESS_TOKEN` (delt token for lokal/admin-tilgang). Samme variabler må
    settes i Netlify-konsollen før prod-deploy.
+   - `M2PY_ACCESS_TOKEN_PERSONAL` + `ANTHROPIC_API_KEY_PERSONAL` (valgfrie) —
+     et andre passord-nivå: det personlige passordet autentiserer likt (og
+     teller som admin), men forbruket går på den personlige nøkkelen i stedet
+     for den delte. Personlig passord uten personlig nøkkel er 500 med vilje.
    - `FRED_API_KEY` (valgfri) — server-side nøkkel `hent`/`data-svar` injiserer
      for FRED-kilder i registeret (host-matchet, aldri sendt til klienten).
    - `DATA_SVAR_MODEL` (valgfri) — override av modellen `data-svar` bruker
-     (standard: samme som `ANTHROPIC_MODEL`/`claude-sonnet-4-6`).
+     (standard: samme som `ANTHROPIC_MODEL`/`claude-sonnet-5`).
 
 ## Start lokal dev-server
 
@@ -47,7 +51,8 @@ Server starter typisk på `http://localhost:8888`.
 Alle tre endepunktene krever `Authorization: Bearer <token>` (felles
 `_lib/auth.ts`-gate: token-sjekk → metode → body-grense → rate-limit → Anvil-
 validering, med konstant-tid-sammenligning og positiv-cache). Bruk det delte
-`M2PY_ACCESS_TOKEN` lokalt, eller et gyldig brukertoken fra Anvil.
+`M2PY_ACCESS_TOKEN`/`M2PY_ACCESS_TOKEN_PERSONAL` lokalt, eller et gyldig
+brukertoken fra Anvil.
 
 ## Test dm-vurder med curl
 

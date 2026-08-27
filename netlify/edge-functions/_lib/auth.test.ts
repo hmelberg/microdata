@@ -343,3 +343,25 @@ Deno.test("extractLlmKey rejects non-ASCII and embedded spaces", () => {
 Deno.test("extractLlmKey returns null when the header is absent", () => {
   assertEquals(extractLlmKey(req({})), null);
 });
+
+// ── to passord: personlig + delt (2026-08-28) ─────────────────────────────
+
+Deno.test("runGate: valid personal token proceeds without calling Anvil", async () => {
+  const deps = makeDeps({ sharedToken: "delt", personalToken: "privat" });
+  const r = await runGate(req({ token: "privat" }), { endpoint: "kode-svar", maxBodyBytes: 1000 }, deps);
+  assertEquals(r, null);
+  assertEquals(deps.calls.validate, 0);
+});
+
+Deno.test("runGate: wrong token is 401 even with both passwords configured", async () => {
+  const deps = makeDeps({ sharedToken: "delt", personalToken: "privat" });
+  const r = await runGate(req({ token: "feil" }), { endpoint: "kode-svar", maxBodyBytes: 1000 }, deps);
+  assertEquals(r?.status, 401);
+});
+
+Deno.test("runAdminGate: personal token is admin without calling Anvil", async () => {
+  const deps = adminDeps({ sharedToken: "delt", personalToken: "privat" });
+  const r = await runAdminGate(req({ token: "privat" }), { endpoint: "data-svar", maxBodyBytes: 1000 }, deps);
+  assertEquals(r, null);
+  assertEquals(deps.calls.fetchUser, 0);
+});
