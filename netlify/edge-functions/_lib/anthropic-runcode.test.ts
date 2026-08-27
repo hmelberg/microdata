@@ -192,3 +192,42 @@ Deno.test("tur-deadline gir ren error-event i stedet for kuttet strøm", async (
   if (!err) throw new Error("error-event mangler: " + JSON.stringify(ev.map((e) => e.type)));
   if (!String(err.message).includes("plattformtaket")) throw new Error("feil melding: " + err.message);
 });
+
+Deno.test("thinking-blokker rekonstrueres MED signatur og rundtures intakte", async () => {
+  // Adaptiv tenking strømmer thinking_delta + signature_delta; en blokk uten
+  // signatur er MALFORMERT ved replay og gir Anthropic 400 på neste hop
+  // (målt i prod 2026-08-28 på sosialhjelp-spørsmålet).
+  const tenkTur = [
+    { type: "message_start", message: { usage: { input_tokens: 8 } } },
+    { type: "content_block_start", index: 0, content_block: { type: "thinking", thinking: "" } },
+    { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "resonnerer…" } },
+    { type: "content_block_delta", index: 0, delta: { type: "signature_delta", signature: "SIG123" } },
+    { type: "content_block_stop", index: 0 },
+    { type: "content_block_start", index: 1, content_block: { type: "tool_use", id: "tk1", name: "variabel_info", input: {} } },
+    { type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: '{"navn":"X"}' } },
+    { type: "content_block_stop", index: 1 },
+    { type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 7 } },
+    { type: "message_stop" },
+  ];
+  const bodies: string[] = [];
+  let call = 0;
+  const fetchImpl = ((_u: string, init?: RequestInit) => {
+    if (init) bodies.push(String(init.body));
+    call++;
+    return Promise.resolve(new Response(
+      sseUpstream(call === 1 ? tenkTur : streamedTextTurn("Svar.")), { status: 200 }));
+  }) as unknown as typeof fetch;
+  const ev = await samle(runAgenticStream({
+    ...BASE,
+    executeTool: () => Promise.resolve("detaljer"),
+    turnsPerCall: 2,
+    deps: { fetchImpl },
+  }));
+  assert(ev.some((e) => e.type === "done"), "done mangler: " + JSON.stringify(ev.map(e => e.type)));
+  // Andre API-kall må bære thinking-blokken KOMPLETT (tekst + signatur).
+  const b2 = JSON.parse(bodies[1]);
+  const assistant = b2.messages.find((m: { role: string }) => m.role === "assistant");
+  const think = assistant.content.find((c: { type: string }) => c.type === "thinking");
+  assertEquals(think.thinking, "resonnerer…");
+  assertEquals(think.signature, "SIG123");
+});

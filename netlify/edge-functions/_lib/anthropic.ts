@@ -462,6 +462,14 @@ async function streamOneTurn(
         partialJson.set(idx, (partialJson.get(idx) ?? "") + String(d.partial_json ?? ""));
       } else if (d.type === "citations_delta" && d.citation) {
         blk.citations = [...(blk.citations as unknown[] ?? []), d.citation];
+      } else if (d.type === "thinking_delta") {
+        // Adaptiv tenking: blokken MÅ rundtures komplett (tekst + signatur) —
+        // en thinking-blokk uten signatur er malformert ved replay og gir 400
+        // på neste hop (målt i prod 2026-08-28). askstat mangler dette
+        // (de sender uten effort); ikke kopiér bort ved synk.
+        blk.thinking = String(blk.thinking ?? "") + String(d.thinking ?? "");
+      } else if (d.type === "signature_delta") {
+        blk.signature = String(blk.signature ?? "") + String(d.signature ?? "");
       }
     } else if (t === "content_block_stop") {
       const idx = obj.index as number;
