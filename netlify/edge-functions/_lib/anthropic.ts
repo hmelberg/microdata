@@ -1,3 +1,5 @@
+import { flushSseBuffer, parseSseFrames } from "./sse-frames.ts";
+
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 
@@ -213,65 +215,38 @@ function transformAnthropicStream(
   return new ReadableStream({
     async start(controller) {
       const reader = upstream.getReader();
+      // One payload handler, used for both the streaming reads and the
+      // end-of-stream drain. These two paths used to be a verbatim
+      // copy-paste of each other (framing AND event handling duplicated),
+      // so a fix to one silently missed the other; framing now lives in
+      // sse-frames.ts and the event vocabulary lives here, once.
+      const handlePayload = (payload: string) => {
+        try {
+          const obj = JSON.parse(payload);
+          if (obj.type === "content_block_delta" && obj.delta?.type === "text_delta") {
+            const out: StreamEvent = { type: "text", text: obj.delta.text };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(out)}\n\n`));
+          } else if (obj.type === "message_start" && obj.message?.usage) {
+            inputTokens = obj.message.usage.input_tokens ?? 0;
+            cacheReadTokens = obj.message.usage.cache_read_input_tokens ?? 0;
+            cacheCreationTokens = obj.message.usage.cache_creation_input_tokens ?? 0;
+          } else if (obj.type === "message_delta" && obj.usage) {
+            outputTokens = obj.usage.output_tokens ?? outputTokens;
+          }
+        } catch (_e) {
+          // ignore non-JSON event data
+        }
+      };
       try {
         while (true) {
           const { value, done } = await reader.read();
           if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          let nlIdx;
-          while ((nlIdx = buffer.indexOf("\n\n")) >= 0) {
-            const event = buffer.slice(0, nlIdx);
-            buffer = buffer.slice(nlIdx + 2);
-            const dataLine = event.split("\n").find((l) => l.startsWith("data:"));
-            if (!dataLine) continue;
-            const payload = dataLine.slice(5).trim();
-            if (!payload || payload === "[DONE]") continue;
-            try {
-              const obj = JSON.parse(payload);
-              if (obj.type === "content_block_delta" && obj.delta?.type === "text_delta") {
-                const out: StreamEvent = { type: "text", text: obj.delta.text };
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(out)}\n\n`));
-              } else if (obj.type === "message_start" && obj.message?.usage) {
-                inputTokens = obj.message.usage.input_tokens ?? 0;
-                cacheReadTokens = obj.message.usage.cache_read_input_tokens ?? 0;
-                cacheCreationTokens = obj.message.usage.cache_creation_input_tokens ?? 0;
-              } else if (obj.type === "message_delta" && obj.usage) {
-                outputTokens = obj.usage.output_tokens ?? outputTokens;
-              }
-            } catch (_e) {
-              // ignore non-JSON event data
-            }
-          }
+          const parsed = parseSseFrames(decoder.decode(value, { stream: true }), buffer);
+          buffer = parsed.buffer;
+          parsed.payloads.forEach(handlePayload);
         }
         // Drain any residual buffer content not yet terminated by \n\n
-        if (buffer.trim()) {
-          buffer += "\n\n";
-          let nlIdx;
-          while ((nlIdx = buffer.indexOf("\n\n")) >= 0) {
-            const event = buffer.slice(0, nlIdx);
-            buffer = buffer.slice(nlIdx + 2);
-            const dataLine = event.split("\n").find((l) => l.startsWith("data:"));
-            if (!dataLine) continue;
-            const payload = dataLine.slice(5).trim();
-            if (!payload || payload === "[DONE]") continue;
-            try {
-              const obj = JSON.parse(payload);
-              if (obj.type === "content_block_delta" && obj.delta?.type === "text_delta") {
-                const out: StreamEvent = { type: "text", text: obj.delta.text };
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(out)}\n\n`));
-              } else if (obj.type === "message_start" && obj.message?.usage) {
-                inputTokens = obj.message.usage.input_tokens ?? 0;
-                cacheReadTokens = obj.message.usage.cache_read_input_tokens ?? 0;
-                cacheCreationTokens = obj.message.usage.cache_creation_input_tokens ?? 0;
-              } else if (obj.type === "message_delta" && obj.usage) {
-                outputTokens = obj.usage.output_tokens ?? outputTokens;
-              }
-            } catch (_e) {
-              // ignore non-JSON event data
-            }
-          }
-        }
+        flushSseBuffer(buffer).forEach(handlePayload);
         const done: StreamEvent = {
           type: "done",
           inputTokens,
