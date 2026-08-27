@@ -332,6 +332,13 @@ export interface AgenticOptions {
   // anthropic-kompatibel gateway, og output_config.effort NØSTET.
   apiBase?: string;
   effort?: string;
+  // run_code-graften (samlet svar-pipeline 2026-08-28, portert fra askstats
+  // native løkke): verktøynavn i clientTools utføres av KLIENTEN — kallet
+  // emitteres som {type:"run_code", script} + continue m/state.pending, og
+  // resultatet kommer tilbake i `runResult` på neste invokasjon.
+  clientTools?: string[];
+  maxRunCode?: number;
+  runResult?: string;
 }
 
 // Everything the loop needs to pick up where a previous invocation stopped.
@@ -412,8 +419,26 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
         usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 },
       };
       const turnsPerCall = opts.turnsPerCall ?? 1;
+      const clientToolNames = new Set(opts.clientTools ?? []);
+      const maxRunCode = opts.maxRunCode ?? 2;
 
       try {
+        // Resume etter run_code: flett klientens resultat inn som tool_result
+        // sammen med eventuelle server-verktøyresultater fra samme tur.
+        // (Portert fra askstats løkke; get_pack-grenen utelatt — microdata
+        // har ikke verktøyet.)
+        if (state.pending) {
+          if (typeof opts.runResult !== "string") {
+            throw new Error("resume med ventende run_code mangler run_result");
+          }
+          const merged = [...state.pending.results,
+            { tool_use_id: state.pending.awaitingId, content: opts.runResult }];
+          state.messages.push({
+            role: "user",
+            content: merged.map((r) => ({ type: "tool_result", tool_use_id: r.tool_use_id, content: r.content })),
+          });
+          delete state.pending;
+        }
         for (let i = 0; i < turnsPerCall; i++) {
           if (state.turn >= maxTurns) throw new Error("tool-loopen nådde maks antall turer");
           const turnLabel = state.turn === 0
@@ -478,8 +503,23 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
           const toolUses = content.filter((b: { type?: string }) => b.type === "tool_use");
           if (json.stop_reason === "tool_use" && toolUses.length) {
             state.messages.push({ role: "assistant", content });
-            const results: Record<string, unknown>[] = [];
+            const results: { tool_use_id: string; content: string }[] = [];
+            // Klientutført verktøy (run_code): utfør ALDRI her — pauser løkka
+            // og overlater kjøringen til klienten via pending/continue.
+            let clientCall: { id: string; name: string; input: Record<string, unknown> } | null = null;
             for (const tu of toolUses) {
+              if (clientToolNames.has(tu.name)) {
+                state.runCalls = (state.runCalls ?? 0) + 1;
+                if (state.runCalls > maxRunCode) {
+                  results.push({ tool_use_id: tu.id, content:
+                    "Kjøre-budsjettet er brukt opp — skriv sluttsvaret NÅ basert på det du allerede vet. Vær ærlig om hva som ikke ble verifisert." });
+                } else if (clientCall) {
+                  results.push({ tool_use_id: tu.id, content: "Kall ett klientverktøy (run_code) én gang per tur." });
+                } else {
+                  clientCall = { id: tu.id, name: tu.name, input: (tu.input ?? {}) as Record<string, unknown> };
+                }
+                continue;
+              }
               state.clientCalls++;
               const label = opts.progressLabel?.(tu.name, tu.input ?? {}) ?? `Kjører ${tu.name} …`;
               emit({ type: "progress", text: label });
@@ -493,9 +533,19 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
                   out = `Verktøyfeil: ${String(e).slice(0, 300)}`;
                 }
               }
-              results.push({ type: "tool_result", tool_use_id: tu.id, content: out });
+              results.push({ tool_use_id: tu.id, content: out });
             }
-            state.messages.push({ role: "user", content: results });
+            if (clientCall) {
+              state.pending = { results, awaitingId: clientCall.id, name: "run_code" };
+              emit({ type: "run_code", script: String(clientCall.input.script ?? "") });
+              emit({ type: "continue", state, ...(opts.continueExtra?.() ?? {}) });
+              controller.close();
+              return;
+            }
+            state.messages.push({
+              role: "user",
+              content: results.map((r) => ({ type: "tool_result", tool_use_id: r.tool_use_id, content: r.content })),
+            });
             continue;
           }
           // Final answer

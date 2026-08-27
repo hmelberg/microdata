@@ -4,7 +4,7 @@
 
 **Goal:** Én Send-knapp og ett agentisk `/api/svar`-løp der modellen kjører microdata-script i emulatoren via klientutført `run_code`, ser resultatene og svarer begrunnet; `kode-svar`/`kode-svar-v2`/`data-svar` slettes.
 
-**Architecture:** Motorlaget (`_lib/anthropic.ts` + `_lib/providers/*`) er BYTE-IDENTISK med askstat og har allerede pending-protokollen (`clientTools`, `maxRunCode`, `runResult`, SSE-event `{type:"run_code",script}`) — det RØRES IKKE. Nytt: `svar.ts`-endepunkt, mikrodata-egen systeminstruks oppå eksisterende `buildCachedPrefix` (ekstraheres til `_lib/prefiks.ts`), `variabel_info`-verktøy, `run-disiplin.ts` COPIED fra askstat, og klientløkke i `js/ai-chat.js`.
+**Architecture:** Provider-laget (`_lib/providers/*`) er byte-identisk med askstat og har run_code-støtten; den native `anthropic.ts`-løkka hadde divergert og fikk run_code-mekanikken portert inn i Task 6b (pending/clientTools/maxRunCode/runResult + `{type:"run_code",script}`-event). Nytt: `svar.ts`-endepunkt, mikrodata-egen systeminstruks oppå eksisterende `buildCachedPrefix` (ekstraheres til `_lib/prefiks.ts`), `variabel_info`-verktøy, `run-disiplin.ts` COPIED fra askstat, og klientløkke i `js/ai-chat.js`.
 
 **Tech Stack:** Deno edge functions (test: `cd netlify/edge-functions && deno check *.ts _lib/*.ts && deno test --allow-all _lib/`), vanilla JS-klient (test: `node --test "tests/js/*.test.js"` — glob-formen, katalogformen feiler).
 

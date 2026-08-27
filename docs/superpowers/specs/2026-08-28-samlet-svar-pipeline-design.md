@@ -38,10 +38,15 @@ modellen utskriften og svarer på spørsmålet, ikke bare på «lag et script».
 
 microdata har allerede askstats transport-skjelett: `runAgenticStream` med
 continue/resume-protokoll (én modell-turn per edge-invokasjon, state re-POSTes),
-verktøybudsjett (`clientCalls`), serverutførte verktøy (`search_catalog`,
-`table_metadata`, `probe`) og hostet websøk — men **uten** `pending`-tilstanden
-som lar et verktøy utføres av KLIENTEN mellom to invokasjoner. Det er den biten
-`run_code` trenger, og den finnes ferdig i askstats `anthropic.ts`/`svar.ts`.
+verktøybudsjett (`clientCalls`), serverutførte verktøy og hostet websøk.
+KORRIGERT UNDER IMPLEMENTERING (2026-08-28): `_lib/providers/*` er identiske
+med askstat og har full run_code-støtte, men `anthropic.ts` hadde DIVERGERT
+(microdata-lokalt: workspaceHeader/effort/sse-frames-refaktoren; askstat-lokalt:
+delta-streaming/apiTarget-redirect-vern) — den native løkka hadde pending-TYPEN
+men manglet MEKANIKKEN. Run_code-mekanikken ble derfor portert målrettet inn i
+microdatas løkkevariant (egen testfil `anthropic-runcode.test.ts`); askstats
+delta-streaming ble bevisst IKKE med. Filene er ikke lenger byte-identiske —
+cherry-pick av motorendringer krever nå manuell diff.
 
 Klienten har på sin side allerede: auto-run med bekreftelse + 3 reparasjonsrunder
 mot den lokale motoren (`webAnswerWithRepair`), script-innsetting i editor, og
