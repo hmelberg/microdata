@@ -20,8 +20,13 @@ Deno.test("Node-trygge moduler rører ikke Deno-globalen", async () => {
   const treff: string[] = [];
   for (const f of NODE_TRYGGE) {
     const src = await Deno.readTextFile(new URL(f, import.meta.url));
-    // Kommentarer og strenger som nevner «Deno» er greit; kall er ikke.
-    if (/\bDeno\.(env|readTextFile|writeTextFile)\b/.test(src)) treff.push(f);
+    // Regelen er absolutt: INGEN Deno.*-tilgang i disse filene, ikke bare de
+    // tre API-ene som var kjent da denne testen ble skrevet. En smalere regex
+    // (f.eks. kun env/readTextFile/writeTextFile) ville sluppet gjennom
+    // Deno.serve, Deno.exit, Deno.cwd, Deno.readFile osv. — reell risiko for
+    // en fil som ellers ser Node-trygg ut. (Kommentert 2026-08-29 etter
+    // review-funn: regexen var for smal, brifen tok feil, ikke reviewen.)
+    if (/\bDeno\.\w+/.test(src)) treff.push(f);
   }
   assertEquals(treff, []);
 });
