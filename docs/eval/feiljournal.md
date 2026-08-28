@@ -5,8 +5,14 @@ STYLE.md-mønster: **hver observasjon appendes som datert entry** (sitat/symptom
 + rotårsak/hypotese + status), og destilleres **periodisk** til promptregler i
 `_lib/svar-instruks.ts` eller kodeendringer — aldri en prompt som bare vokser.
 
-Arbeidsflyt: Hans limer inn feil han treffer i appen; Claude legger til funn
-fra eval-kjøringer (`scripts/eval_svar.py` → `docs/eval/kjoringer/`).
+Arbeidsflyt: TEKNISKE feil fanges AUTOMATISK — kall autentisert med det
+personlige passordet journalføres server-side til Netlify Blobs-storen
+`feiljournal` (hendelser: `sporsmal`, `run_feil`, `feil`; delt passord/BYOK
+journalføres aldri). Les fra repoet med:
+`netlify blobs:list feiljournal` og `netlify blobs:get feiljournal <nøkkel>`.
+KVALITETSDOMMER (dårlige-men-feilfrie svar) kan ikke fanges automatisk — de
+limes inn av Hans med et par ords kommentar. Claude legger til funn fra
+eval-kjøringer (`scripts/eval_svar.py` → `docs/eval/kjoringer/`).
 En entry lukkes med commit-referanse når den er destillert eller fikset.
 Kvalitetsfunn måles mot kriteriene i `svar-evalsett.md` (spesielt #4
 syntetisk-merking, #6 ingen fabrikkerte variabler, #7 syntaksregler).

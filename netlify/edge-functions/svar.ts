@@ -19,6 +19,7 @@ import {
 } from "./_lib/svar-instruks.ts";
 import { type GenMode } from "./_lib/prefiks.ts";
 import { variabelInfo } from "./_lib/tools/variabel-info.ts";
+import { feiljournalStore, journalfor } from "./_lib/feiljournal.ts";
 
 interface ResumeBody { state?: AgenticResumeState; run_ok_calls?: unknown; }
 interface RequestBody {
@@ -99,6 +100,18 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   const choice = resolveLlm(request, body, "svar");
   if (choice instanceof Response) return choice;
 
+  // Personlig-autentisert kall (Hans' private passord): oppstrøms-feildetaljer
+  // følger SSE-error-eventet (skrubbet for API-nøkkelen i anthropic.ts) —
+  // Netlify-live-tail er flyktig, og «Anthropic API error 400» alene er
+  // udiagnostiserbart (thinking-signatur-400-en 2026-08-28 kostet en full
+  // reproduksjonsrunde). Delt passord og BYOK matcher aldri her → generisk.
+  const bearer = (request.headers.get("authorization") ?? "").startsWith("Bearer ")
+    ? (request.headers.get("authorization") ?? "").slice(7).trim()
+    : "";
+  const personligToken = Deno.env.get("M2PY_ACCESS_TOKEN_PERSONAL") ?? "";
+  const erPersonlig = bearer.length > 0 && personligToken.length > 0 &&
+    timingSafeEqual(bearer, personligToken);
+
   // Run-disiplinen (COPIED-kontrakten): OK.-klassifiserte kjøringer teller
   // mot svar-klart-stopp — påminnelse etter første, stenging etter andre.
   let runOkCalls = coerceRunOkCalls(body.resume?.run_ok_calls);
@@ -113,7 +126,21 @@ export default async (request: Request, context: IpContext): Promise<Response> =
 
   const origin = new URL(request.url).origin;
   const mode = coerceMode(body.mode);
-  const budsjett = svarBudsjett(coerceQuality(body.quality) ?? "balanced");
+  const kvalitet = coerceQuality(body.quality) ?? "balanced";
+  const budsjett = svarBudsjett(kvalitet);
+
+  // Feiljournalen (selvforbedringssløyfen 2026-08-28): KUN personlig-
+  // autentisert trafikk journalføres — Hans' egen bruk, hans data. Alt er
+  // best-effort og fire-and-glem (journalfor feiler åpent; isolatet lever så
+  // lenge svarstrømmen gjør, så skrivingene rekker frem).
+  const journal = erPersonlig ? feiljournalStore() : null;
+  const journalHendelse = (type: string, detalj?: string): void => {
+    if (journal) void journalfor(journal, { type, sporsmal: question, detalj, mode, quality: kvalitet });
+  };
+  if (!body.resume) journalHendelse("sporsmal");
+  if (runResultTilLopet !== undefined && klassifiserRunResult(runResultTilLopet) === "feil") {
+    journalHendelse("run_feil", runResultTilLopet);
+  }
   let system: string;
   try {
     system = await buildSvarSystem(origin, mode, {
@@ -144,19 +171,13 @@ export default async (request: Request, context: IpContext): Promise<Response> =
     runResult: runResultTilLopet,
     resume: resumeState,
     continueExtra: () => ({ run_ok_calls: runOkCalls }),
+    // Feiljournal-avlytting: error-events fra løkka. Providers-veien (askstat-
+    // identisk fil) kjenner ikke onEmit og ignorerer nøkkelen — bevisst.
+    onEmit: (ev: Record<string, unknown>) => {
+      if (ev.type === "error") journalHendelse("feil", String(ev.message ?? ""));
+    },
   };
   const providerDeps = { timeoutMs: 180_000, retries: 1 };
-  // Personlig-autentisert kall (Hans' private passord): oppstrøms-feildetaljer
-  // følger SSE-error-eventet (skrubbet for API-nøkkelen i anthropic.ts) —
-  // Netlify-live-tail er flyktig, og «Anthropic API error 400» alene er
-  // udiagnostiserbart (thinking-signatur-400-en 2026-08-28 kostet en full
-  // reproduksjonsrunde). Delt passord og BYOK matcher aldri her → generisk.
-  const bearer = (request.headers.get("authorization") ?? "").startsWith("Bearer ")
-    ? (request.headers.get("authorization") ?? "").slice(7).trim()
-    : "";
-  const personligToken = Deno.env.get("M2PY_ACCESS_TOKEN_PERSONAL") ?? "";
-  const erPersonlig = bearer.length > 0 && personligToken.length > 0 &&
-    timingSafeEqual(bearer, personligToken);
   let inner: ReadableStream<Uint8Array>;
   try {
     if (choice.provider?.type === "openai-compat") {

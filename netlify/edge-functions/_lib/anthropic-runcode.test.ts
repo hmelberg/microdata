@@ -275,3 +275,15 @@ Deno.test("oppstrøms 400 uten verboseUpstream: generisk melding, ingen detalj",
   assertStringIncludes(msg, "Anthropic API error 400");
   assertEquals(msg.includes("hemmelig oppstrøms-detalj"), false, "detaljen lekket uten flagg: " + msg);
 });
+
+Deno.test("onEmit-kroken får hvert emittert event (feiljournal-avlytting)", async () => {
+  const sett: string[] = [];
+  const ev = await samle(runAgenticStream({
+    ...BASE,
+    executeTool: () => Promise.resolve("x"),
+    onEmit: (o) => sett.push(String(o.type)),
+    deps: { fetchImpl: sseFetch([streamedTextTurn("Svar.")]) },
+  }));
+  assertEquals(sett, ev.map((e) => e.type));
+  assert(sett.includes("done"));
+});

@@ -348,6 +348,9 @@ export interface AgenticOptions {
   clientTools?: string[];
   maxRunCode?: number;
   runResult?: string;
+  // Avlyttingskrok (microdata-tillegg, feiljournalen 2026-08-28): kalles med
+  // hvert emittert SSE-objekt. Må aldri kaste — kalles best-effort.
+  onEmit?: (obj: Record<string, unknown>) => void;
 }
 
 // Everything the loop needs to pick up where a previous invocation stopped.
@@ -563,8 +566,10 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
 
   return new ReadableStream({
     async start(controller) {
-      const emit = (obj: Record<string, unknown>) =>
+      const emit = (obj: Record<string, unknown>) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+        try { opts.onEmit?.(obj); } catch (_e) { /* avlytting velter aldri strømmen */ }
+      };
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         "x-api-key": opts.apiKey,
