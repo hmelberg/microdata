@@ -47,6 +47,7 @@ Deno.test("resolve: alias expansion, registry id, proxy flags", () => {
     viaProxy: false,
     key: undefined,
     exec: undefined,
+    kind: undefined,   // kind() er del av resolve-kontrakten (udefinert uten eksplisitt opsjon)
   });
   assertEquals(r[1].viaProxy, true);   // fred: auth + no CORS
   assertEquals(r[1].url, "https://api.stlouisfed.org/fred/series/observations?series_id=UNRATE&file_type=json");

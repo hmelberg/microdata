@@ -68,6 +68,12 @@ export interface RetryDeps {
   // Hard frist for ÉN streamet tur (default 50 s — under Netlifys målte
   // 60s-kutt per invokasjon), injiserbar for tester.
   turnDeadlineMs?: number;
+  // Personlig-autentisert kall (microdata-tillegg 2026-08-28): ta oppstrøms-
+  // feildetaljen (skrubbet for API-nøkkelen) med i feilmeldingen, slik at
+  // SSE-error-eventet er diagnoserbart uten server-logg (Netlify-live-tail er
+  // flyktig). Delt passord/BYOK setter aldri flagget — detaljen kan røpe
+  // kontodiagnostikk.
+  verboseUpstream?: boolean;
 }
 
 /**
@@ -430,6 +436,14 @@ async function streamOneTurn(
   if (!resp.ok || !resp.body) {
     const detail = await resp.text().catch(() => "");
     console.error(`Anthropic API error ${resp.status}: ${detail}`);
+    // verboseUpstream (microdata-tillegg 2026-08-28): personlig-autentiserte
+    // kall får detaljen med i feilmeldingen — API-nøkkelen skrubbes til ***
+    // først (tom/udefinert nøkkel = no-op), og detaljen kuttes til 300 tegn.
+    if (deps.verboseUpstream) {
+      const key = headers["x-api-key"];
+      const scrubbed = key ? detail.split(key).join("***") : detail;
+      throw new Error(`Anthropic API error ${resp.status}: ${scrubbed.slice(0, 300)}`);
+    }
     throw new Error(`Anthropic API error ${resp.status}`);
   }
 

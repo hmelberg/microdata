@@ -231,3 +231,47 @@ Deno.test("thinking-blokker rekonstrueres MED signatur og rundtures intakte", as
   assertEquals(think.thinking, "resonnerer…");
   assertEquals(think.signature, "SIG123");
 });
+
+Deno.test("oppstrøms 400 med verboseUpstream: detaljen følger error-eventet, nøkkelen skrubbet", async () => {
+  // Personlig-autentisert kall skal få oppstrøms-detaljen i SSE-error-eventet
+  // (Netlify-live-tail er flyktig — thinking-signatur-400-en 2026-08-28 kostet
+  // en full reproduksjonsrunde). API-nøkkelen skal ALDRI med: skrubbes til ***.
+  const KEY = "sk-ant-HEMMELIG123";
+  const fetchImpl = (() => Promise.resolve(new Response(
+    JSON.stringify({ type: "error", error: {
+      type: "invalid_request_error",
+      message: `thinking-blokk mangler signatur (nøkkel ${KEY} avvist)`,
+    } }),
+    { status: 400 },
+  ))) as unknown as typeof fetch;
+  const ev = await samle(runAgenticStream({
+    ...BASE, apiKey: KEY,
+    executeTool: () => Promise.resolve("x"),
+    deps: { fetchImpl, verboseUpstream: true },
+  }));
+  const err = ev.find((e) => e.type === "error");
+  assert(err, "error-event mangler: " + JSON.stringify(ev.map((e) => e.type)));
+  const msg = String(err!.message);
+  assertStringIncludes(msg, "Anthropic API error 400");
+  assertStringIncludes(msg, "thinking-blokk mangler signatur");
+  assertEquals(msg.includes(KEY), false, "API-nøkkelen lekket i error-eventet: " + msg);
+  assertStringIncludes(msg, "***");
+});
+
+Deno.test("oppstrøms 400 uten verboseUpstream: generisk melding, ingen detalj", async () => {
+  // Delt passord og BYOK skal fortsatt få den generiske meldingen — detaljen
+  // kan røpe kontodiagnostikk.
+  const fetchImpl = (() => Promise.resolve(new Response(
+    "hemmelig oppstrøms-detalj om kontoen", { status: 400 },
+  ))) as unknown as typeof fetch;
+  const ev = await samle(runAgenticStream({
+    ...BASE,
+    executeTool: () => Promise.resolve("x"),
+    deps: { fetchImpl },
+  }));
+  const err = ev.find((e) => e.type === "error");
+  assert(err, "error-event mangler: " + JSON.stringify(ev.map((e) => e.type)));
+  const msg = String(err!.message);
+  assertStringIncludes(msg, "Anthropic API error 400");
+  assertEquals(msg.includes("hemmelig oppstrøms-detalj"), false, "detaljen lekket uten flagg: " + msg);
+});

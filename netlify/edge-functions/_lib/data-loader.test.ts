@@ -29,6 +29,7 @@ Deno.test("resolveAndFetchLoads: fetches, sniffs format, proxy fallback on CORS"
 });
 
 Deno.test("resolveAndFetchLoads: BYOK-nøkkel sendes som X-Anthropic-Key på proxy-kall når token mangler", async () => {
+  DL._resetCacheForTests(); // testen over cachet samme blocked.example-URL — uten reset ses aldri proxy-kallet
   const calls: { url: string; headers: Record<string, string> }[] = [];
   const fetchImpl = ((input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
@@ -92,6 +93,7 @@ Deno.test("url envelope + key literal decrypts", async () => {
 });
 
 Deno.test("envelope without key prompts via promptKey(ask)", async () => {
+  DL._resetCacheForTests(); // testen over cachet en ANNEN konvolutt på samme URL — ny nøkkel mot gamle bytes gir «feil nøkkel»
   const plain = new TextEncoder().encode("q\n1\n");
   const { envelope, key } = await EC.encryptBytes(plain, "csv");
   const fetchImpl = (() => Promise.resolve(jsonResp(envelope))) as typeof fetch;

@@ -4,7 +4,7 @@
 // Strukturmal: askstats svar.ts, minus ruter/packs/keys/discover — microdata
 // har ikke askstats finn-data-problem; kunnskapen er front-lastet i prefiksen
 // og detaljer hentes med variabel_info.
-import { gate, upstreamErrorResponse, extractByokKey, type IpContext } from "./_lib/auth.ts";
+import { gate, timingSafeEqual, upstreamErrorResponse, extractByokKey, type IpContext } from "./_lib/auth.ts";
 import { type AgenticResumeState, runAgenticStream } from "./_lib/anthropic.ts";
 import { coerceQuality, resolveLlm } from "./_lib/llm-choice.ts";
 import { runProviderAgenticStream } from "./_lib/providers/agentic.ts";
@@ -146,6 +146,17 @@ export default async (request: Request, context: IpContext): Promise<Response> =
     continueExtra: () => ({ run_ok_calls: runOkCalls }),
   };
   const providerDeps = { timeoutMs: 180_000, retries: 1 };
+  // Personlig-autentisert kall (Hans' private passord): oppstrøms-feildetaljer
+  // følger SSE-error-eventet (skrubbet for API-nøkkelen i anthropic.ts) —
+  // Netlify-live-tail er flyktig, og «Anthropic API error 400» alene er
+  // udiagnostiserbart (thinking-signatur-400-en 2026-08-28 kostet en full
+  // reproduksjonsrunde). Delt passord og BYOK matcher aldri her → generisk.
+  const bearer = (request.headers.get("authorization") ?? "").startsWith("Bearer ")
+    ? (request.headers.get("authorization") ?? "").slice(7).trim()
+    : "";
+  const personligToken = Deno.env.get("M2PY_ACCESS_TOKEN_PERSONAL") ?? "";
+  const erPersonlig = bearer.length > 0 && personligToken.length > 0 &&
+    timingSafeEqual(bearer, personligToken);
   let inner: ReadableStream<Uint8Array>;
   try {
     if (choice.provider?.type === "openai-compat") {
@@ -161,8 +172,12 @@ export default async (request: Request, context: IpContext): Promise<Response> =
         runTurn: makeOpenAiResponsesTurn(choice.provider),
       });
     } else {
+      // KUN den anthropic-native grenen får verboseUpstream: providers-veien
+      // (runProviderAgenticStream/_lib/providers/*) er byte-identisk med
+      // askstat og skal ikke divergere for et microdata-tillegg.
       inner = runAgenticStream({
         ...commonOpts,
+        deps: { verboseUpstream: erPersonlig },
         apiKey: choice.apiKey,
         model: choice.provider ? choice.provider.model : choice.model,
         cacheTtl: "1h",
