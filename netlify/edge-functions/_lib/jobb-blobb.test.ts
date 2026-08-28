@@ -108,3 +108,44 @@ Deno.test("slettJobb fjerner både chunks og head", async () => {
   await slettJobb(store, "j1");
   assertEquals([...data.keys()], []);
 });
+
+Deno.test("overlappende kall mister ingenting — bufret og seq er serialisert", async () => {
+  const { store } = fakeStore();
+  const na = 1000;  // fast time — ingen time-basert flush
+  const s = lagSkriver(store, "j1", () => na);
+  // Fyr av tre skriv-kall uten å awaite — ville feil uten serialisering.
+  // Dette tester at concurrent calls ikke mister buffret innhold eller la head
+  // peke på en seq som ikke er skrevet ennå.
+  const p1 = s.skriv('data: {"type":"delta","text":"a"}\n\n');
+  const p2 = s.skriv('data: {"type":"delta","text":"b"}\n\n');
+  const p3 = s.skriv('data: {"type":"delta","text":"c"}\n\n');
+  const p4 = s.skriv('data: {"type":"done"}\n\n');  // kontroll-event tvinger flush
+  // Nå skal alt flushet.
+  await Promise.all([p1, p2, p3, p4]);
+  const head = await lesHead(store, "j1");
+  assertEquals(head?.seq, 1, "seq skal være 1 — alle events i en chunk");
+  const chunk1 = await store.get("j1/000001");
+  assertEquals(chunk1,
+    'data: {"type":"delta","text":"a"}\n\ndata: {"type":"delta","text":"b"}\n\ndata: {"type":"delta","text":"c"}\n\ndata: {"type":"done"}\n\n',
+    "chunk skal inneholde alle fire events i rekkefølge — ingenting tapt");
+});
+
+Deno.test("150 ms-grensen er eksakt — 149 ms flushes ikke, 150 ms flushes", async () => {
+  // Tilfelle 1: 149 ms — ingen flush
+  let na = 1000;
+  const { store: store1, rekkefolge: rekkefolge1 } = fakeStore();
+  const s1 = lagSkriver(store1, "j1", () => na);
+  await s1.skriv('data: {"type":"delta","text":"a"}\n\n');
+  na = 1149;  // 149 ms senere
+  await s1.skriv('data: {"type":"delta","text":"b"}\n\n');
+  assertEquals(rekkefolge1, [], "149 ms skal ikke triggre flush");
+
+  // Tilfelle 2: 150 ms — flush
+  na = 1000;
+  const { store: store2, rekkefolge: rekkefolge2 } = fakeStore();
+  const s2 = lagSkriver(store2, "j1", () => na);
+  await s2.skriv('data: {"type":"delta","text":"a"}\n\n');
+  na = 1150;  // 150 ms senere
+  await s2.skriv('data: {"type":"delta","text":"b"}\n\n');
+  assertEquals(rekkefolge2, ["j1/000001", "j1/head"], "150 ms skal trigre flush");
+});

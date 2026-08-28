@@ -47,6 +47,19 @@ export function lagSkriver(
   let seq = 0;
   let sistFlush = start;
 
+  // Alle skrivinger serialiseres gjennom denne kjeden. Uten den deler skriv()
+  // og flush() muterbar tilstand (buffer, seq) på tvers av await, og to
+  // overlappende kall kan både miste buffret innhold og la head peke på en
+  // chunk som ikke er skrevet ennå — nøyaktig feilen chunk-før-head finnes
+  // for å hindre. Kjeden gjør modulen trygg uavhengig av kallerens disiplin,
+  // i stedet for å hvile på en uskreven forutsetning hos kalleren.
+  let kjede: Promise<void> = Promise.resolve();
+  const iKo = (f: () => Promise<void>): Promise<void> => {
+    const neste = kjede.then(f, f);   // en feilet skriving stopper ikke de neste
+    kjede = neste.catch(() => {});    // kalleren ser sin egen feil; kjeden går videre
+    return neste;
+  };
+
   const flush = async (state: JobbHead["state"]): Promise<void> => {
     if (buffer.length > 0) {
       seq++;
@@ -58,14 +71,16 @@ export function lagSkriver(
   };
 
   return {
-    async skriv(sse: string): Promise<void> {
-      buffer += sse;
-      if (TVINGER_FLUSH.test(sse) || now() - sistFlush >= FLUSH_MS) {
-        await flush("kjorer");
-      }
+    skriv(sse: string): Promise<void> {
+      return iKo(async () => {
+        buffer += sse;
+        if (TVINGER_FLUSH.test(sse) || now() - sistFlush >= FLUSH_MS) {
+          await flush("kjorer");
+        }
+      });
     },
-    async avslutt(state: "ferdig" | "feil"): Promise<void> {
-      await flush(state);
+    avslutt(state: "ferdig" | "feil"): Promise<void> {
+      return iKo(() => flush(state));
     },
   };
 }
