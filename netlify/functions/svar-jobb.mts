@@ -70,9 +70,12 @@ export default async (request: Request): Promise<Response> => {
   const mode = (body.mode === "python" || body.mode === "r") ? body.mode : "microdata";
   const kvalitet = coerceQuality(body.quality) ?? "balanced";
 
-  // Feiljournalen følger løpet, ikke porten: `run_feil` og `feil` oppstår
-  // INNE i løkka, så et no-op her ville stille tømt journalen for nettopp de
-  // hendelsene selvforbedringssløyfen lever av. /api/svar skriver `sporsmal`.
+  // Feiljournalen følger løpet, ikke porten: KUN `feil` oppstår INNE i løkka
+  // (emittert av onEmit i svar-lop.ts, tur for tur), så et no-op her ville
+  // stille tømt journalen for nettopp den hendelsen selvforbedringssløyfen
+  // lever av her. `sporsmal` og `run_feil` skrives IKKE av denne funksjonen —
+  // begge oppstår på handler-nivå i svar.ts (før byggLop kalles), og hører
+  // hjemme der, ikke her.
   const journal = erPersonlig ? feiljournalStore() : null;
   const journalHendelse = (type: string, detalj?: string): void => {
     if (journal) {
