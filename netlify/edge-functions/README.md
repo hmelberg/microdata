@@ -48,10 +48,10 @@ Server starter typisk på `http://localhost:8888`.
 ## Auth
 
 Alle tre endepunktene krever `Authorization: Bearer <token>` (felles
-`_lib/auth.ts`-gate: token-sjekk → metode → body-grense → rate-limit → Anvil-
-validering, med konstant-tid-sammenligning og positiv-cache). Bruk det delte
-`M2PY_ACCESS_TOKEN`/`M2PY_ACCESS_TOKEN_PERSONAL` lokalt, eller et gyldig
-brukertoken fra Anvil.
+`_lib/auth.ts`-gate: token-sjekk → metode → body-grense → rate-limit →
+passord-sjekk, med konstant-tid-sammenligning). De eneste gyldige tokens er
+de to passordene `M2PY_ACCESS_TOKEN` og `M2PY_ACCESS_TOKEN_PERSONAL`; alt
+annet gir umiddelbar 401 (Anvil-fallbacken ble fjernet 2026-08-28).
 
 ## Test dm-vurder med curl
 

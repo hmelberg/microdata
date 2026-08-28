@@ -1,24 +1,19 @@
 // Shared request gate for the AI edge functions (kode-svar, dm-vurder,
-// tolk-resultat). Consolidates what was ~40 lines of copy-pasted auth /
-// rate-limit / body-guard logic in each handler, and fixes several issues the
-// duplicated version had:
-//   - rate-limit runs BEFORE the (network) Anvil validation, so an attacker
-//     can no longer amplify requests against the free-tier Anvil app;
-//   - the shared-token comparison is constant-time;
-//   - the Anvil call has a timeout (no hung isolates);
-//   - positive validations are cached briefly in-isolate (fewer Anvil calls);
+// tolk-resultat). Consolidates what was copy-pasted auth / rate-limit /
+// body-guard logic in each handler:
+//   - the password comparisons are constant-time;
+//   - rate-limit runs before auth, so brute force against the passwords is
+//     throttled;
 //   - the spoofable x-forwarded-for fallback for the client IP is dropped
 //     (only the platform-set x-nf-client-connection-ip is trusted).
+//
+// 2026-08-28: Anvil-fallbacken (mdataapi.anvil.app/_/api/auth/me) er fjernet.
+// Appen er et offentlig BYOK-bygg uten innlogging, og kjøring av generert
+// kode skjer nå i emulatoren (run_code) — de eneste gyldige Bearer-tokens er
+// de to konfigurerte passordene (M2PY_ACCESS_TOKEN og
+// M2PY_ACCESS_TOKEN_PERSONAL). Feil token gir umiddelbar 401 i stedet for en
+// 4-sekunders nettverksrundtur mot Anvil.
 import { checkRateLimit as defaultCheckRateLimit } from "./rate-limit.ts";
-
-const ANVIL_DEFAULT_URL = "https://mdataapi.anvil.app/_/api/auth/me";
-const AUTH_CACHE_TTL_MS = 5 * 60 * 1000; // positive-validation cache lifetime
-const ANVIL_TIMEOUT_MS = 4000;
-
-// In-isolate positive-auth cache: token -> expiry epoch ms. Deliberately not
-// persisted (no token material written to Blobs); a cold isolate just
-// re-validates. A revoked token keeps working for at most AUTH_CACHE_TTL_MS.
-const _authCache = new Map<string, number>();
 
 /** Constant-time string comparison (no early return on first mismatch). */
 export function timingSafeEqual(a: string, b: string): boolean {
@@ -120,9 +115,6 @@ export interface GateDeps {
     endpoint: string,
     ip: string,
   ) => Promise<{ allowed: boolean; retryAfterSeconds: number }>;
-  validateToken: (token: string) => Promise<boolean>;
-  now: () => number;
-  cache: Map<string, number>;
 }
 
 interface BaseCheckResult {
@@ -132,10 +124,9 @@ interface BaseCheckResult {
 
 /**
  * Steps 1-4 shared by runGate and runAdminGate: token presence, method check,
- * content-length cap, and rate limit (in that order, before any expensive
- * validation). Returns the extracted token plus a short-circuit Response when
- * one of the checks fails, or `failure: null` when the caller should proceed
- * to its own auth step.
+ * content-length cap, and rate limit (in that order, before auth). Returns the
+ * extracted token plus a short-circuit Response when one of the checks fails,
+ * or `failure: null` when the caller should proceed to its own auth step.
  */
 async function runBaseChecks(
   request: Request,
@@ -179,10 +170,9 @@ async function runBaseChecks(
     };
   }
 
-  // 4. rate-limit BEFORE the expensive Anvil validation (no amplification).
-  // Det PERSONLIGE passordet er helt unntatt: matchen er gratis (konstant-tid,
-  // ingen nettverk), så det finnes ingen amplifisering å bremse — og eieren
-  // skal ikke stoppes av sin egen 60/t-kvote. Feilgjetninger matcher ikke og
+  // 4. rate-limit BEFORE auth. Det PERSONLIGE passordet er helt unntatt:
+  // matchen er gratis (konstant-tid, ingen nettverk), og eieren skal ikke
+  // stoppes av sin egen 60/t-kvote. Feilgjetninger matcher ikke og
   // rate-limites som før, så brute force mot passordene er fortsatt bremset.
   const exempt = !!rateLimitExempt && presentedToken.length > 0 &&
     rateLimitExempt(presentedToken);
@@ -238,104 +228,21 @@ export async function runGate(
   // Bearer token are present, BYOK wins and the token is never validated.
   if (byokKey !== null || llmKey !== null) return null;
 
-  // 5. auth: cheap configured passwords (constant-time) -> positive cache
-  // -> Anvil
-  const now = deps.now();
-  let authenticated = false;
-  if (matchesConfiguredToken(presentedToken, deps)) {
-    authenticated = true;
-  }
-  if (!authenticated) {
-    const exp = deps.cache.get(presentedToken);
-    if (exp && exp > now) authenticated = true;
-    else if (exp) deps.cache.delete(presentedToken);
-  }
-  if (!authenticated && await deps.validateToken(presentedToken)) {
-    authenticated = true;
-    deps.cache.set(presentedToken, now + AUTH_CACHE_TTL_MS);
-  }
-  if (!authenticated) {
+  // 5. auth: kun de konfigurerte passordene (konstant-tid). Alt annet gir
+  // umiddelbar 401 — ingen ekstern validering.
+  if (!matchesConfiguredToken(presentedToken, deps)) {
     return new Response("Unauthorized", { status: 401 });
   }
-
   return null;
-}
-
-/** Build an Anvil /auth/me validator with an abort timeout. */
-export function makeAnvilValidator(
-  anvilUrl: string,
-  timeoutMs: number = ANVIL_TIMEOUT_MS,
-  fetchImpl: typeof fetch = fetch,
-): (token: string) => Promise<boolean> {
-  return async (token: string): Promise<boolean> => {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const resp = await fetchImpl(anvilUrl, {
-        method: "GET",
-        headers: { "Authorization": `Bearer ${token}` },
-        signal: ctrl.signal,
-      });
-      if (!resp.ok) return false;
-      const data = await resp.json();
-      // /auth/me returns { principal_kind, user, ... }. Accept any successful
-      // response — Anvil's whitelist gates who can log in.
-      return !!(data &&
-        (data.user || data.principal_kind === "service_token" ||
-          data.principal_kind === "anonymous"));
-    } catch (_e) {
-      // network error / timeout -> treat as unauthorized rather than crashing
-      return false;
-    } finally {
-      clearTimeout(timer);
-    }
-  };
 }
 
 /** Env-wired gate used by the handlers. */
 export function gate(request: Request, opts: GateOptions, context?: IpContext): Promise<Response | null> {
-  const anvilUrl = Deno.env.get("M2PY_ANVIL_VALIDATE_URL") ?? ANVIL_DEFAULT_URL;
   return runGate(request, opts, {
     sharedToken: Deno.env.get("M2PY_ACCESS_TOKEN") ?? undefined,
     personalToken: Deno.env.get("M2PY_ACCESS_TOKEN_PERSONAL") ?? undefined,
     checkRateLimit: defaultCheckRateLimit,
-    validateToken: makeAnvilValidator(anvilUrl),
-    now: () => Date.now(),
-    cache: _authCache,
   }, context);
-}
-
-export interface UserInfo {
-  ok: boolean;
-  isAdmin: boolean;
-}
-
-/** Like makeAnvilValidator, but returns the user's admin flag too. */
-export function makeAnvilUserFetcher(
-  anvilUrl: string,
-  timeoutMs: number = ANVIL_TIMEOUT_MS,
-  fetchImpl: typeof fetch = fetch,
-): (token: string) => Promise<UserInfo> {
-  return async (token: string): Promise<UserInfo> => {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const resp = await fetchImpl(anvilUrl, {
-        method: "GET",
-        headers: { "Authorization": `Bearer ${token}` },
-        signal: ctrl.signal,
-      });
-      if (!resp.ok) return { ok: false, isAdmin: false };
-      const data = await resp.json();
-      const ok = !!(data && (data.user || data.principal_kind === "service_token"));
-      const isAdmin = !!(data && data.user && data.user.is_admin === true);
-      return { ok, isAdmin };
-    } catch (_e) {
-      return { ok: false, isAdmin: false };
-    } finally {
-      clearTimeout(timer);
-    }
-  };
 }
 
 export interface AdminGateDeps {
@@ -343,14 +250,13 @@ export interface AdminGateDeps {
   /** Se GateDeps.personalToken — samme rolle, teller også som admin. */
   personalToken?: string;
   checkRateLimit: GateDeps["checkRateLimit"];
-  fetchUser: (token: string) => Promise<UserInfo>;
-  now: () => number;
-  cache: Map<string, { exp: number; isAdmin: boolean }>;
 }
 
-const _adminCache = new Map<string, { exp: number; isAdmin: boolean }>();
-
-/** Gate + admin requirement (data-svar, hent). Shared token counts as admin. */
+/**
+ * Gate + admin requirement (data-svar, hent). Begge de konfigurerte
+ * passordene teller som admin; alt annet gir 401. (Uten kontoer finnes det
+ * ingen «innlogget, men ikke admin»-tilstand, så 403-veien er borte.)
+ */
 export async function runAdminGate(
   request: Request,
   opts: GateOptions,
@@ -372,37 +278,17 @@ export async function runAdminGate(
   // and rate-limit checks above still ran; the handler uses the key upstream.
   if (byokKey !== null || llmKey !== null) return null;
 
-  const now = deps.now();
-  let info: UserInfo | null = null;
-  if (matchesConfiguredToken(presentedToken, deps)) {
-    info = { ok: true, isAdmin: true };
+  if (!matchesConfiguredToken(presentedToken, deps)) {
+    return new Response("Unauthorized", { status: 401 });
   }
-  if (!info) {
-    const hit = deps.cache.get(presentedToken);
-    if (hit && hit.exp > now) info = { ok: true, isAdmin: hit.isAdmin };
-    else if (hit) deps.cache.delete(presentedToken);
-  }
-  if (!info) {
-    const fetched = await deps.fetchUser(presentedToken);
-    if (fetched.ok) {
-      deps.cache.set(presentedToken, { exp: now + AUTH_CACHE_TTL_MS, isAdmin: fetched.isAdmin });
-      info = fetched;
-    }
-  }
-  if (!info?.ok) return new Response("Unauthorized", { status: 401 });
-  if (!info.isAdmin) return new Response("Forbudt: krever admin", { status: 403 });
   return null;
 }
 
 /** Env-wired admin gate used by data-svar and hent. */
 export function adminGate(request: Request, opts: GateOptions, context?: IpContext): Promise<Response | null> {
-  const anvilUrl = Deno.env.get("M2PY_ANVIL_VALIDATE_URL") ?? ANVIL_DEFAULT_URL;
   return runAdminGate(request, opts, {
     sharedToken: Deno.env.get("M2PY_ACCESS_TOKEN") ?? undefined,
     personalToken: Deno.env.get("M2PY_ACCESS_TOKEN_PERSONAL") ?? undefined,
     checkRateLimit: defaultCheckRateLimit,
-    fetchUser: makeAnvilUserFetcher(anvilUrl),
-    now: () => Date.now(),
-    cache: _adminCache,
   }, context);
 }

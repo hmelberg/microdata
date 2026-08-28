@@ -139,7 +139,6 @@ window.M2PY_I18N.en = {
   "Logg ut": "Log out",
   "Åpne admin-panel": "Open admin panel",
   "Avansert: API-base og service-token": "Advanced: API base and service token",
-  "Adressen til Anvil-appen som kjører API-et. Standard: https://mdataapi.anvil.app": "The address of the Anvil app running the API. Default: https://mdataapi.anvil.app",
   "Service-token (kun for automatisering)": "Service token (automation only)",
   "(la stå tom for vanlig bruk)": "(leave empty for normal use)",
   "Lagres lokalt. Sendes som X-API-Key. Brukes kun for skript / eval-harness.": "Stored locally. Sent as <code>X-API-Key</code>. Used only for scripts / the eval harness.",

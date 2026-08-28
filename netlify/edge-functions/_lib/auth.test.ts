@@ -1,9 +1,11 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
+  type AdminGateDeps,
   clientIp,
   extractByokKey,
   extractLlmKey,
   type GateDeps,
+  runAdminGate,
   runGate,
   timingSafeEqual,
   upstreamErrorResponse,
@@ -33,21 +35,20 @@ function req(opts: {
   });
 }
 
-function makeDeps(over: Partial<GateDeps> = {}): GateDeps & { calls: { validate: number } } {
-  const calls = { validate: 0 };
-  const deps: GateDeps & { calls: { validate: number } } = {
+function makeDeps(over: Partial<GateDeps> = {}): GateDeps {
+  return {
     sharedToken: undefined,
     checkRateLimit: () => Promise.resolve({ allowed: true, retryAfterSeconds: 0 }),
-    validateToken: () => {
-      calls.validate++;
-      return Promise.resolve(false);
-    },
-    now: () => 1000,
-    cache: new Map<string, number>(),
-    calls,
     ...over,
   };
-  return deps;
+}
+
+function adminDeps(over: Partial<AdminGateDeps> = {}): AdminGateDeps {
+  return {
+    sharedToken: undefined,
+    checkRateLimit: () => Promise.resolve({ allowed: true, retryAfterSeconds: 0 }),
+    ...over,
+  };
 }
 
 Deno.test("timingSafeEqual: equal strings match, different do not", () => {
@@ -78,115 +79,48 @@ Deno.test("runGate: oversized content-length -> 413", async () => {
   assertEquals(resp?.status, 413);
 });
 
-Deno.test("runGate: rate-limited -> 429 and Anvil NOT called (no amplification)", async () => {
+Deno.test("runGate: rate-limited -> 429 with Retry-After", async () => {
   const deps = makeDeps({
     checkRateLimit: () => Promise.resolve({ allowed: false, retryAfterSeconds: 42 }),
   });
   const resp = await runGate(req({ token: "x" }), { endpoint: "t", maxBodyBytes: 100 }, deps);
   assertEquals(resp?.status, 429);
   assertEquals(resp?.headers.get("Retry-After"), "42");
-  assertEquals(deps.calls.validate, 0); // rate-limit ran before validation
 });
 
-Deno.test("runGate: valid shared token proceeds without calling Anvil", async () => {
+Deno.test("runGate: valid shared token proceeds", async () => {
   const deps = makeDeps({ sharedToken: "shared-secret" });
   const resp = await runGate(req({ token: "shared-secret" }), { endpoint: "t", maxBodyBytes: 100 }, deps);
   assertEquals(resp, null);
-  assertEquals(deps.calls.validate, 0);
 });
 
-Deno.test("runGate: invalid token -> 401", async () => {
-  const deps = makeDeps({ validateToken: () => Promise.resolve(false) });
+Deno.test("runGate: wrong token -> immediate 401 (ingen Anvil-fallback)", async () => {
+  const deps = makeDeps({ sharedToken: "shared-secret" });
   const resp = await runGate(req({ token: "nope" }), { endpoint: "t", maxBodyBytes: 100 }, deps);
   assertEquals(resp?.status, 401);
 });
 
-Deno.test("runGate: positive Anvil validation is cached (second call skips Anvil)", async () => {
-  const cache = new Map<string, number>();
-  let validateCalls = 0;
-  const deps = makeDeps({
-    cache,
-    validateToken: () => {
-      validateCalls++;
-      return Promise.resolve(true);
-    },
-  });
-  const r1 = await runGate(req({ token: "good" }), { endpoint: "t", maxBodyBytes: 100 }, deps);
-  const r2 = await runGate(req({ token: "good" }), { endpoint: "t", maxBodyBytes: 100 }, deps);
-  assertEquals(r1, null);
-  assertEquals(r2, null);
-  assertEquals(validateCalls, 1); // second request served from cache
-});
-
-Deno.test("runGate: expired cache entry triggers re-validation", async () => {
-  const cache = new Map<string, number>([["good", 500]]); // expiry 500
-  let validateCalls = 0;
-  const deps = makeDeps({
-    cache,
-    now: () => 1000, // past expiry
-    validateToken: () => {
-      validateCalls++;
-      return Promise.resolve(true);
-    },
-  });
-  const resp = await runGate(req({ token: "good" }), { endpoint: "t", maxBodyBytes: 100 }, deps);
-  assertEquals(resp, null);
-  assertEquals(validateCalls, 1);
+Deno.test("runGate: no passwords configured -> every token is 401", async () => {
+  const resp = await runGate(req({ token: "anything" }), { endpoint: "t", maxBodyBytes: 100 }, makeDeps());
+  assertEquals(resp?.status, 401);
 });
 
 // Admin gate tests
-import { makeAnvilUserFetcher, runAdminGate, type AdminGateDeps } from "./auth.ts";
 
-function adminDeps(over: Partial<AdminGateDeps> = {}): AdminGateDeps & { calls: { fetchUser: number } } {
-  const calls = { fetchUser: 0 };
-  return {
-    calls,
-    sharedToken: undefined,
-    checkRateLimit: () => Promise.resolve({ allowed: true, retryAfterSeconds: 0 }),
-    fetchUser: () => { calls.fetchUser++; return Promise.resolve({ ok: true, isAdmin: true }); },
-    now: () => 1_000_000,
-    cache: new Map(),
-    ...over,
-  };
-}
-
-Deno.test("runAdminGate: admin user passes, non-admin gets 403, invalid 401", async () => {
+Deno.test("runAdminGate: shared token passes, wrong token 401", async () => {
   const opts = { endpoint: "data-svar", maxBodyBytes: 1000 };
-  assertEquals(await runAdminGate(req({ token: "t1" }), opts, adminDeps()), null);
-  const r403 = await runAdminGate(req({ token: "t2" }), opts,
-    adminDeps({ fetchUser: () => Promise.resolve({ ok: true, isAdmin: false }) }));
-  assertEquals(r403?.status, 403);
-  const r401 = await runAdminGate(req({ token: "t3" }), opts,
-    adminDeps({ fetchUser: () => Promise.resolve({ ok: false, isAdmin: false }) }));
-  assertEquals(r401?.status, 401);
-});
-
-Deno.test("runAdminGate: shared token is admin; result cached", async () => {
   const deps = adminDeps({ sharedToken: "hemmelig" });
-  const opts = { endpoint: "data-svar", maxBodyBytes: 1000 };
   assertEquals(await runAdminGate(req({ token: "hemmelig" }), opts, deps), null);
-  assertEquals(deps.calls.fetchUser, 0);
-  assertEquals(await runAdminGate(req({ token: "bruker" }), opts, deps), null);
-  assertEquals(await runAdminGate(req({ token: "bruker" }), opts, deps), null);
-  assertEquals(deps.calls.fetchUser, 1); // second hit came from cache
+  const r401 = await runAdminGate(req({ token: "feil" }), opts, deps);
+  assertEquals(r401?.status, 401);
 });
 
 Deno.test("runAdminGate: allowedMethods lets GET through when configured", async () => {
   const opts = { endpoint: "hent", maxBodyBytes: 0, allowedMethods: ["GET"] };
   const getReq = req({ token: "t", method: "GET" });
-  assertEquals(await runAdminGate(getReq, opts, adminDeps()), null);
+  assertEquals(await runAdminGate(getReq, opts, adminDeps({ sharedToken: "t" })), null);
   const postOpts = { endpoint: "hent", maxBodyBytes: 0 }; // default POST-only
-  assertEquals((await runAdminGate(getReq, postOpts, adminDeps()))?.status, 405);
-});
-
-Deno.test("makeAnvilUserFetcher maps /auth/me shape", async () => {
-  const mk = (payload: unknown, status = 200) =>
-    makeAnvilUserFetcher("https://anvil.test/auth/me", 1000,
-      (() => Promise.resolve(new Response(JSON.stringify(payload), { status }))) as typeof fetch);
-  assertEquals(await mk({ user: { is_admin: true } })("t"), { ok: true, isAdmin: true });
-  assertEquals(await mk({ user: { is_admin: false } })("t"), { ok: true, isAdmin: false });
-  assertEquals(await mk({ user: {} })("t"), { ok: true, isAdmin: false });
-  assertEquals(await mk({}, 401)("t"), { ok: false, isAdmin: false });
+  assertEquals((await runAdminGate(getReq, postOpts, adminDeps({ sharedToken: "t" })))?.status, 405);
 });
 
 // ── BYOK: user-supplied Anthropic key ──
@@ -232,26 +166,9 @@ Deno.test("upstreamErrorResponse: no BYOK -> always 502", () => {
 
 // ── BYOK: runGate and runAdminGate paths ──
 
-function makeByokAdminDeps(): AdminGateDeps & { calls: { fetchUser: number } } {
-  const calls = { fetchUser: 0 };
-  return {
-    sharedToken: undefined,
-    checkRateLimit: () => Promise.resolve({ allowed: true, retryAfterSeconds: 0 }),
-    fetchUser: () => {
-      calls.fetchUser++;
-      return Promise.resolve({ ok: false, isAdmin: false });
-    },
-    now: () => 1000,
-    cache: new Map<string, { exp: number; isAdmin: boolean }>(),
-    calls,
-  };
-}
-
-Deno.test("runGate: valid BYOK header, no bearer -> passes without validation", async () => {
-  const deps = makeDeps();
-  const resp = await runGate(req({ byok: GOOD_KEY }), { endpoint: "t", maxBodyBytes: 100, allowByok: true }, deps);
+Deno.test("runGate: valid BYOK header, no bearer -> passes", async () => {
+  const resp = await runGate(req({ byok: GOOD_KEY }), { endpoint: "t", maxBodyBytes: 100, allowByok: true }, makeDeps());
   assertEquals(resp, null);
-  assertEquals(deps.calls.validate, 0);
 });
 
 Deno.test("runGate: malformed BYOK header, no bearer -> 401", async () => {
@@ -278,42 +195,35 @@ Deno.test("runGate: BYOK still rate-limited -> 429", async () => {
 });
 
 Deno.test("runAdminGate: valid BYOK header, no bearer -> passes without admin", async () => {
-  const deps = makeByokAdminDeps();
-  const resp = await runAdminGate(req({ byok: GOOD_KEY }), { endpoint: "t", maxBodyBytes: 100, allowByok: true }, deps);
+  const resp = await runAdminGate(req({ byok: GOOD_KEY }), { endpoint: "t", maxBodyBytes: 100, allowByok: true }, adminDeps());
   assertEquals(resp, null);
-  assertEquals(deps.calls.fetchUser, 0);
 });
 
-Deno.test("runAdminGate: no BYOK, non-admin token -> 403 (unchanged)", async () => {
-  const deps = makeByokAdminDeps();
-  deps.fetchUser = () => Promise.resolve({ ok: true, isAdmin: false });
+Deno.test("runAdminGate: no BYOK, wrong token -> 401", async () => {
+  const deps = adminDeps({ sharedToken: "riktig" });
   const resp = await runAdminGate(req({ token: "user-token" }), { endpoint: "t", maxBodyBytes: 100, allowByok: true }, deps);
-  assertEquals(resp?.status, 403);
+  assertEquals(resp?.status, 401);
 });
 
 // ── BYOK is opt-in per endpoint (finding 1: hent must never allow it) ──
 
 Deno.test("runGate: valid BYOK header, NO allowByok -> 401 (BYOK not accepted)", async () => {
-  const deps = makeDeps();
-  const resp = await runGate(req({ byok: GOOD_KEY }), { endpoint: "t", maxBodyBytes: 100 }, deps);
+  const resp = await runGate(req({ byok: GOOD_KEY }), { endpoint: "t", maxBodyBytes: 100 }, makeDeps());
   assertEquals(resp?.status, 401);
 });
 
-Deno.test("runAdminGate: valid BYOK header, NO allowByok -> 401 (fetchUser not ok, BYOK ignored)", async () => {
-  const deps = makeByokAdminDeps();
-  const resp = await runAdminGate(req({ byok: GOOD_KEY }), { endpoint: "t", maxBodyBytes: 100 }, deps);
+Deno.test("runAdminGate: valid BYOK header, NO allowByok -> 401 (BYOK ignored)", async () => {
+  const resp = await runAdminGate(req({ byok: GOOD_KEY }), { endpoint: "t", maxBodyBytes: 100 }, adminDeps());
   assertEquals(resp?.status, 401);
 });
 
 Deno.test("runGate: allowByok, valid BYOK header AND invalid Bearer token both present -> passes (BYOK wins)", async () => {
-  const deps = makeDeps({ validateToken: () => Promise.resolve(false) });
   const headers = new Headers();
   headers.set("authorization", "Bearer definitely-not-valid");
   headers.set("x-anthropic-key", GOOD_KEY);
   const request = new Request("https://example.test/", { method: "POST", headers });
-  const resp = await runGate(request, { endpoint: "t", maxBodyBytes: 100, allowByok: true }, deps);
+  const resp = await runGate(request, { endpoint: "t", maxBodyBytes: 100, allowByok: true }, makeDeps());
   assertEquals(resp, null);
-  assertEquals(deps.calls.validate, 0); // BYOK short-circuits before token validation
 });
 
 // ── extractLlmKey (multi-provider-runden 2026-08-27) ──────────────────────
@@ -333,7 +243,7 @@ Deno.test("extractLlmKey rejects out-of-range lengths", () => {
 });
 
 Deno.test("extractLlmKey rejects non-ASCII and embedded spaces", () => {
-  assertEquals(extractLlmKey(req({ llm: "abcdefgh\u00e5" })), null);
+  assertEquals(extractLlmKey(req({ llm: "abcdefghå" })), null);
   assertEquals(extractLlmKey(req({ llm: "abcd efgh" })), null);
   // Kontrolltegn (NUL o.l.) testes IKKE her: Headers.set avviser dem som
   // ugyldig header-verdi, så de kan ikke nå extractLlmKey via en ekte
@@ -346,11 +256,10 @@ Deno.test("extractLlmKey returns null when the header is absent", () => {
 
 // ── to passord: personlig + delt (2026-08-28) ─────────────────────────────
 
-Deno.test("runGate: valid personal token proceeds without calling Anvil", async () => {
+Deno.test("runGate: valid personal token proceeds", async () => {
   const deps = makeDeps({ sharedToken: "delt", personalToken: "privat" });
   const r = await runGate(req({ token: "privat" }), { endpoint: "kode-svar", maxBodyBytes: 1000 }, deps);
   assertEquals(r, null);
-  assertEquals(deps.calls.validate, 0);
 });
 
 Deno.test("runGate: wrong token is 401 even with both passwords configured", async () => {
@@ -359,11 +268,10 @@ Deno.test("runGate: wrong token is 401 even with both passwords configured", asy
   assertEquals(r?.status, 401);
 });
 
-Deno.test("runAdminGate: personal token is admin without calling Anvil", async () => {
+Deno.test("runAdminGate: personal token is admin", async () => {
   const deps = adminDeps({ sharedToken: "delt", personalToken: "privat" });
   const r = await runAdminGate(req({ token: "privat" }), { endpoint: "data-svar", maxBodyBytes: 1000 }, deps);
   assertEquals(r, null);
-  assertEquals(deps.calls.fetchUser, 0);
 });
 
 // ── personlig passord: ingen ratelimit (2026-08-28) ───────────────────────

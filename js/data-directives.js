@@ -1,7 +1,7 @@
 // connect/load-direktiver for Web-modus (spec 5b/5c i
 // docs/superpowers/specs/2026-07-03-web-data-svar-design.md, utvidet av
 // docs/superpowers/specs/2026-07-05-encrypted-external-sources-design.md §1).
-//   # connect <base-url|register-id|anvil-navn> [as alias] [, key(...)][, exec(...)][, kind(...)]
+//   # connect <base-url|register-id> [as alias] [, key(...)][, exec(...)][, kind(...)]
 //   # load <url|alias/sti> as navn [, key(...)]  — uttrekk (hel ramme)
 //   # require <url> as navn                      — legacy-alias for load (D1)
 //   kind(csv|parquet|duckdb|sqlite|json) — eksplisitt kildetype, hopper over sniffing
@@ -94,8 +94,10 @@
       } else {
         var src = findRegistrySource(registry, conn.target);
         if (!src) {
-          // Ikke i web-registeret: en registrert Anvil-kilde (spec §1, regel 3).
-          return { alias: l.alias, anvil: conn.target, key: key, exec: exec, kind: kind };
+          // Ikke i web-registeret: ukjent navn. (Tidligere ble slike merket
+          // som eksterne Anvil-kilder og slått opp mot et API — den grenen er
+          // fjernet i denne offentlige byggen; nå er det en vanlig feil.)
+          return { alias: l.alias, url: '', viaProxy: false, error: 'ukjent kilde «' + conn.target + '» (ikke i registeret)' };
         }
         base = src.base_url;
         viaProxy = !!src.auth || src.cors === false;

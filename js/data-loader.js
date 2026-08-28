@@ -20,8 +20,7 @@
   // the last run — the highest-frequency friction point in the app given
   // how often a script gets tweaked and re-run during iteration. Keyed by
   // resolved URL; only raw bytes are cached (decryption still runs fresh
-  // per item/run, and strict-source key authorization is deliberately never
-  // cached — see authorizeStrict below). No TTL/invalidation, same as
+  // per item/run). No TTL/invalidation, same as
   // _registryCache above — a page reload is the reset, by design (2026-07-07,
   // docs/superpowers/2026-07-07-code-review.md §6 item 1).
   var _bufCache = {};
@@ -69,10 +68,10 @@
     return 'csv';
   }
 
-  // Hoved-API: {loads: [{alias, bytes(Uint8Array), format}],
-  //             remote: [{alias, sourceId, key}]} eller kast norsk feil.
-  // remote = registrerte kilder som IKKE kan analyseres lokalt (level != public):
-  // index.html ruter hele scriptet til serveren med source_keys (spec §4).
+  // Hoved-API: {loads: [{alias, bytes(Uint8Array), format}], remote: []}
+  // eller kast norsk feil. remote er ALLTID tom i denne offentlige BYOK-
+  // byggen (ingen server-side kjøring) — feltet beholdes kun som form, siden
+  // kallere sjekker `.remote` på resultatet.
   async function resolveAndFetchLoads(script, deps) {
     deps = deps || {};
     var fetchImpl = deps.fetchImpl || (typeof fetch !== 'undefined' ? fetch.bind(global) : null);
@@ -85,56 +84,22 @@
     var bad = resolved.filter(function (r) { return r.error; });
     if (bad.length) throw new Error('Direktivfeil: ' + bad.map(function (b) { return b.error; }).join('; '));
 
-    var remote = [];
-    var localItems = [];
-    for (var i = 0; i < resolved.length; i++) {
-      var item = resolved[i];
-      if (item.anvil) {
-        var grant = await fetchSourceAccess(item, deps, fetchImpl);
-        if (grant.remote_only || item.exec === 'remote') {
-          if (item.exec === 'local') throw new Error('«' + item.anvil + '» er ikke offentlig — kan ikke kjøres lokalt (kjøres på server).');
-          remote.push({ alias: item.alias, sourceId: item.anvil, key: item.key });
-          continue;
-        }
-        item.url = grant.location;
-        item.grant = grant;
-        item.viaProxy = false;
-      } else if (item.exec === 'remote') {
-        throw new Error('exec(remote) krever en registrert kilde (navn), ikke URL: ' + item.alias);
-      }
-      localItems.push(item);
-    }
-
-    var loads = await fetchResolvedItems(localItems, deps);
-    return { loads: loads, remote: remote };
+    var loads = await fetchResolvedItems(resolved, deps);
+    return { loads: loads, remote: [] };
   }
 
   // Fetch+decrypt+cache for an already-resolved item list (each
-  // {alias, url, kind, key, table, viaProxy, grant?}) — the part of
+  // {alias, url, kind, key, table, viaProxy}) — the part of
   // resolveAndFetchLoads that doesn't depend on connect/load-directive
   // syntax at all. Extracted (2026-07-09) so a mode with its OWN directive
   // syntax (SafeStat mode's bare `require <url> as <alias>` DSL statement,
   // not a "#"/"--"/"//"-prefixed comment directive DataDirectives.parse can
   // recognize) can still get key()/kind()/caching for free instead of a
   // second, narrower hand-rolled fetch — see index.html's runSafeStatScript.
-  // -> [{alias, bytes, format, table?, kind?, envelope?, key?, level?, strict?}]
+  // -> [{alias, bytes, format, table?, kind?}]
   async function fetchResolvedItems(localItems, deps) {
     deps = deps || {};
     var fetchImpl = deps.fetchImpl || (typeof fetch !== 'undefined' ? fetch.bind(global) : null);
-    // V3 (spec browser-strict): strict-kilder får ALDRI nøkkel via
-    // /source_access — HVER strict-kjøring (kryptert eller ei) autoriseres og
-    // logges via /local_run_authorize (deps.authorizeStrict), som utleverer
-    // eventuelle nøkler. Ingen caching: callbacken kalles per kjøring.
-    var strictItems = localItems.filter(function (it) {
-      return it.grant && it.grant.local_profile === 'strict';
-    });
-    if (strictItems.length) {
-      if (!deps.authorizeStrict) throw new Error('strict-kilder krever autorisert kjøring — mangler authorizeStrict');
-      var runKeys = await deps.authorizeStrict(strictItems.map(function (it) { return it.anvil; }));
-      strictItems.forEach(function (it) {
-        if (runKeys && runKeys[it.anvil]) it.grant = Object.assign({}, it.grant, { key: runKeys[it.anvil] });
-      });
-    }
 
     function fetchBytes(item) {
       var k = item.url;
@@ -158,44 +123,8 @@
       var out = { alias: item.alias, bytes: dec.bytes, format: dec.format };
       if (item.table) out.table = item.table;
       if (item.kind) out.kind = item.kind;
-      if (dec.envelope) { out.envelope = dec.envelope; out.key = dec.key; }
-      // out.level is exposed for ANY registered grant, not just strict — the
-      // sidebar's click-to-view gating needs the real level even for a
-      // protected/sensitive source whose local_mode happens to be "open"
-      // (allowed to run in the ordinary non-strict path). l.strict (only true
-      // for local_profile==='strict') still separately gates the actual
-      // STRICT execution route; this is purely informational for the UI.
-      if (item.grant && item.grant.level) out.level = item.grant.level;
-      if (item.grant && item.grant.local_profile === 'strict') {
-        // strict-grant (spec 2026-07-05-browser-strict-execution §2): rammen
-        // får KUN gå inn i safepy-fasaden; nivået velger policy-tier lokalt.
-        out.strict = true;
-        out.level = item.grant.level || 'protected';
-      }
       return out;
     }));
-  }
-
-  function fetchSourceAccess(item, deps, fetchImpl) {
-    var base = (deps.apiBase || '').replace(/\/+$/, '');
-    if (!base) return Promise.reject(new Error('ingen API-base konfigurert for kilden «' + item.anvil + '»'));
-    var headers = deps.authToken ? { 'Authorization': 'Bearer ' + deps.authToken } : {};
-    return fetchImpl(base + '/_/api/source_access?id=' + encodeURIComponent(item.anvil), { headers: headers })
-      .then(function (r) {
-        if (r.status === 404) {
-          // roadmap §2a: tagged so the UI can offer "request access" instead
-          // of a dead end (POST /access_request, apiBase-relative — see
-          // index.html's renderAccessDeniedError). Same message either way —
-          // 404 here already means "unknown OR denied", never leak which.
-          var e = new Error('Fant ikke kilden «' + item.anvil + '» eller du mangler tilgang — logg inn, eller kontakt eieren.');
-          e.accessDenied = true;
-          e.sourceId = item.anvil;
-          e.apiBase = base;
-          throw e;
-        }
-        if (!r.ok) throw new Error('source_access ' + r.status + ' for «' + item.anvil + '»');
-        return r.json();
-      });
   }
 
   // safepy-enc-v1: sniffFormat sier json — sjekk konvolutt, verifiser
@@ -209,34 +138,16 @@
     var computed = await EC.envelopeFingerprint(env);
     if (env.fingerprint && computed !== env.fingerprint)
       throw new Error('«' + item.alias + '»: ødelagt fil (fingerprint stemmer ikke)');
-    if (item.grant && item.grant.fingerprint && computed !== item.grant.fingerprint)
-      throw new Error('«' + item.alias + '»: filen er endret siden den ble registrert — kontakt eieren');
-    var key;
-    if (item.grant && item.grant.local_profile === 'strict') {
-      // Strict: nøkkelen kommer fra per-kjørings-autorisasjonen (V3) eller et
-      // eksplisitt key()-literal (mode 2). ALDRI promptKey/økt-cache — mangler
-      // nøkkelen, nektes kjøringen.
-      key = (item.grant && item.grant.key) || (item.key && item.key !== 'ask' ? item.key : null);
-      if (!key) throw new Error('«' + item.alias + '»: kjøringen ble ikke autorisert med nøkkel — strict-kilder bruker aldri lagrede/spurte nøkler; prøv igjen eller bruk key(<nøkkel>)');
-    } else {
-      key = (item.key && item.key !== 'ask') ? item.key
-          : (item.grant && item.grant.key) ? item.grant.key
-          : deps.promptKey ? await deps.promptKey(item.alias)
-          : null;
-      if (!key) throw new Error('«' + item.alias + '» er kryptert og krever nøkkel — bruk key(...) eller key(ask)');
-    }
-    if (item.grant && item.grant.local_profile === 'strict') {
-      // V4 (spec browser-strict): ingen klartekst i JS eller på Pyodide-FS for
-      // strict — konvolutten og nøkkelen sendes videre og dekrypteres først
-      // INNE i kjøringen (safepy.encfile); klartekst slippes etter kjøringen.
-      return { bytes: null, format: env.payload_format || 'csv', envelope: env, key: key };
-    }
+    var key = (item.key && item.key !== 'ask') ? item.key
+        : deps.promptKey ? await deps.promptKey(item.alias)
+        : null;
+    if (!key) throw new Error('«' + item.alias + '» er kryptert og krever nøkkel — bruk key(...) eller key(ask)');
     var plain = await EC.decryptEnvelope(env, key);
     return { bytes: plain, format: env.payload_format || 'csv' };
   }
 
   // Project A: fetch the SOURCES a spec needs (each connect alias as a whole
-  // table), honoring grants/decrypt/remote routing exactly like load does, and
+  // table), honoring key()/decrypt exactly like load does, and
   // return the spec so the runtime can assemble. Same fetch layer as
   // resolveAndFetchLoads — only the shape of the request changes.
   async function resolveAndAssemble(script, deps) {
@@ -288,7 +199,7 @@
     var resolved = DD.resolve(parsedLoads, registry);
     var descriptors = {};
     resolved.forEach(function (r) {
-      if (r.error || r.anvil) return; // protected/anvil/error sources are never pushdown-eligible
+      if (r.error) return; // error sources are never pushdown-eligible
       // .csv-sniff siden trinn B: bare .parquet/.csv-endelser gjenkjennes uten
       // eksplisitt kind() — alt annet er 'other' og aldri pushdown-kandidat.
       descriptors[r.alias] = { url: r.url,
