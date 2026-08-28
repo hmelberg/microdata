@@ -14,6 +14,11 @@ __pycache__/
 # Local working notes (not tracked)
 Notater og mulige issues.md
 
+# Node deps for netlify/functions/ (package.json, added Task 5 fix round —
+# first Node-runtime code in this repo; @netlify/blobs is a real runtime
+# import, so a manifest + install step exists now).
+node_modules/
+
 # Editor / IDE
 .claude/
 .vscode/
