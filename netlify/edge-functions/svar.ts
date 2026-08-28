@@ -4,23 +4,17 @@
 // Strukturmal: askstats svar.ts, minus ruter/packs/keys/discover — microdata
 // har ikke askstats finn-data-problem; kunnskapen er front-lastet i prefiksen
 // og detaljer hentes med variabel_info.
-import { timingSafeEqual, upstreamErrorResponse, extractByokKey, type IpContext } from "./_lib/auth.ts";
-import { type AgenticResumeState, runAgenticStream } from "./_lib/anthropic.ts";
+import { timingSafeEqual, extractByokKey, type IpContext } from "./_lib/auth.ts";
+import { type AgenticResumeState } from "./_lib/anthropic.ts";
 import { coerceQuality, resolveLlm } from "./_lib/llm-choice.ts";
-import { runProviderAgenticStream } from "./_lib/providers/agentic.ts";
-import { makeOpenAiCompatTurn } from "./_lib/providers/openai-compat.ts";
-import { makeOpenAiResponsesTurn } from "./_lib/providers/openai-responses.ts";
 import {
-  coerceRunOkCalls, filtrerRunCode, klassifiserRunResult, medPaaminnelse,
+  coerceRunOkCalls, klassifiserRunResult, medPaaminnelse,
 } from "./_lib/run-disiplin.ts";
-import {
-  buildSvarSystem, coerceUserInstructions, progressLabel, questionTurn,
-  RUN_CODE_TOOL, svarBudsjett, VARIABEL_INFO_TOOL,
-} from "./_lib/svar-instruks.ts";
 import { type GenMode } from "./_lib/prefiks.ts";
-import { variabelInfo } from "./_lib/tools/variabel-info.ts";
 import { journalfor } from "./_lib/feiljournal.ts";
 import { denoEnv, feiljournalStore, gate } from "./_lib/deno-kabling.ts";
+import { SSE_HEADERS } from "./_lib/jobb-tail.ts";
+import { byggLop } from "./_lib/svar-lop.ts";
 
 interface ResumeBody { state?: AgenticResumeState; run_ok_calls?: unknown; }
 interface RequestBody {
@@ -123,12 +117,10 @@ export default async (request: Request, context: IpContext): Promise<Response> =
     runOkCalls++;
     if (runOkCalls === 1) runResultTilLopet = medPaaminnelse(runResultTilLopet);
   }
-  const tools = filtrerRunCode([RUN_CODE_TOOL, VARIABEL_INFO_TOOL], runOkCalls);
 
   const origin = new URL(request.url).origin;
   const mode = coerceMode(body.mode);
   const kvalitet = coerceQuality(body.quality) ?? "balanced";
-  const budsjett = svarBudsjett(kvalitet);
 
   // Feiljournalen (selvforbedringssløyfen 2026-08-28): KUN personlig-
   // autentisert trafikk journalføres — Hans' egen bruk, hans data. Alt er
@@ -142,76 +134,11 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   if (runResultTilLopet !== undefined && klassifiserRunResult(runResultTilLopet) === "feil") {
     journalHendelse("run_feil", runResultTilLopet);
   }
-  let system: string;
-  try {
-    system = await buildSvarSystem(origin, mode, {
-      userInstructions: coerceUserInstructions(body.instructions),
-    });
-  } catch (e) {
-    console.error("svar: prefiks-bygging feilet:", e);
-    return new Response("Systemreferansen er utilgjengelig", { status: 502 });
-  }
-
-  const executeTool = async (name: string, input: Record<string, unknown>): Promise<string> => {
-    if (name === "variabel_info") {
-      return await variabelInfo(origin, String(input.navn ?? ""));
-    }
-    throw new Error(`ukjent verktøy: ${name}`);
-  };
-
-  const commonOpts = {
-    system,
-    userContent: questionTurn(question, body.script),
-    tools,
-    executeTool,
-    progressLabel,
-    maxTokens: 8192,
-    maxClientToolCalls: budsjett.clientCalls,
-    clientTools: ["run_code"],
-    maxRunCode: budsjett.runCalls,
-    runResult: runResultTilLopet,
-    resume: resumeState,
-    continueExtra: () => ({ run_ok_calls: runOkCalls }),
-    // Feiljournal-avlytting: error-events fra løkka. Providers-veien (askstat-
-    // identisk fil) kjenner ikke onEmit og ignorerer nøkkelen — bevisst.
-    onEmit: (ev: Record<string, unknown>) => {
-      if (ev.type === "error") journalHendelse("feil", String(ev.message ?? ""));
-    },
-  };
-  const providerDeps = { timeoutMs: 180_000, retries: 1 };
-  let inner: ReadableStream<Uint8Array>;
-  try {
-    if (choice.provider?.type === "openai-compat") {
-      inner = runProviderAgenticStream({
-        ...commonOpts,
-        deps: providerDeps,
-        runTurn: makeOpenAiCompatTurn(choice.provider),
-      });
-    } else if (choice.provider?.type === "openai-responses") {
-      inner = runProviderAgenticStream({
-        ...commonOpts,
-        deps: providerDeps,
-        runTurn: makeOpenAiResponsesTurn(choice.provider),
-      });
-    } else {
-      // KUN den anthropic-native grenen får verboseUpstream: providers-veien
-      // (runProviderAgenticStream/_lib/providers/*) er byte-identisk med
-      // askstat og skal ikke divergere for et microdata-tillegg.
-      inner = runAgenticStream({
-        ...commonOpts,
-        deps: { verboseUpstream: erPersonlig },
-        apiKey: choice.apiKey,
-        model: choice.provider ? choice.provider.model : choice.model,
-        cacheTtl: "1h",
-        effort: choice.effort,
-        apiBase: choice.provider?.type === "anthropic-compat" ? choice.provider.baseUrl : undefined,
-      });
-    }
-  } catch (e) {
-    return upstreamErrorResponse(e, byokKey);
-  }
-
-  return new Response(inner, {
-    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+  const lop = await byggLop({
+    origin, question, mode, script: body.script, instructions: body.instructions,
+    choice, erPersonlig, resumeState, runResultTilLopet, runOkCalls,
+    kvalitet, journalHendelse, turnDeadlineMs: 50_000, byokKey,
   });
+  if (lop instanceof Response) return lop;
+  return new Response(lop, { headers: SSE_HEADERS });
 };
