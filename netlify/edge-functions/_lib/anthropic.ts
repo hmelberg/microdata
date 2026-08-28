@@ -35,23 +35,6 @@ export interface StreamEvent {
   message?: string;
 }
 
-/**
- * Identitetskoblede Anthropic-nøkler krever at forespørselen sier HVILKET
- * workspace den handler på vegne av — uten headeren svarer API-et 400
- * («anthropic-workspace-id is required when authenticating with an
- * identity-linked API key»), uansett hvor riktig resten av bodyen er.
- * Vanlige workspace-nøkler trenger den ikke, så headeren settes kun når
- * ANTHROPIC_WORKSPACE_ID faktisk er konfigurert.
- *
- * Gjelder BARE serverens egen nøkkel. En BYOK-bruker med identitetskoblet
- * nøkkel må bruke en vanlig workspace-nøkkel i stedet — vi har ingen måte å
- * vite workspace-id-en deres på.
- */
-function workspaceHeader(): Record<string, string> {
-  const id = Deno.env.get("ANTHROPIC_WORKSPACE_ID");
-  return id ? { "anthropic-workspace-id": id } : {};
-}
-
 /** Endepunktet for dette kallet: brukerens gateway, ellers Anthropic selv. */
 function apiTarget(apiBase?: string): string {
   return apiBase ? `${apiBase.replace(/\/+$/, "")}/messages` : ANTHROPIC_API;
@@ -129,7 +112,6 @@ export async function streamAnthropic(
     "Content-Type": "application/json",
     "x-api-key": opts.apiKey,
     "anthropic-version": ANTHROPIC_VERSION,
-    ...workspaceHeader(),
   };
   if (opts.system && useLongTtl) {
     headers["anthropic-beta"] = "extended-cache-ttl-2025-04-11";
@@ -196,7 +178,6 @@ export async function messageAnthropic(
     "Content-Type": "application/json",
     "x-api-key": opts.apiKey,
     "anthropic-version": ANTHROPIC_VERSION,
-    ...workspaceHeader(),
   };
   if (opts.system && useLongTtl) {
     headers["anthropic-beta"] = "extended-cache-ttl-2025-04-11";
@@ -574,7 +555,6 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
         "Content-Type": "application/json",
         "x-api-key": opts.apiKey,
         "anthropic-version": ANTHROPIC_VERSION,
-        ...workspaceHeader(),
       };
       if (useLongTtl) headers["anthropic-beta"] = "extended-cache-ttl-2025-04-11";
       const system = [{

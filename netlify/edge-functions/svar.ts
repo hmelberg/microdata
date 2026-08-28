@@ -4,7 +4,7 @@
 // Strukturmal: askstats svar.ts, minus ruter/packs/keys/discover — microdata
 // har ikke askstats finn-data-problem; kunnskapen er front-lastet i prefiksen
 // og detaljer hentes med variabel_info.
-import { gate, timingSafeEqual, upstreamErrorResponse, extractByokKey, type IpContext } from "./_lib/auth.ts";
+import { timingSafeEqual, upstreamErrorResponse, extractByokKey, type IpContext } from "./_lib/auth.ts";
 import { type AgenticResumeState, runAgenticStream } from "./_lib/anthropic.ts";
 import { coerceQuality, resolveLlm } from "./_lib/llm-choice.ts";
 import { runProviderAgenticStream } from "./_lib/providers/agentic.ts";
@@ -19,7 +19,8 @@ import {
 } from "./_lib/svar-instruks.ts";
 import { type GenMode } from "./_lib/prefiks.ts";
 import { variabelInfo } from "./_lib/tools/variabel-info.ts";
-import { feiljournalStore, journalfor } from "./_lib/feiljournal.ts";
+import { journalfor } from "./_lib/feiljournal.ts";
+import { denoEnv, feiljournalStore, gate } from "./_lib/deno-kabling.ts";
 
 interface ResumeBody { state?: AgenticResumeState; run_ok_calls?: unknown; }
 interface RequestBody {
@@ -97,7 +98,7 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   }
 
   const byokKey = extractByokKey(request);
-  const choice = resolveLlm(request, body, "svar");
+  const choice = resolveLlm(request, body, "svar", denoEnv);
   if (choice instanceof Response) return choice;
 
   // Personlig-autentisert kall (Hans' private passord): oppstrøms-feildetaljer
@@ -108,7 +109,7 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   const bearer = (request.headers.get("authorization") ?? "").startsWith("Bearer ")
     ? (request.headers.get("authorization") ?? "").slice(7).trim()
     : "";
-  const personligToken = Deno.env.get("M2PY_ACCESS_TOKEN_PERSONAL") ?? "";
+  const personligToken = denoEnv("M2PY_ACCESS_TOKEN_PERSONAL") ?? "";
   const erPersonlig = bearer.length > 0 && personligToken.length > 0 &&
     timingSafeEqual(bearer, personligToken);
 

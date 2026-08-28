@@ -7,8 +7,6 @@
 // Leses fra repoet med:  netlify blobs:list feiljournal  /  netlify blobs:get
 // feiljournal <nøkkel>. Journalen er BEST-EFFORT: den feiler ÅPENT og får
 // aldri velte et svar.
-// @ts-ignore - @netlify/blobs via esm.sh for Deno/Edge-kompatibilitet
-import { getStore } from "https://esm.sh/@netlify/blobs@7";
 
 export interface JournalStore {
   set(key: string, value: string): Promise<void>;
@@ -54,9 +52,4 @@ export async function journalfor(
   } catch (_e) {
     // best-effort: journalfeil skal aldri nå brukeren
   }
-}
-
-/** Standard-storen. Egen funksjon så svar.ts kan hente den lat og testene slippe nettverk. */
-export function feiljournalStore(): JournalStore {
-  return (getStore as unknown as (opts: { name: string }) => JournalStore)({ name: "feiljournal" });
 }

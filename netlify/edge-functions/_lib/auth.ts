@@ -13,7 +13,6 @@
 // de to konfigurerte passordene (M2PY_ACCESS_TOKEN og
 // M2PY_ACCESS_TOKEN_PERSONAL). Feil token gir umiddelbar 401 i stedet for en
 // 4-sekunders nettverksrundtur mot Anvil.
-import { checkRateLimit as defaultCheckRateLimit } from "./rate-limit.ts";
 
 /** Constant-time string comparison (no early return on first mismatch). */
 export function timingSafeEqual(a: string, b: string): boolean {
@@ -236,15 +235,6 @@ export async function runGate(
   return null;
 }
 
-/** Env-wired gate used by the handlers. */
-export function gate(request: Request, opts: GateOptions, context?: IpContext): Promise<Response | null> {
-  return runGate(request, opts, {
-    sharedToken: Deno.env.get("M2PY_ACCESS_TOKEN") ?? undefined,
-    personalToken: Deno.env.get("M2PY_ACCESS_TOKEN_PERSONAL") ?? undefined,
-    checkRateLimit: defaultCheckRateLimit,
-  }, context);
-}
-
 export interface AdminGateDeps {
   sharedToken?: string;
   /** Se GateDeps.personalToken — samme rolle, teller også som admin. */
@@ -282,13 +272,4 @@ export async function runAdminGate(
     return new Response("Unauthorized", { status: 401 });
   }
   return null;
-}
-
-/** Env-wired admin gate used by data-svar and hent. */
-export function adminGate(request: Request, opts: GateOptions, context?: IpContext): Promise<Response | null> {
-  return runAdminGate(request, opts, {
-    sharedToken: Deno.env.get("M2PY_ACCESS_TOKEN") ?? undefined,
-    personalToken: Deno.env.get("M2PY_ACCESS_TOKEN_PERSONAL") ?? undefined,
-    checkRateLimit: defaultCheckRateLimit,
-  }, context);
 }

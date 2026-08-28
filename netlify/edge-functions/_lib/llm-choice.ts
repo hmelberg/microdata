@@ -53,7 +53,7 @@ function envKeysFor(site: CallSite): string[] {
 }
 
 /**
- * Velg modell + effort. `env` injiseres slik at testene aldri rører Deno.env.
+ * Velg modell + effort. `env` injiseres slik at testene aldri rører Denos miljøoppslag.
  *
  * Merk at en env-overstyring bytter MODELLEN, ikke effort-nivået: driftaren
  * som pinner en modell mener ikke dermed at brukerens kvalitetsvalg skal
@@ -111,7 +111,7 @@ export function resolveLlm(
   request: Request,
   body: { provider?: unknown; quality?: unknown },
   site: CallSite,
-  env: (k: string) => string | undefined = (k) => Deno.env.get(k),
+  env: (k: string) => string | undefined,
 ): LlmChoice | Response {
   const parsed = parseProviderConfig(body.provider, request);
   if (parsed && "error" in parsed) return parsed.error;

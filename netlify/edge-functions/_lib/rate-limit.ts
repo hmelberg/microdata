@@ -1,6 +1,3 @@
-// @ts-ignore - @netlify/blobs imported via esm.sh for Deno/Edge Function compatibility
-import { getStore } from "https://esm.sh/@netlify/blobs@7";
-
 const WINDOW_MS = 60 * 60 * 1000;
 // Generous on purpose: these are interactive endpoints, and 10/hour ran out
 // mid-session. This is an abuse guard, not a quota.
@@ -10,7 +7,7 @@ interface RateRecord {
   calls: number[];
 }
 
-interface RateStore {
+export interface RateStore {
   get(key: string, opts: { type: "json" }): Promise<unknown>;
   setJSON(key: string, value: unknown): Promise<unknown>;
 }
@@ -18,16 +15,7 @@ interface RateStore {
 export async function checkRateLimit(
   endpoint: string,
   ip: string,
-  // Injectable for tests; defaults to the Netlify Blobs store.
-  getStoreImpl: (name: string) => RateStore = ((name: string) =>
-    (getStore as unknown as (opts: { name: string; consistency: string }) => RateStore)({
-      name,
-      // Strong consistency is REQUIRED. With the default (eventual), the
-      // writes below succeed but the reads above never see them, so the
-      // counter stays empty and the limit silently never fires — measured
-      // against prod on 2026-08-24, this endpoint family never returned 429.
-      consistency: "strong",
-    })),
+  getStoreImpl: (name: string) => RateStore,
 ): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
   if (!ip) return { allowed: true, retryAfterSeconds: 0 };
   try {
