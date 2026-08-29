@@ -86,7 +86,13 @@ export interface GateOptions {
    * Accept a well-formed X-Anthropic-Key in place of token/admin auth — only
    * for endpoints that forward the key to Anthropic, which validates it.
    * Never set this on endpoints that don't consume the key (they would
-   * become effectively anonymous).
+   * become effectively anonymous) — with ONE documented exception:
+   * svar-tail.ts, which makes no model call and spends no server key at all.
+   * A BYOK caller has no bearer token, so without this flag it could never
+   * reconnect to its own stream; the real capability check there is the job
+   * UUID in the URL (36 chars, minted by /api/svar), not the key. Any other
+   * handler that sets this without consuming the key is a bug, not a second
+   * instance of this exception.
    */
   allowByok?: boolean;
   /**
@@ -97,7 +103,10 @@ export interface GateOptions {
    * X-Llm-Key-authenticated request that lacks a complete parsed `provider`
    * body, or it would fall through to the server's own env-configured API key
    * as an anonymous bypass. In this repo that check lives in resolveLlm
-   * (_lib/llm-choice.ts); never set this flag on a handler that skips it.
+   * (_lib/llm-choice.ts); never set this flag on a handler that skips it —
+   * with the SAME one documented exception as allowByok above: svar-tail.ts,
+   * where resolveLlm is simply not in the picture (no model call, no key
+   * spent), and the job UUID is the real capability check.
    */
   allowLlmKey?: boolean;
 }

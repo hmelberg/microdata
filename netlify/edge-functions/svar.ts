@@ -152,11 +152,19 @@ export default async (request: Request, context: IpContext): Promise<Response> =
     const v = request.headers.get(h);
     if (v) videre[h] = v;
   }
+  // resume kastes ut av spreaden med vilje: den bærer HELE samtalen én gang
+  // til, ved siden av resumeState under. Doblingen halverte det effektive
+  // 2 MB-budsjettet, og en resume over ~1 MB døde som en usynlig 413 inne i
+  // bakgrunnsinvokasjonen — platformens 202 kastet svaret, og klienten så
+  // «Svarjobben startet aldri» ti sekunder senere, umulig å skille fra et
+  // reelt krasj (Task 6 review-funn 2). Den uvaliderte kopien skal heller
+  // ikke reise videre: resumeState er den validerte/rekonstruerte utgaven.
+  const { resume: _uvalidert, ...offentlig } = body;
   const spawn = await fetch(new URL("/api/svar-jobb", origin), {
     method: "POST",
     headers: videre,
     body: JSON.stringify({
-      ...body, jobId, runOkCalls, runResultTilLopet,
+      ...offentlig, jobId, runOkCalls, runResultTilLopet,
       resumeState, quality: kvalitet,
       // erPersonlig sendes IKKE — jobb-funksjonen regner den ut fra tokenet
       // selv. Et klientsatt flagg ville vært en innsyns-bypass.

@@ -45,12 +45,32 @@ export function jobbStore(): BlobbStore {
 const rateLimitDep = (endpoint: string, ip: string) =>
   checkRateLimit(endpoint, ip, rateLimitStore);
 
+// Speiler ingenRateLimit i node-kabling.mts (samme resonnement, samme rolle,
+// annen runtime): /api/svar-tail er ALDRI rate-limitet. En tail er ikke et
+// nytt spørsmål — det er samme spørsmål som allerede talte mot 60/t-grensen
+// på /api/svar, bare neste avspillingsvindu. Uten dette no-opet fikk
+// svar-tail sin EGEN 60/t-bøtte (nøkkelen er `${endpoint}:${ip}`, og
+// "svar-tail" er en annen endpoint-streng enn "svar") — en 13-minutters jobb
+// bruker ~17 håndoverleveringer à 45 s, så den fjerde lange jobben innen én
+// time traff 429 midt i strømmen (Task 6 review-funn 1).
+const ingenRateLimit = () =>
+  Promise.resolve({ allowed: true, retryAfterSeconds: 0 });
+
 /** Env-kablet port brukt av edge-handlerne. */
 export function gate(request: Request, opts: GateOptions, context?: IpContext) {
   return runGate(request, opts, {
     sharedToken: denoEnv("M2PY_ACCESS_TOKEN"),
     personalToken: denoEnv("M2PY_ACCESS_TOKEN_PERSONAL"),
     checkRateLimit: rateLimitDep,
+  }, context);
+}
+
+/** Env-kablet port for /api/svar-tail — se ingenRateLimit over. */
+export function tailGate(request: Request, opts: GateOptions, context?: IpContext) {
+  return runGate(request, opts, {
+    sharedToken: denoEnv("M2PY_ACCESS_TOKEN"),
+    personalToken: denoEnv("M2PY_ACCESS_TOKEN_PERSONAL"),
+    checkRateLimit: ingenRateLimit,
   }, context);
 }
 
