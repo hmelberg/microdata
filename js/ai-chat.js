@@ -639,6 +639,65 @@
           }
         }
 
+        // Overleveringen: taileren gir fra seg på 45 s med {type:'tail'}, og vi
+        // plukker opp fra samme markør. Usynlig for handleSvarEvent — hele
+        // poenget er at event-strømmen ser sammenhengende ut.
+        //
+        // Defineres HER, ikke ved consumeSse (linje ~555): den bruker
+        // `markdown`/`bubble`/`signal`, som er lokale i runSvar og ikke synlige
+        // der consumeSse er definert. Plassert ved consumeSse ville den kastet
+        // ReferenceError på aller første overlevering (forhåndsskanningens
+        // Ruling B).
+        //
+        // markdownVedGrense er gjenopprettingspunktet: ryker nettet MIDT i et
+        // segment, spoler vi svarteksten tilbake dit og henter segmentet på nytt.
+        // Uten det ville en gjentakelse duplisert tekst brukeren alt har sett.
+        async function consumeMedTail(resp, onEvent, hop) {
+          let neste = null;
+          let markdownVedGrense = null;
+          let overleveringer = 0;
+          const wrap = (ev) => {
+            if (ev.type === 'tail') { neste = ev; return; }
+            onEvent(ev);
+          };
+          await consumeSse(resp, wrap).catch((e) => rethrowDescribed(e, 'svar', 'stream', hop));
+          while (neste) {
+            // Klient-side speil av `hop > 40`-vakten under: server-siden har
+            // en dødjobb-vakt (jobb-tail.ts, 16 min «kjorer» → forklart feil),
+            // men den dekker kun ÉN patologi (en drept bakgrunnsprosess).
+            // Denne grensen er billig forsikring mot enhver annen overleverings-
+            // patologi den vakten ikke modellerer. 40 × 45 s ≈ 30 min — et ekte
+            // svar overleverer aldri i nærheten av så mange ganger.
+            overleveringer++;
+            if (overleveringer > 40) {
+              throw new Error(T('Avbrutt: svaret ble ikke ferdig etter 40 overleveringer.'));
+            }
+            const t = neste;
+            neste = null;
+            markdownVedGrense = markdown;
+            const url = '/api/svar-tail?job=' + encodeURIComponent(t.job) +
+                      '&from=' + encodeURIComponent(t.cursor);
+            let r;
+            try {
+              // postWithRetry er en generisk fetch-wrapper tross navnet; GET er
+              // trygt her fordi tail-avspilling er idempotent.
+              r = await AiTransport.postWithRetry(url, {
+                method: 'GET', headers: edgeAuthHeaders(), signal: signal,
+              });
+              if (!r.ok || !r.body) throw new Error('HTTP ' + r.status + ' ' + (await r.text()));
+              await consumeSse(r, wrap);
+            } catch (e) {
+              if (e && e.name === 'AbortError') throw e;
+              // Spol tilbake til segmentgrensen og prøv samme markør én gang til.
+              markdown = markdownVedGrense;
+              streamRenderMd(bubble, markdown);
+              neste = t;
+              if (t._forsokt) rethrowDescribed(e, 'svar-tail', 'stream', hop);
+              t._forsokt = true;
+            }
+          }
+        }
+
         for (let hop = 0; ; hop++) {
           if (hop > 40) throw new Error(T('Avbrutt: svaret ble ikke ferdig etter 40 fortsettelses-runder.'));
           const resp = await AiTransport.postWithRetry('/api/svar', {
@@ -661,11 +720,11 @@
           if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()));
 
           let cont = null, pendingRun = null;
-          await consumeSse(resp, (ev) => {
+          await consumeMedTail(resp, (ev) => {
             if (ev.type === 'continue') { cont = { state: ev.state, run_ok_calls: ev.run_ok_calls }; return; }
             if (ev.type === 'run_code') { pendingRun = ev.script || ''; return; }
             handleSvarEvent(ev);
-          }).catch((e) => rethrowDescribed(e, 'svar', 'stream', hop));
+          }, hop);
 
           if (pendingRun != null) {
             if (signal && signal.aborted) {

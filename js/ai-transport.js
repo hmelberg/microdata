@@ -8,6 +8,11 @@
 //                    et brudd midt i en SSE-strøm skal aldri re-POSTes herfra
 //                    (delvis tekst kan alt være rendret, og et data-svar-hopp
 //                    ville kjørt — og fakturert — samme modell-turn på nytt).
+//                    Navnet er historisk (opprinnelig kun POST); ai-chat.js
+//                    bruker den også med method:'GET' mot /api/svar-tail
+//                    (Task 7) — trygt der fordi en GET mot tail-avspillingen
+//                    ikke fakturerer noe og er idempotent (ren avlesning fra
+//                    Blobs, samme markør gir samme innhold).
 //   describeError  — navngir endepunkt og fase (før svar / underveis, evt.
 //                    fortsettelses-runde) slik at neste feilmelding forklarer
 //                    seg selv. Bevisste, allerede oversatte meldinger (401-
