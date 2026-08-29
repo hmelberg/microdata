@@ -65,6 +65,9 @@ export interface LopInput {
   kvalitet: SvarKvalitet;
   journalHendelse: (type: string, detalj?: string) => void;
   turnDeadlineMs: number;
+  /** Tidligere turer i samme samtale (klientens `historikk`, oversatt til
+   * API-roller). Seedes som EKTE meldingsturer i anthropic.ts. */
+  forhistorikk?: { role: "user" | "assistant"; content: string }[];
   /** Valgfri: fylles med hva dette hoppet gjorde (til feiljournalen). */
   samler?: HopSamler;
   // Ikke i den opprinnelige kontrakt-lista (task-4-brief §Interfaces) — men
@@ -115,6 +118,7 @@ export async function byggLop(inp: LopInput): Promise<ReadableStream<Uint8Array>
   const commonOpts = {
     system,
     userContent: questionTurn(question, script),
+    forhistorikk: inp.forhistorikk,
     tools,
     executeTool,
     progressLabel,

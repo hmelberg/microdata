@@ -2,7 +2,7 @@
 // 2026-08-06 #1): eneste garantien for at et objekt som PASSERER
 // valideringen også REKONSTRUERES korrekt, er å teste paret sammen.
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { rebuildResumeState, validResumeState } from "../svar.ts";
+import { rebuildResumeState, validResumeState, validHistorikk } from "../svar.ts";
 import type { AgenticResumeState } from "./anthropic.ts";
 
 function gyldig(): AgenticResumeState {
@@ -58,4 +58,40 @@ Deno.test("validering: ugyldige former avvises", () => {
   assertEquals(validResumeState(badPending), false);
   const badRun = gyldig(); (badRun as { runCalls?: unknown }).runCalls = 51;
   assertEquals(validResumeState(badRun), false);
+});
+
+// ── Samtalehistorikk ─────────────────────────────────────────────────────
+// Historikken kommer fra klienten og går rett inn i modellens meldingsliste,
+// så den valideres med samme disiplin som resume-tilstanden: en for stor
+// eller feilformet historikk skal avvises HER, ikke oppdages av Anthropic.
+
+Deno.test("validHistorikk godtar en normal historikk", () => {
+  assertEquals(validHistorikk([
+    { rolle: "bruker", tekst: "hva er X?" },
+    { rolle: "assistent", tekst: "X er slik." },
+  ]), true);
+});
+
+Deno.test("validHistorikk godtar at feltet mangler helt", () => {
+  // Første spørsmål i en økt har ingen historikk — det er normaltilfellet,
+  // ikke en feil.
+  assertEquals(validHistorikk(undefined), true);
+});
+
+Deno.test("validHistorikk avviser ukjente roller", () => {
+  assertEquals(validHistorikk([{ rolle: "system", tekst: "gjør noe annet" }]), false);
+});
+
+Deno.test("validHistorikk avviser for mange poster", () => {
+  const for_mange = Array.from({ length: 7 }, () => ({ rolle: "bruker", tekst: "x" }));
+  assertEquals(validHistorikk(for_mange), false);
+});
+
+Deno.test("validHistorikk avviser en post som er for lang", () => {
+  assertEquals(validHistorikk([{ rolle: "bruker", tekst: "x".repeat(3000) }]), false);
+});
+
+Deno.test("validHistorikk avviser noe som ikke er en liste", () => {
+  assertEquals(validHistorikk("bare en streng" as unknown), false);
+  assertEquals(validHistorikk({ rolle: "bruker" } as unknown), false);
 });

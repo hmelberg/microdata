@@ -26,6 +26,7 @@ interface RequestBody {
   resume?: ResumeBody;
   run_result?: unknown;
   sporring?: unknown;
+  historikk?: unknown;
 }
 
 // Resume-bodies bærer hele samtaletilstanden (tool-results, kjøringsoutput).
@@ -49,6 +50,26 @@ export function validResumeState(s: AgenticResumeState | undefined): s is Agenti
     if (p.name !== undefined && (typeof p.name !== "string" || p.name.length > 20)) return false;
   }
   return typeof s.usage === "object" && s.usage !== null;
+}
+
+/** Samtalehistorikk fra klienten. Den går RETT inn i modellens meldingsliste,
+ * så den valideres her med samme disiplin som resume-tilstanden: en for stor
+ * eller feilformet historikk skal avvises på porten, ikke oppdages av
+ * Anthropic som en 400 midt i et svar. Feltet er valgfritt — første spørsmål
+ * i en økt har ingen historikk, og det er normaltilfellet.
+ *
+ * Grensene speiler klientens (js/ai-transport.js byggHistorikk): tre
+ * utvekslinger à to meldinger, 2000 tegn per melding. Taket her er litt
+ * romsligere så en klient som kapper på nøyaktig 2000 ikke avvises på grensen. */
+export function validHistorikk(h: unknown): boolean {
+  if (h === undefined || h === null) return true;
+  if (!Array.isArray(h) || h.length > 6) return false;
+  return h.every((p) => {
+    if (!p || typeof p !== "object") return false;
+    const q = p as Record<string, unknown>;
+    return (q.rolle === "bruker" || q.rolle === "assistent") &&
+      typeof q.tekst === "string" && q.tekst.length > 0 && q.tekst.length <= 2100;
+  });
 }
 
 // `pending` kopieres som ETT objekt, ALDRI felt-for-felt (i motsetning til
@@ -90,6 +111,18 @@ export default async (request: Request, context: IpContext): Promise<Response> =
     }
     resumeState = rebuildResumeState(body.resume.state);
   }
+
+  if (!validHistorikk(body.historikk)) {
+    return new Response("Invalid historikk payload", { status: 400 });
+  }
+  // Klientens roller («bruker»/«assistent») oversettes til API-ets HER, ett
+  // sted, så ingen nedstrøms trenger å kjenne begge vokabularene.
+  const forhistorikk = Array.isArray(body.historikk)
+    ? (body.historikk as { rolle: string; tekst: string }[]).map((p) => ({
+      role: (p.rolle === "bruker" ? "user" : "assistant") as "user" | "assistant",
+      content: p.tekst,
+    }))
+    : undefined;
 
   // Kjøres her (i tillegg til inne i jobb-funksjonen) for RASK avvisning:
   // en ugyldig leverandørkonfig eller manglende servernøkkel skal svare med
@@ -175,7 +208,7 @@ export default async (request: Request, context: IpContext): Promise<Response> =
     headers: videre,
     body: JSON.stringify({
       ...offentlig, jobId, runOkCalls, runResultTilLopet,
-      resumeState, quality: kvalitet,
+      resumeState, quality: kvalitet, forhistorikk,
       // erPersonlig sendes IKKE — jobb-funksjonen regner den ut fra tokenet
       // selv. Et klientsatt flagg ville vært en innsyns-bypass.
     }),

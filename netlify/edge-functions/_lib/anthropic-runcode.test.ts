@@ -341,3 +341,48 @@ Deno.test("onEmit-kroken får hvert emittert event (feiljournal-avlytting)", asy
   assertEquals(sett, ev.map((e) => e.type));
   assert(sett.includes("done"));
 });
+
+// ── Samtalehistorikk seedes som EKTE meldingsturer ───────────────────────
+// Ikke som en tekstblokk i brukerturen: da leser den som referat. Poenget er
+// at modellen skal kjenne igjen sitt eget oppklarende spørsmål som SITT.
+// (Journalen 2026-08-28: Hans svarte «2022, 35-55 år» på et spørsmål modellen
+// ikke lenger visste at den hadde stilt.)
+Deno.test("historikk blir ekte meldingsturer FØR dagens spørsmål", async () => {
+  let sendt: Record<string, unknown> | null = null;
+  const fetchImpl = ((_u: string, init: RequestInit) => {
+    sendt = JSON.parse(String(init.body));
+    return Promise.resolve(new Response(sseUpstream(streamedTextTurn("ok")), { status: 200 }));
+  }) as unknown as typeof fetch;
+
+  await samle(runAgenticStream({
+    ...BASE,
+    userContent: "DAGENS SPØRSMÅL",
+    forhistorikk: [
+      { role: "user", content: "hvilket år?" },
+      { role: "assistant", content: "Jeg trenger å vite årstallet." },
+    ],
+    executeTool: () => Promise.resolve("x"),
+    deps: { fetchImpl },
+  }));
+
+  const meldinger = (sendt!.messages as { role: string; content: unknown }[]);
+  assertEquals(meldinger.length, 3, "to historikk-turer + dagens spørsmål");
+  assertEquals(meldinger[0].role, "user");
+  assertEquals(meldinger[0].content, "hvilket år?");
+  assertEquals(meldinger[1].role, "assistant");
+  assertEquals(meldinger[2].content, "DAGENS SPØRSMÅL");
+});
+
+Deno.test("uten historikk er meldingslisten nøyaktig som før", async () => {
+  let sendt: Record<string, unknown> | null = null;
+  const fetchImpl = ((_u: string, init: RequestInit) => {
+    sendt = JSON.parse(String(init.body));
+    return Promise.resolve(new Response(sseUpstream(streamedTextTurn("ok")), { status: 200 }));
+  }) as unknown as typeof fetch;
+
+  await samle(runAgenticStream({
+    ...BASE, userContent: "bare dette",
+    executeTool: () => Promise.resolve("x"), deps: { fetchImpl },
+  }));
+  assertEquals((sendt!.messages as unknown[]).length, 1);
+});

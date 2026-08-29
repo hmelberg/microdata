@@ -68,6 +68,18 @@ export default async (request: Request): Promise<Response> => {
   const hoppStart = Date.now();
   const samler = nyHopSamler();
 
+  // Valideres HER også. Edge har alt gjort det, men denne funksjonen er
+  // offentlig nåbar og feltet går RETT inn i modellens meldingsliste — en
+  // uvalidert liste her ville vært en vei til å plante vilkårlige
+  // assistent-turer i samtalen.
+  const rå = body.forhistorikk;
+  const forhistorikk = Array.isArray(rå) && rå.length <= 6 && rå.every((p) =>
+      p && typeof p === "object" &&
+      (p.role === "user" || p.role === "assistant") &&
+      typeof p.content === "string" && p.content.length > 0 && p.content.length <= 2100)
+    ? rå as { role: "user" | "assistant"; content: string }[]
+    : undefined;
+
   const skriver = lagSkriver(jobbStore(), jobId, () => Date.now());
   await skriver.start();
 
@@ -128,6 +140,7 @@ export default async (request: Request): Promise<Response> => {
     resumeState: body.resumeState, runResultTilLopet: body.runResultTilLopet,
     runOkCalls: Number(body.runOkCalls) || 0,
     kvalitet, journalHendelse, samler,
+    forhistorikk,
     turnDeadlineMs: TUR_FRIST_MS, byokKey,
   });
   if (lop instanceof Response) {

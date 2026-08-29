@@ -316,6 +316,12 @@ export interface AgenticOptions {
   // and the client re-POSTs with `resume` = that state.
   resume?: AgenticResumeState;
   turnsPerCall?: number;
+  /** Tidligere turer i SAMME samtale, seedet foran dagens spørsmål.
+   * Ekte meldingsturer, ikke en tekstblokk i brukerturen: modellen skal
+   * kjenne igjen sitt eget oppklarende spørsmål som SITT, ikke som referat
+   * av noe den blir fortalt at den sa. (Chatten hadde ingen hukommelse i det
+   * hele tatt før 2026-08-29 — se feiljournalen samme dato.) */
+  forhistorikk?: { role: "user" | "assistant"; content: string }[];
   continueExtra?: () => Record<string, unknown>;
   deps?: RetryDeps;
   // Speiler AnthropicStreamOptions (multi-provider-runden 2026-08-27):
@@ -575,7 +581,10 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
       }];
 
       const state: AgenticResumeState = opts.resume ?? {
-        messages: [{ role: "user", content: opts.userContent }],
+        messages: [
+          ...(opts.forhistorikk ?? []),
+          { role: "user", content: opts.userContent },
+        ],
         turn: 0,
         clientCalls: 0,
         usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 },

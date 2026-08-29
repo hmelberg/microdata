@@ -789,6 +789,12 @@
                 instructions: lsGet('md_ai_instructions') || undefined,
                 resume: resume || undefined,
                 run_result: runResult == null ? undefined : runResult,
+                // Kun på FØRSTE hopp: resume-hoppene bærer allerede løkkas
+                // egen meldingstilstand, og historikken ville da blitt seedet
+                // inn på nytt for hver runde.
+                historikk: hop === 0 && !resume
+                  ? AiTransport.byggHistorikk(state.history)
+                  : undefined,
               }, edgeBodyExtras())),
               signal,
             }).catch((e) => rethrowDescribed(e, 'svar', 'request', hop));

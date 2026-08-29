@@ -109,8 +109,43 @@
     return msg;   // bevisst kastet, allerede forståelig — ikke pakk inn
   }
 
-  global.AiTransport = { postWithRetry: postWithRetry, describeError: describeError, nesteTailSteg: nesteTailSteg };
+
+  // ── Samtalehukommelse ───────────────────────────────────────────────────
+  // Chatten hadde ingen hukommelse fram til 2026-08-29: questionTurn() bygde
+  // brukerturen av dagens spørsmål alene, og state.history ble kun brukt til
+  // å tegne tråden. Journalen viste hva det kostet — Hans svarte «2022,
+  // 35-55 år, ja filltrer» på et oppklarende spørsmål modellen ikke lenger
+  // visste at den hadde stilt, og gjentok til slutt hele spørsmålet.
+  //
+  // Ligger her og ikke i ai-chat.js av samme grunn som nesteTailSteg: ren
+  // logikk må bo utenfor DOM-closuren for å kunne node-testes, og en av-for-en
+  // i utvelgelsen ville ellers bare fått modellen til å virke litt glemsk.
+  var HIST_UTVEKSLINGER = 3;     // tre spørsmål + tre svar
+  var HIST_MAKS_TEGN = 2000;     // per melding
+
+  function byggHistorikk(history) {
+    if (!Array.isArray(history) || history.length < 2) return [];
+    // SISTE post er spørsmålet brukeren stiller NÅ — sendSvarMessage pusher
+    // den før runSvar kalles. Kom den med, ville modellen sett oppdraget sitt
+    // to ganger: én gang som «tidligere», én gang som det den skal svare på.
+    var tidligere = history.slice(0, -1);
+    var ut = [];
+    for (var i = 0; i < tidligere.length; i++) {
+      var p = tidligere[i];
+      var tekst = p.role === 'user'
+        ? p.text
+        : (p.meta && p.meta.markdown);
+      if (typeof tekst !== 'string' || !tekst.trim()) continue;   // avbrutt tur
+      ut.push({
+        rolle: p.role === 'user' ? 'bruker' : 'assistent',
+        tekst: tekst.slice(0, HIST_MAKS_TEGN),
+      });
+    }
+    return ut.slice(-(HIST_UTVEKSLINGER * 2));
+  }
+
+  global.AiTransport = { postWithRetry: postWithRetry, describeError: describeError, byggHistorikk: byggHistorikk, nesteTailSteg: nesteTailSteg };
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { postWithRetry: postWithRetry, describeError: describeError, nesteTailSteg: nesteTailSteg };
+    module.exports = { postWithRetry: postWithRetry, describeError: describeError, byggHistorikk: byggHistorikk, nesteTailSteg: nesteTailSteg };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
