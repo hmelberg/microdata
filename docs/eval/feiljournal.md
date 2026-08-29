@@ -67,3 +67,41 @@ ett blikk) fantes kun i Netlifys flyktige edge-logg — diagnosen krevde full
 reproduksjonsrunde.
 **Destillat:** Kall autentisert med personlig passord får skrubbet
 oppstrøms-detalj i error-eventet; delt/BYOK forblir generisk.
+
+## 2026-08-29 — Chatten har ingen hukommelse mellom spørsmål      [ÅPEN]
+**Symptom:** Journalen 2026-08-28 viser at Hans svarte på oppklarende spørsmål
+med fragmenter — «2022, 35-55 år, ja filltrer. nei, ikke panel.» (20:38) og
+«yrkeslønn, filtere for å finne de foreldrene som er enslige slik du sa»
+(20:39) — og fire minutter senere gjentok hele det opprinnelige spørsmålet
+(20:43). Det er atferden til noen hvis svar ikke lander.
+**Rotårsak:** `questionTurn()` (svar-instruks.ts:135) bygger brukerturen av
+DAGENS spørsmål alene. `state.history` i ai-chat.js brukes KUN til å tegne
+tråden — den sendes aldri. Modellen mottok altså «2022, 35-55 år» som et
+helt nytt, kontekstløst spørsmål og kunne umulig vite hva den hadde spurt om.
+Statsløsheten er arvet fra den gamle tre-veis-designen (kode-svar var «ETT
+enkelt kall»), og ble aldri revurdert da pipelinen ble samtalepreget. Speccen
+2026-08-28 nevner samtalehistorikk verken i designet eller under «Utsatt» —
+dette er ikke en dokumentert beslutning, det er et hull ingen så.
+**Klassifisering:** KODE, ikke prompt. En perfekt modell ville feilet likt.
+**Destillat:** venter på Hans' beslutning om omfang (se runde-notat under).
+
+## 2026-08-29 — Ett forskningsspørsmål, åtte forsøk, aldri besvart  [LUKKET 649339a]
+**Symptom:** Samme spørsmål — effekten på voksne barns yrkesinntekt når en
+forelder blir syk — stilt i åtte varianter over 17 timer (28. kl. 20:35 til
+29. kl. 09:38). Tre eksplisitte «Svaret overskred plattformtaket (60 s)» og
+til slutt en stille heng.
+**Rotårsak:** to feil i serie. 60 s-veggen (lukket av background-transporten),
+og deretter at en max_tokens-avkortet tur ble meldt som `done` (649339a).
+**Destillat:** ingen promptregel — dette var kode hele veien. Tatt med i
+ledgeren fordi den MÅLTE kostnaden: null svar på et ekte forskningsspørsmål,
+og en bruker som prøvde åtte ganger før han ga opp.
+
+## 2026-08-29 — Runde-notat: hva evalen ENNÅ ikke kan bedømme
+Forklaringsspørsmål oppfører seg riktig (tre kjøringer, alle svarte direkte
+uten kjøring og uten oppslag — kriterium 5s unntak). Promptcachen er verifisert
+virksom (81 664 tokens LEST, ikke skapt).
+Men kriteriene 2, 3, 4, 6 og 7 handler alle om hva som skjer under en ekte
+analysekjøring, og **ingen analysespørsmål har noensinne fullført** i denne
+pipelinen. Evalsettets resultatlogg er tom av samme grunn. Runden kan derfor
+ikke uttale seg om kjernen: om modellen leser utskriften og svarer på
+spørsmålet i stedet for på «lag et script». Neste runde må starte der.
