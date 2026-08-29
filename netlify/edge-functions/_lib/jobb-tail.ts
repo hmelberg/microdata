@@ -72,9 +72,19 @@ export function tailStream(opts: TailOpts): ReadableStream<Uint8Array> {
             }
             cursor = head.seq;
           }
-          // Ferdig OG drenert: rydd og lukk.
+          // Ferdig OG drenert: lukk — men IKKE slett (Task 7 review-funn).
+          // Klientens nettglipp-retry re-GETer fra samme markør etter et
+          // nettbrudd. Den forlatte server-taileren fra FØR bruddet har ingen
+          // cancel()-handler og poller videre; den kan drenere ferdig og
+          // slette jobben i det ~1-sekundsvinduet før retryen når fram. Da
+          // finner retryen ingen head, og HELE svaret er tapt — ikke bare
+          // halen. Vinduet er smalt, men konsekvensen er total, så den
+          // timesvise feieren (rydd-jobber) blir eneste rydder av ferdige
+          // jobber: retry blir dermed idempotent uansett hvor mange ganger
+          // klienten kobler seg på igjen. Dødjobb-veien under BEHOLDER
+          // slettingen — den jobben er faktisk død, og klienten skal ikke
+          // prøve igjen.
           if (head.state !== "kjorer" && cursor >= head.seq) {
-            await slettJobb(store, jobId);
             return;
           }
           // Dødjobb-vakt: en jobb som har stått «kjorer» lenger enn

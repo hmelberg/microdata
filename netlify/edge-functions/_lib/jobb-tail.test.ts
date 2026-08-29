@@ -95,14 +95,24 @@ Deno.test("manglende head gir forklart feil etter ventetiden", async () => {
   assertStringIncludes(ut, "startet aldri");
 });
 
-Deno.test("ferdig jobb ryddes bort etter drenering", async () => {
+// Task 7 review-funn (invertert fra "ferdig jobb ryddes bort etter drenering"):
+// en klient som re-GETer fra samme markør etter et nettglipp må finne jobben
+// fortsatt der. Den forlatte server-taileren fra FØR bruddet har ingen
+// cancel()-handler og poller videre — slettet taileren her, kunne den drenere
+// ferdig og rydde bort HELE svaret i det smale vinduet før retryen når fram,
+// og retryen ville funnet ingen head i det hele tatt. Retry-idempotens veier
+// tyngre enn rask opprydding; den timesvise feieren (rydd-jobber) er nå eneste
+// rydder av FERDIGE jobber. Dødjobb-veien beholder sin egen sletting (se
+// testene under) — den jobben er faktisk død, og der er det ingen retry å
+// beskytte.
+Deno.test("ferdig jobb ryddes IKKE bort etter drenering — retry må finne den igjen", async () => {
   const { store, data } = fakeStore();
   const k = klokke(120);
   const s = lagSkriver(store, "j1", k.now);
   await s.skriv('data: {"type":"done"}\n\n');
   await s.avslutt("ferdig");
   await lesAlt(tailStream({ store, jobId: "j1", fra: 0, ...k }));
-  assertEquals([...data.keys()], []);
+  assertEquals(data.has("j1/head"), true);
 });
 
 Deno.test("overlevering rydder IKKE — jobben lever videre", async () => {
