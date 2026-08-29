@@ -844,7 +844,17 @@
           const meta = await runSvar(text, thinkingNode, ctrl.signal);
           state.history.push({ role: 'assistant', meta });
         } catch (e) {
-          if (e.name !== 'AbortError') appendError(thinkingNode, '✗ ' + (e && e.message ? e.message : String(e)));
+          if (e.name !== 'AbortError') {
+            appendError(thinkingNode, '✗ ' + (e && e.message ? e.message : String(e)));
+          } else {
+            // Avbryt i vinduet mellom forordet og neste event hopper forbi
+            // handleSvarEvent helt — uten dette blir den kursiverte
+            // forord-teksten stående under "Tenker …"-stillaset for alltid,
+            // samme kategori opprydding som delta- og run_code-grenene i
+            // runSvar allerede gjør.
+            const f = thinkingNode.querySelector('.ai-forord');
+            if (f) f.remove();
+          }
         } finally {
           state.abortCtrl = null;
           if (dom.aiAbortBtn) dom.aiAbortBtn.style.display = 'none';
