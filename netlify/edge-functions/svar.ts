@@ -4,7 +4,7 @@
 // Strukturmal: askstats svar.ts, minus ruter/packs/keys/discover — microdata
 // har ikke askstats finn-data-problem; kunnskapen er front-lastet i prefiksen
 // og detaljer hentes med variabel_info.
-import { timingSafeEqual, extractByokKey, type IpContext } from "./_lib/auth.ts";
+import { timingSafeEqual, type IpContext } from "./_lib/auth.ts";
 import { type AgenticResumeState } from "./_lib/anthropic.ts";
 import { coerceQuality, resolveLlm } from "./_lib/llm-choice.ts";
 import {
@@ -12,9 +12,8 @@ import {
 } from "./_lib/run-disiplin.ts";
 import { type GenMode } from "./_lib/prefiks.ts";
 import { journalfor } from "./_lib/feiljournal.ts";
-import { denoEnv, feiljournalStore, gate } from "./_lib/deno-kabling.ts";
-import { SSE_HEADERS } from "./_lib/jobb-tail.ts";
-import { byggLop } from "./_lib/svar-lop.ts";
+import { denoEnv, feiljournalStore, gate, jobbStore } from "./_lib/deno-kabling.ts";
+import { SSE_HEADERS, tailStream } from "./_lib/jobb-tail.ts";
 
 interface ResumeBody { state?: AgenticResumeState; run_ok_calls?: unknown; }
 interface RequestBody {
@@ -91,7 +90,10 @@ export default async (request: Request, context: IpContext): Promise<Response> =
     resumeState = rebuildResumeState(body.resume.state);
   }
 
-  const byokKey = extractByokKey(request);
+  // Kjøres her (i tillegg til inne i jobb-funksjonen) for RASK avvisning:
+  // en ugyldig leverandørkonfig eller manglende servernøkkel skal svare med
+  // riktig statuskode med én gang, ikke først etter at klienten har ventet
+  // ventPaaHeadMs (10 s) på en jobb som aldri fikk skrevet sin første head.
   const choice = resolveLlm(request, body, "svar", denoEnv);
   if (choice instanceof Response) return choice;
 
@@ -134,11 +136,38 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   if (runResultTilLopet !== undefined && klassifiserRunResult(runResultTilLopet) === "feil") {
     journalHendelse("run_feil", runResultTilLopet);
   }
-  const lop = await byggLop({
-    origin, question, mode, script: body.script, instructions: body.instructions,
-    choice, erPersonlig, resumeState, runResultTilLopet, runOkCalls,
-    kvalitet, journalHendelse, turnDeadlineMs: 50_000, byokKey,
+  const jobId = crypto.randomUUID();
+  const jobbNokkel = denoEnv("SVAR_JOBB_SECRET") ?? "";
+  if (!jobbNokkel) {
+    console.error("SVAR_JOBB_SECRET is not set");
+    return new Response("Server configuration error", { status: 500 });
+  }
+  // Videresend brukerens egen legitimasjon UENDRET — jobb-funksjonen kjører
+  // hele porten på nytt, og BYOK-nøkkelen må nå fram dit den faktisk brukes.
+  const videre: Record<string, string> = {
+    "content-type": "application/json",
+    "x-jobb-nokkel": jobbNokkel,
+  };
+  for (const h of ["authorization", "x-anthropic-key", "x-llm-key"]) {
+    const v = request.headers.get(h);
+    if (v) videre[h] = v;
+  }
+  const spawn = await fetch(new URL("/api/svar-jobb", origin), {
+    method: "POST",
+    headers: videre,
+    body: JSON.stringify({
+      ...body, jobId, runOkCalls, runResultTilLopet,
+      resumeState, quality: kvalitet,
+      // erPersonlig sendes IKKE — jobb-funksjonen regner den ut fra tokenet
+      // selv. Et klientsatt flagg ville vært en innsyns-bypass.
+    }),
   });
-  if (lop instanceof Response) return lop;
-  return new Response(lop, { headers: SSE_HEADERS });
+  if (spawn.status !== 202) {
+    console.error(`svar: jobbstart feilet med ${spawn.status}`);
+    return new Response("Kunne ikke starte svarjobben", { status: 502 });
+  }
+  return new Response(
+    tailStream({ store: jobbStore(), jobId, fra: 0 }),
+    { headers: SSE_HEADERS },
+  );
 };

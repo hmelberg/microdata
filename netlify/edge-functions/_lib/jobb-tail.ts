@@ -29,6 +29,13 @@ export interface TailOpts {
 
 const sse = (obj: unknown): string => `data: ${JSON.stringify(obj)}\n\n`;
 
+/** En jobb som står «kjorer» lenger enn dette er død — bakgrunnsfunksjonen ble
+ * drept (OOM, plattformdrap) etter at head var skrevet, men før avslutt.
+ * Uten denne grensen overleverer taileren hvert 45. sekund i det uendelige og
+ * klienten kobler seg på like lenge. 16 min er like over background-taket på
+ * 15, så en levende jobb rekker alltid å bli ferdig først. */
+const MAKS_JOBB_MS = 16 * 60 * 1000;
+
 export function tailStream(opts: TailOpts): ReadableStream<Uint8Array> {
   const {
     store, jobId, fra,
@@ -67,6 +74,19 @@ export function tailStream(opts: TailOpts): ReadableStream<Uint8Array> {
           }
           // Ferdig OG drenert: rydd og lukk.
           if (head.state !== "kjorer" && cursor >= head.seq) {
+            await slettJobb(store, jobId);
+            return;
+          }
+          // Dødjobb-vakt: en jobb som har stått «kjorer» lenger enn
+          // MAKS_JOBB_MS kommer aldri til å bli ferdig — bakgrunnsprosessen
+          // som skulle kalt avslutt() finnes ikke lenger. Rydd og forklar i
+          // stedet for å overlevere til enda en tailer som ville ventet like
+          // forgjeves.
+          if (head.state === "kjorer" && now() - head.start > MAKS_JOBB_MS) {
+            send(sse({
+              type: "error",
+              message: "Svarjobben stanset uventet (over 16 minutter uten å bli ferdig). Prøv spørsmålet på nytt.",
+            }));
             await slettJobb(store, jobId);
             return;
           }

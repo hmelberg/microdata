@@ -10,6 +10,7 @@ import {
 } from "./auth.ts";
 import { checkRateLimit, type RateStore } from "./rate-limit.ts";
 import { type JournalStore } from "./feiljournal.ts";
+import { type BlobbStore } from "./jobb-blobb.ts";
 
 export const denoEnv = (k: string): string | undefined => Deno.env.get(k);
 
@@ -27,8 +28,19 @@ export function feiljournalStore(): JournalStore {
   return (getStore as unknown as StoreFabrikk)({ name: "feiljournal" }) as JournalStore;
 }
 
-// MERK: `jobbStore()` hører hjemme her, men opprettes først i Task 6 — den
-// importerer `BlobbStore` fra `jobb-blobb.ts`, som ikke finnes før Task 2.
+export function jobbStore(): BlobbStore {
+  // Strong consistency er PÅKREVD, ikke valgfritt: med default (eventual)
+  // lykkes skriverens setJSON-kall, men taileren leser en gammel (eller
+  // ingen) head og henger for alltid — samme felle som rateLimitStore over,
+  // og en som alt har kostet dette prosjektet fire repoers stille-tomme
+  // tellere (se MEMORY.md «Netlify Blobs: eventual consistency dreper rate
+  // limits»). Her er skadebildet verre: ikke en glemt grense, men en klient
+  // som poller i det uendelige mot en jobb som faktisk er ferdig.
+  return (getStore as unknown as StoreFabrikk)({
+    name: "svarjobb",
+    consistency: "strong",
+  }) as BlobbStore;
+}
 
 const rateLimitDep = (endpoint: string, ip: string) =>
   checkRateLimit(endpoint, ip, rateLimitStore);
