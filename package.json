@@ -6,6 +6,7 @@
     "@netlify/blobs": "^11.0.2"
   },
   "devDependencies": {
-    "@netlify/functions": "^6.0.0"
+    "@netlify/functions": "^6.0.0",
+    "playwright": "^1.62.1"
   }
 }

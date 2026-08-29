@@ -601,6 +601,11 @@
         // 2026-08-29 da en heng ga to identiske sporsmal-poster.
         const sporringId = (crypto.randomUUID ? crypto.randomUUID()
           : String(Date.now()) + Math.random().toString(36).slice(2));
+        // Eksponert for eval-motoren (scripts/eval-motor.mjs): uten den kan en
+        // automatisert kjøring ikke finne igjen SINE egne journalposter, og
+        // måtte gjettet på tidsstempel — samme skjøre kobling som sporring-id-en
+        // ble innført for å fjerne.
+        try { window.mdSisteSporring = sporringId; } catch (_e) { /* ignorert */ }
         let markdown = '';
         let _lastRender = 0;
         let resume = null;
