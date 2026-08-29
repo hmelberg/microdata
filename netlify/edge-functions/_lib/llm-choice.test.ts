@@ -92,6 +92,22 @@ Deno.test("complete provider config authenticates and carries its own key", () =
   assertEquals(c.provider?.type, "openai-compat");
 });
 
+// «egen leverandør + Grundig» er en NÅBAR kombinasjon — klienten velger
+// provider og quality uavhengig av hverandre. Task 9-reviewen (2026-08-29)
+// fant at forordet (svar-jobb.mts) opprinnelig portet BARE på choice.effort,
+// som betydde at choice.apiKey (brukerens FREMMEDE nøkkel, se apiKey-linja
+// over) ble sendt til api.anthropic.com via et hardkodet Haiku-kall uten
+// apiBase. Denne testen beviser at effort og provider overlever SAMTIDIG i
+// choice — gaten i svar-jobb.mts må derfor eksplisitt utelukke provider,
+// ikke bare sjekke effort.
+Deno.test("provider + best quality er nåbar samtidig — effort og provider overlever begge", () => {
+  const c = resolveLlm(
+    reqWith({ "x-llm-key": "sk-abcdefgh" }), { provider: MISTRAL, quality: "best" }, "svar", () => undefined,
+  ) as LlmChoice;
+  assertEquals(c.effort, "high");
+  assertEquals(c.provider?.type, "openai-compat");
+});
+
 Deno.test("a provider config with a blocked base_url is a 400, not a silent fallback", () => {
   const r = resolveLlm(
     reqWith({ "x-llm-key": "sk-abcdefgh" }),

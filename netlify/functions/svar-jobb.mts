@@ -111,7 +111,15 @@ export default async (request: Request): Promise<Response> => {
   // samtidighet til den mest risikofylte filen i denne planen for å spare
   // ~1,5 s på en tur som uansett tar 30+, og brukeren kan ikke merke
   // forskjellen på et forord ved 1 s og ett ved 1,5 s.
-  if (choice.effort && !body.resumeState) {
+  //
+  // Forordet er BEVISST bare for den native Anthropic-veien. Med egen
+  // leverandør er choice.apiKey brukerens FREMMEDE nøkkel (llm-choice.ts:155),
+  // og messageAnthropic uten apiBase går til api.anthropic.com
+  // (anthropic.ts:39-41) — et forord ville dermed sendt nøkkelen til en vert
+  // brukeren ikke har valgt. En gateway har heller ingen garantert
+  // haiku-ekvivalent. Forordet er pynt; det er ikke verdt en egen kodevei
+  // per leverandørtype.
+  if (choice.effort && !choice.provider && !body.resumeState) {
     await skrivForord(skriver, { apiKey: choice.apiKey, question: String(body.question ?? "") });
   }
 

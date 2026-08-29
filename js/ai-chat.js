@@ -773,6 +773,12 @@
               // "Tenker … 47 s"-linja er ikke lenger sann og skal ikke stå
               // og telle videre på en fase vi har forlatt.
               if (pulsTimer) { clearInterval(pulsTimer); pulsTimer = null; }
+              // Samme grunn: run_code fanges opp FØR handleSvarEvent ser det,
+              // så delta-grenens opprydding aldri kjører for denne turen.
+              // Uten dette blir forordet stående under "▶ Kjører scriptet …"
+              // til et senere hopp endelig strømmer tekst — eller for alltid.
+              const f = thinkingNode.querySelector('.ai-forord');
+              if (f) f.remove();
               if (signal && signal.aborted) {
                 throw Object.assign(new Error('Stopped'), { name: 'AbortError' });
               }
