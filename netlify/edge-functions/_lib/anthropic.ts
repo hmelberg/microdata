@@ -495,14 +495,25 @@ async function streamOneTurn(
   // Plattformtaket: Netlify kutter invokasjonen hardt ved ~60 s (målt, også
   // med aktiv strøm). Turen får derfor en egen frist litt under taket, slik
   // at brukeren får en FORKLART feil i stedet for en kuttet forbindelse.
-  const deadline = Date.now() + (deps.turnDeadlineMs ?? 50_000);
+  const turFristMs = deps.turnDeadlineMs ?? 50_000;
+  const deadline = Date.now() + turFristMs;
+  // Meldingen MÅ lese fristen, ikke anta den. Den sto hardkodet på «60 s per
+  // kall» fra edge-tiden; etter at løpet flyttet til background-funksjonen er
+  // fristen 5 min, og en bruker som traff den fikk både feil tall og feil råd
+  // («prøv Rask»). Funnet 2026-08-29, etter merge.
+  const fristFeil = () => {
+    const sek = Math.round(turFristMs / 1000);
+    const lesbar = sek >= 120 ? `${Math.round(sek / 60)} min` : `${sek} s`;
+    return `Svaret overskred tidsgrensen på ${lesbar} for én modelltur. ` +
+      `Still spørsmålet enklere, eller velg et raskere kvalitetsnivå.`;
+  };
   try {
     while (true) {
       let timer: number | undefined;
       const budsjett = Math.min(STREAM_IDLE_MS, deadline - Date.now());
       if (budsjett <= 0) {
         throw new Error(
-          "Svaret overskred plattformtaket (60 s per kall). Prøv kvalitetsnivået Rask, eller still spørsmålet enklere.",
+          fristFeil(),
         );
       }
       const r = await Promise.race([
@@ -510,7 +521,7 @@ async function streamOneTurn(
         new Promise<never>((_, rej) => {
           timer = setTimeout(() => rej(new Error(
             Date.now() + 1 >= deadline
-              ? "Svaret overskred plattformtaket (60 s per kall). Prøv kvalitetsnivået Rask, eller still spørsmålet enklere."
+              ? fristFeil()
               : "Anthropic-strømmen stallet (> 120 s uten data)",
           )), budsjett);
         }),

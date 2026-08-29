@@ -17,9 +17,16 @@ import {
   feiljournalStore, ingenRateLimit, jobbStore, nodeEnv,
 } from "./_shared/node-kabling.mts";
 
-// 13 min: under background-taket på 15, så en løpsk tur får en FORKLART feil
-// i stedet for stille død.
-const TUR_FRIST_MS = 780_000;
+// 5 min per modelltur (Hans, 2026-08-29). Merk hva taket FAKTISK begrenser:
+// forbruket er allerede takstyrt av max_tokens (8192) og turnsPerCall=1, så en
+// forlatt jobb koster maks én tur uansett hvor lenge den står. Taket begrenser
+// altså funksjonstid og gir raskere, forklart feil — ikke tokenforbruk. Det som
+// sparer tokens er en ekte avbryt-knapp (eget løp: AbortSignal helt fram til
+// fetch-en i anthropic.ts).
+// 5 min mot realistisk verste tilfelle: 8192 tokens på Opus ≈ 2,3-3,4 min pluss
+// tenkefase ≈ 45 s ≈ 4,2 min. Margin, men ikke stor — treffes den, sier
+// feilmeldingen nå hvor lang fristen var, i stedet for å påstå «60 s».
+const TUR_FRIST_MS = 300_000;
 
 export default async (request: Request): Promise<Response> => {
   const hemmelighet = nodeEnv("SVAR_JOBB_SECRET") ?? "";

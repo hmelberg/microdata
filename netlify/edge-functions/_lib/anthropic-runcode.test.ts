@@ -185,12 +185,18 @@ Deno.test("tur-deadline gir ren error-event i stedet for kuttet strøm", async (
     executeTool: () => Promise.resolve("x"),
     deps: {
       fetchImpl: (() => Promise.resolve(new Response(evig, { status: 200 }))) as typeof fetch,
-      turnDeadlineMs: 80,
+      turnDeadlineMs: 1_500,
     },
   }));
   const err = ev.find((e) => e.type === "error");
   if (!err) throw new Error("error-event mangler: " + JSON.stringify(ev.map((e) => e.type)));
-  if (!String(err.message).includes("plattformtaket")) throw new Error("feil melding: " + err.message);
+  // Meldingen skal LESE den injiserte fristen, ikke anta en. Den sto hardkodet
+  // på «60 s per kall» fra edge-tiden og løy for alle som traff den etter at
+  // løpet flyttet til bakgrunnsfunksjonen (funnet 2026-08-29). Assertionen
+  // binder seg derfor til tallet, ikke bare til teksten.
+  if (!String(err.message).includes("tidsgrensen på 2 s")) {
+    throw new Error("meldingen leser ikke den injiserte fristen: " + err.message);
+  }
 });
 
 Deno.test("thinking-blokker rekonstrueres MED signatur og rundtures intakte", async () => {

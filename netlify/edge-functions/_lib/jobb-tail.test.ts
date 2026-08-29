@@ -2,12 +2,7 @@ import { assertEquals, assertStringIncludes } from "https://deno.land/std@0.224.
 import {
   chunkNokkel, headNokkel, lagSkriver, type BlobbStore,
 } from "./jobb-blobb.ts";
-import { tailStream } from "./jobb-tail.ts";
-
-// Speiler MAKS_JOBB_MS i jobb-tail.ts (ikke eksportert — den er et internt
-// grensetall, ikke en del av modulens grensesnitt). Endres grensen der, må
-// den endres her.
-const MAKS_JOBB_MS = 16 * 60 * 1000;
+import { MAKS_JOBB_MS, tailStream } from "./jobb-tail.ts";
 
 function fakeStore() {
   const data = new Map<string, string>();

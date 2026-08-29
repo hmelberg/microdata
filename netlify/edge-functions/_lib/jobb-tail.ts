@@ -32,9 +32,15 @@ const sse = (obj: unknown): string => `data: ${JSON.stringify(obj)}\n\n`;
 /** En jobb som står «kjorer» lenger enn dette er død — bakgrunnsfunksjonen ble
  * drept (OOM, plattformdrap) etter at head var skrevet, men før avslutt.
  * Uten denne grensen overleverer taileren hvert 45. sekund i det uendelige og
- * klienten kobler seg på like lenge. 16 min er like over background-taket på
- * 15, så en levende jobb rekker alltid å bli ferdig først. */
-const MAKS_JOBB_MS = 16 * 60 * 1000;
+ * klienten kobler seg på like lenge.
+ *
+ * 7 min er satt ut fra TUR_FRIST_MS (5 min i svar-jobb.mts), ikke ut fra
+ * plattformtaket: en levende jobb er én modelltur pluss prefiks-bygging og
+ * et eventuelt forord, altså ~5,2 min i verste fall. Marginen er derfor reell,
+ * men jobben blir ikke hengende i 16 minutter når den umulig kan leve så lenge.
+ * EKSPORTERT med vilje — testen speilet den tidligere som literal, og da ville
+ * en endring her latt testene stå grønne mot den gamle grensen. */
+export const MAKS_JOBB_MS = 7 * 60 * 1000;
 
 export function tailStream(opts: TailOpts): ReadableStream<Uint8Array> {
   const {
