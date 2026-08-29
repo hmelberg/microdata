@@ -1,7 +1,6 @@
 {
   "name": "microdata",
   "private": true,
-  "type": "module",
   "description": "Manifest finnes KUN for netlify/functions/. Resten av repoet er statiske filer og Deno edge-functions uten byggsteg — ikke legg til et build-script her uten å sjekke Netlify-sidens innstillinger først (publish_dir og cmd er begge tomme, så Netlify publiserer repo-rota som den er).",
   "dependencies": {
     "@netlify/blobs": "^11.0.2"
