@@ -32,3 +32,40 @@ Deno.test("journalfor: feiler ÅPENT — en død store velter aldri svaret", asy
   const storeSynk = { set: () => { throw new Error("synkron eksplosjon"); } };
   await journalfor(storeSynk, { type: "sporsmal", sporsmal: "x" });
 });
+
+Deno.test("svar-hendelsen bærer svar/script/oppslag/slutt/usage, med caps", async () => {
+  let skrevet = "";
+  const store = { set: (_k: string, v: string) => { skrevet = v; return Promise.resolve(); } };
+  await journalfor(store, {
+    type: "svar",
+    sporsmal: "hva er effekten?",
+    mode: "microdata",
+    quality: "balanced",
+    svar: "S".repeat(5000),
+    script: "K".repeat(4000),
+    oppslag: Array.from({ length: 30 }, (_, i) => `V${i}`),
+    slutt: "done",
+    usage: { inputTokens: 3500, outputTokens: 8192 },
+  }, new Date("2026-08-29T09:23:21.777Z"), "test");
+  const p = JSON.parse(skrevet);
+  assertEquals(p.type, "svar");
+  assertEquals(p.slutt, "done");
+  assertEquals(p.usage.outputTokens, 8192);
+  assertEquals(p.svar.length, 4000, "svar skal kappes på 4000");
+  assertEquals(p.script.length, 3000, "script skal kappes på 3000");
+  assertEquals(p.oppslag.length, 20, "oppslag skal kappes på 20");
+});
+
+Deno.test("de gamle hendelsene får ALDRI de nye feltene som tomme nøkler", async () => {
+  // En sporsmal-post skal se ut nøyaktig som før — ellers vokser journalen med
+  // støy, og eldre poster blir vanskeligere å lese ved siden av nye.
+  let skrevet = "";
+  const store = { set: (_k: string, v: string) => { skrevet = v; return Promise.resolve(); } };
+  await journalfor(store, { type: "sporsmal", sporsmal: "q", mode: "microdata", quality: "fast" },
+    new Date("2026-08-29T09:23:21.777Z"), "test");
+  const p = JSON.parse(skrevet);
+  assertEquals("svar" in p, false);
+  assertEquals("script" in p, false);
+  assertEquals("oppslag" in p, false);
+  assertEquals("usage" in p, false);
+});

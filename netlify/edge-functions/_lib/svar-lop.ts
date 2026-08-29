@@ -22,6 +22,35 @@ import {
 import { type GenMode } from "./prefiks.ts";
 import { variabelInfo } from "./tools/variabel-info.ts";
 
+/** Samler opp det ETT hopp gjorde, så feiljournalen kan lagre mer enn
+ * «du stilte et spørsmål». Fylles av onEmit under; kalleren (svar-jobb.mts)
+ * skriver den til journalen ETTER at pumpen er ferdig — ikke inne i onEmit,
+ * som er synkron og hvis feil svelges. */
+export interface HopSamler {
+  tekst: string;
+  script: string;
+  oppslag: string[];
+  slutt: string;
+  usage?: Record<string, number>;
+}
+
+/** Trekker variabelnavnet ut av en progress-linje. Formen kommer fra
+ * progressLabel() i svar-instruks.ts, som er en ANNEN fil — endres etiketten
+ * der, slutter dette å matche uten at noe feiler. Derfor er funksjonen
+ * eksportert og testet direkte mot progressLabels faktiske utdata, ikke mot
+ * en håndskrevet streng. Returnerer null når linja ikke er et oppslag. */
+export function oppslagFraProgress(tekst: string): string | null {
+  const m = /^Slår opp (.+?) …$/.exec(tekst);
+  return m ? m[1] : null;
+}
+
+export const nyHopSamler = (): HopSamler => ({
+  tekst: "",
+  script: "",
+  oppslag: [],
+  slutt: "",
+});
+
 export interface LopInput {
   origin: string;
   question: string;
@@ -36,6 +65,8 @@ export interface LopInput {
   kvalitet: SvarKvalitet;
   journalHendelse: (type: string, detalj?: string) => void;
   turnDeadlineMs: number;
+  /** Valgfri: fylles med hva dette hoppet gjorde (til feiljournalen). */
+  samler?: HopSamler;
   // Ikke i den opprinnelige kontrakt-lista (task-4-brief §Interfaces) — men
   // upstreamErrorResponse(e, byokKey) i den flyttede if/else-kjeden trenger
   // den (401 vs. 502-skillet), og den finnes ikke andre steder her. svar.ts
@@ -104,6 +135,42 @@ export async function byggLop(inp: LopInput): Promise<ReadableStream<Uint8Array>
     // identisk fil) kjenner ikke onEmit og ignorerer nøkkelen — bevisst.
     onEmit: (ev: Record<string, unknown>) => {
       if (ev.type === "error") journalHendelse("feil", String(ev.message ?? ""));
+      const s = inp.samler;
+      if (!s) return;
+      switch (ev.type) {
+        case "delta":
+          s.tekst += String(ev.text ?? "");
+          break;
+        case "turn_discard":
+          // Tekst fra en verktøy-tur er kladd — den skal ikke havne i
+          // journalen som om den var svaret, like lite som i svarboblen.
+          s.tekst = "";
+          break;
+        case "run_code":
+          s.script = String(ev.script ?? "");
+          break;
+        case "progress": {
+          // Eneste stedet variabel_info-oppslagene er synlige. Etiketten
+          // bygges av progressLabel i svar-instruks.ts — endres den, ryker
+          // dette stille, så formen er bevisst løs (navnet, ikke hele linja).
+          const navn = oppslagFraProgress(String(ev.text ?? ""));
+          if (navn) s.oppslag.push(navn);
+          break;
+        }
+        case "done":
+          s.slutt = "done";
+          s.usage = {
+            inputTokens: Number(ev.inputTokens) || 0,
+            outputTokens: Number(ev.outputTokens) || 0,
+            cacheReadTokens: Number(ev.cacheReadTokens) || 0,
+            cacheCreationTokens: Number(ev.cacheCreationTokens) || 0,
+          };
+          break;
+        case "continue":
+          s.slutt = "continue";
+          break;
+      }
+      if (ev.type === "error") s.slutt = "error";
     },
   };
   const providerDeps = { timeoutMs: 180_000, retries: 1 };

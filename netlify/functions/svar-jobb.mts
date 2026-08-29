@@ -11,7 +11,7 @@ import { extractByokKey, runGate, timingSafeEqual } from "../edge-functions/_lib
 import { coerceQuality, resolveLlm } from "../edge-functions/_lib/llm-choice.ts";
 import { lagSkriver } from "../edge-functions/_lib/jobb-blobb.ts";
 import { skrivForord } from "../edge-functions/_lib/forord.ts";
-import { byggLop } from "../edge-functions/_lib/svar-lop.ts";
+import { byggLop, nyHopSamler } from "../edge-functions/_lib/svar-lop.ts";
 import { journalfor } from "../edge-functions/_lib/feiljournal.ts";
 import {
   feiljournalStore, ingenRateLimit, jobbStore, nodeEnv,
@@ -62,6 +62,11 @@ export default async (request: Request): Promise<Response> => {
   // kald, lavtrafikkert bakgrunnsfunksjon. Uten en tidlig head venter
   // taileren forgjeves og forteller brukeren «Svarjobben startet aldri» mens
   // en full-pris jobb kjører videre i opptil 13 minutter til.
+  // Samler opp hva dette hoppet faktisk gjorde. Skrives til journalen ETTER
+  // pumpen — ikke fra onEmit, som er synkron og hvis feil svelges, og som
+  // dessuten kjører mens strømmen er i ferd med å lukkes.
+  const samler = nyHopSamler();
+
   const skriver = lagSkriver(jobbStore(), jobId, () => Date.now());
   await skriver.start();
 
@@ -121,7 +126,7 @@ export default async (request: Request): Promise<Response> => {
     choice, erPersonlig,
     resumeState: body.resumeState, runResultTilLopet: body.runResultTilLopet,
     runOkCalls: Number(body.runOkCalls) || 0,
-    kvalitet, journalHendelse,
+    kvalitet, journalHendelse, samler,
     turnDeadlineMs: TUR_FRIST_MS, byokKey,
   });
   if (lop instanceof Response) {
@@ -166,6 +171,23 @@ export default async (request: Request): Promise<Response> => {
       type: "error", message: String(e),
     })}\n\n`);
     await skriver.avslutt("feil");
+  }
+
+  // Her, ikke i onEmit: vi er fortsatt inne i handleren, så awaiten rekker
+  // frem. Journalen er best-effort (journalfor feiler åpent), og skrives kun
+  // for personlig-autentisert trafikk — journal er null ellers.
+  if (journal) {
+    await journalfor(journal, {
+      type: "svar",
+      sporsmal: question,
+      mode,
+      quality: kvalitet,
+      svar: samler.tekst,
+      script: samler.script,
+      oppslag: samler.oppslag,
+      slutt: samler.slutt || "ukjent",
+      usage: samler.usage,
+    });
   }
   return new Response(null, { status: 202 });
 };
