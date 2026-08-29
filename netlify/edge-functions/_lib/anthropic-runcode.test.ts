@@ -68,6 +68,54 @@ const BASE = {
   clientTools: ["run_code"],
 };
 
+// En tur som treffer max_tokens er IKKE et ferdig svar. Løkka sjekket bare
+// pause_turn og tool_use, så en avkortet tur falt gjennom til «final answer»
+// og ble meldt som `done`. Målt i prod 2026-08-29: en balansert tur brukte
+// nøyaktig 8192 tokens på tenking, produserte null tekst, og brukeren satt
+// igjen med progress-linjer som aldri ble til noe. Ingenting skilte det fra
+// en heng — derfor disse to testene.
+function maxTokensTur(medTekst: boolean) {
+  return [
+    { type: "message_start", message: { usage: { input_tokens: 10 } } },
+    { type: "content_block_start", index: 0, content_block: { type: "thinking", thinking: "" } },
+    { type: "content_block_delta", index: 0, delta: { type: "signature_delta", signature: "sig" } },
+    { type: "content_block_stop", index: 0 },
+    ...(medTekst
+      ? [
+        { type: "content_block_start", index: 1, content_block: { type: "text", text: "" } },
+        { type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "Halve svaret" } },
+        { type: "content_block_stop", index: 1 },
+      ]
+      : []),
+    { type: "message_delta", delta: { stop_reason: "max_tokens" }, usage: { output_tokens: 8192 } },
+    { type: "message_stop" },
+  ];
+}
+
+Deno.test("max_tokens uten tekst gir forklart feil, ALDRI done", async () => {
+  const ev = await samle(runAgenticStream({
+    ...BASE,
+    executeTool: () => Promise.resolve("x"),
+    deps: { fetchImpl: sseFetch([maxTokensTur(false)]) },
+  }));
+  assertEquals(ev.some((e) => e.type === "done"), false, "avkortet tur ble meldt som ferdig svar");
+  const err = ev.find((e) => e.type === "error");
+  if (!err) throw new Error("mangler error-event: " + JSON.stringify(ev.map((e) => e.type)));
+  assertStringIncludes(String(err.message), "hele token-budsjettet på å tenke");
+});
+
+Deno.test("max_tokens ETTER strømmet tekst sier at svaret ble avkortet", async () => {
+  const ev = await samle(runAgenticStream({
+    ...BASE,
+    executeTool: () => Promise.resolve("x"),
+    deps: { fetchImpl: sseFetch([maxTokensTur(true)]) },
+  }));
+  assertEquals(ev.some((e) => e.type === "done"), false);
+  const err = ev.find((e) => e.type === "error");
+  if (!err) throw new Error("mangler error-event");
+  assertStringIncludes(String(err.message), "avkortet");
+});
+
 Deno.test("run_code-kall → run_code-event + continue med pending, executeTool røres ikke", async () => {
   let executed = 0;
   const ev = await samle(runAgenticStream({

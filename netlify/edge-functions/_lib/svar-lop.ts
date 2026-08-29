@@ -87,7 +87,13 @@ export async function byggLop(inp: LopInput): Promise<ReadableStream<Uint8Array>
     tools,
     executeTool,
     progressLabel,
-    maxTokens: 8192,
+    // 32000, ikke 8192. Taket koster INGENTING i seg selv — du betaler for
+    // genererte tokens, ikke for taket — og 8192 var lavt nok til å bli spist
+    // opp av tenkefasen alene: målt i prod 2026-08-29 brukte én balansert tur
+    // nøyaktig 8192 på tenking og leverte null tekst. Anthropics egen veiledning
+    // for strømmende kall er ~64000; 32000 gir romslig margin og holdes uansett
+    // i sjakk av tur-fristen (5 min) og av at max_tokens nå gir forklart feil.
+    maxTokens: 32000,
     maxClientToolCalls: budsjett.clientCalls,
     clientTools: ["run_code"],
     maxRunCode: budsjett.runCalls,

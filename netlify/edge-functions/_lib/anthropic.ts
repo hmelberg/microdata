@@ -724,6 +724,19 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
             });
             continue;
           }
+          // max_tokens er IKKE et ferdig svar. Løkka sjekket tidligere bare
+          // pause_turn og tool_use, så en tur avkortet på max_tokens falt
+          // gjennom hit og ble meldt som `done`. Målt i prod 2026-08-29: en
+          // balansert tur brukte nøyaktig 8192 tokens på tenking, produserte
+          // null tekst, og brukeren fikk progress-linjer som aldri ble til et
+          // svar — ingenting skilte det fra en heng. Nå sier vi hva som skjedde.
+          if (turn.stopReason === "max_tokens") {
+            throw new Error(
+              turnHadText || carryHadText
+                ? "Svaret ble avkortet: modellen nådde token-taket midt i svaret. Still spørsmålet enklere, eller be om et kortere svar."
+                : "Modellen brukte hele token-budsjettet på å tenke uten å begynne på svaret. Still spørsmålet enklere, eller velg et raskere kvalitetsnivå.",
+            );
+          }
           // Final answer — its deltas were already forwarded live above.
           carryHadText = false;
           emit({ type: "done", ...state.usage });
