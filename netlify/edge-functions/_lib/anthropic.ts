@@ -35,23 +35,6 @@ export interface StreamEvent {
   message?: string;
 }
 
-/**
- * Identitetskoblede Anthropic-nøkler krever at forespørselen sier HVILKET
- * workspace den handler på vegne av — uten headeren svarer API-et 400
- * («anthropic-workspace-id is required when authenticating with an
- * identity-linked API key»), uansett hvor riktig resten av bodyen er.
- * Vanlige workspace-nøkler trenger den ikke, så headeren settes kun når
- * ANTHROPIC_WORKSPACE_ID faktisk er konfigurert.
- *
- * Gjelder BARE serverens egen nøkkel. En BYOK-bruker med identitetskoblet
- * nøkkel må bruke en vanlig workspace-nøkkel i stedet — vi har ingen måte å
- * vite workspace-id-en deres på.
- */
-function workspaceHeader(): Record<string, string> {
-  const id = Deno.env.get("ANTHROPIC_WORKSPACE_ID");
-  return id ? { "anthropic-workspace-id": id } : {};
-}
-
 /** Endepunktet for dette kallet: brukerens gateway, ellers Anthropic selv. */
 function apiTarget(apiBase?: string): string {
   return apiBase ? `${apiBase.replace(/\/+$/, "")}/messages` : ANTHROPIC_API;
@@ -129,7 +112,6 @@ export async function streamAnthropic(
     "Content-Type": "application/json",
     "x-api-key": opts.apiKey,
     "anthropic-version": ANTHROPIC_VERSION,
-    ...workspaceHeader(),
   };
   if (opts.system && useLongTtl) {
     headers["anthropic-beta"] = "extended-cache-ttl-2025-04-11";
@@ -196,7 +178,6 @@ export async function messageAnthropic(
     "Content-Type": "application/json",
     "x-api-key": opts.apiKey,
     "anthropic-version": ANTHROPIC_VERSION,
-    ...workspaceHeader(),
   };
   if (opts.system && useLongTtl) {
     headers["anthropic-beta"] = "extended-cache-ttl-2025-04-11";
@@ -574,7 +555,6 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
         "Content-Type": "application/json",
         "x-api-key": opts.apiKey,
         "anthropic-version": ANTHROPIC_VERSION,
-        ...workspaceHeader(),
       };
       if (useLongTtl) headers["anthropic-beta"] = "extended-cache-ttl-2025-04-11";
       const system = [{
@@ -620,16 +600,21 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
             ? "🧠 Tolker spørsmålet og planlegger"
             : `🤔 Arbeider med svaret (tur ${state.turn + 1})`;
           emit({ type: "progress", text: `${turnLabel} …`, replace: true });
-          const turnStart = Date.now();
           // Heartbeat trengs bare til første delta — deretter holder deltaene
           // SSE-strømmen i live.
           let sawDelta = false;
           let turnHadText = false;
+          // Samme tekst som åpningseventet over (linje ~602) — MED VILJE,
+          // ikke bare "ingen (s)": klienten (js/ai-chat.js, startPuls) eier
+          // sekundtellingen lokalt og bruker tekstlikhet til å skille en NY
+          // fase (restart klokka) fra en heartbeat for SAMME fase (la klokka
+          // stå). Sendte vi et eget sekundtall her, telte to klokker samtidig
+          // og den lokale hoppet tilbake til 0 hvert 10. sekund — nøyaktig
+          // buggen Fix 4 (sluttfiks-planen 2026-08-28) fjerner.
           const beat = setInterval(() => {
             if (sawDelta) return;
-            const s = Math.round((Date.now() - turnStart) / 1000);
             try {
-              emit({ type: "progress", text: `${turnLabel} … (${s} s)`, replace: true });
+              emit({ type: "progress", text: `${turnLabel} …`, replace: true });
             } catch (_) { /* stream already closed */ }
           }, HEARTBEAT_MS);
           let turn: TurnResult;

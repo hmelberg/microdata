@@ -14,6 +14,17 @@ __pycache__/
 # Local working notes (not tracked)
 Notater og mulige issues.md
 
+# Node deps for netlify/functions/ (package.json, added Task 5 fix round —
+# first Node-runtime code in this repo; @netlify/blobs is a real runtime
+# import, so a manifest + install step exists now).
+node_modules/
+
+# Dukket opp ved roten som en bieffekt av å kjøre Deno CLI (deno check/test).
+# Ingen deno.json her til å forankre en avhengighetspolicy i, og repoet har
+# aldri hatt en lockfile — å committe én er en avhengighetspolicy-beslutning
+# utenfor denne planens omfang (background-transport task 6, 2026-08-29).
+deno.lock
+
 # Editor / IDE
 .claude/
 .vscode/

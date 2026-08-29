@@ -1,8 +1,9 @@
 import { detectLanguage } from "./_lib/parse-script-context.ts";
 import { streamAnthropic } from "./_lib/anthropic.ts";
-import { extractByokKey, gate, upstreamErrorResponse, type IpContext } from "./_lib/auth.ts";
+import { extractByokKey, upstreamErrorResponse, type IpContext } from "./_lib/auth.ts";
 import { resolveLlm } from "./_lib/llm-choice.ts";
 import { streamProvider } from "./_lib/providers/single.ts";
+import { denoEnv, gate } from "./_lib/deno-kabling.ts";
 
 interface RequestBody {
   // multi-provider-runden 2026-08-27: valgfri egen leverandør + kvalitetsnivå.
@@ -93,7 +94,7 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   }
 
   const byokKey = extractByokKey(request);
-  const choice = resolveLlm(request, body, "tolk-resultat");
+  const choice = resolveLlm(request, body, "tolk-resultat", denoEnv);
   if (choice instanceof Response) return choice;
 
   // Truncate defensively so a huge output can't blow the prompt.

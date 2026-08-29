@@ -33,12 +33,15 @@ import socket
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections import Counter
 from pathlib import Path
 
 API_URL = "https://microstat.melberg.app/api/svar"
+TAIL_URL = "https://microstat.melberg.app/api/svar-tail"
 MAKS_HOPP = 15
+MAKS_OVERLEVERINGER = 40  # speiler AiTransport.nesteTailSteg i js/ai-transport.js
 DEFAULT_RUN_RESULT = "OK. OUTPUT (truncated):\n(simulert kjøring)"
 GYLDIGE_MODUSER = ("microdata", "python", "r")
 
@@ -83,6 +86,32 @@ def les_passord() -> str:
 
 # ---------------------------------------------------------------- SSE-klient
 
+def _parse_sse_data(buf: list) -> dict:
+    try:
+        return json.loads("\n".join(buf))
+    except json.JSONDecodeError:
+        return {"type": "_parsefeil", "raw": "\n".join(buf)[:500]}
+
+
+def _sse_events(req: urllib.request.Request, timeout: float):
+    """Åpne forespørselen og yield parsede SSE-events (data: {...}-linjer)
+    som dicts. Delt av post_sse (POST /api/svar) og tail-hoppene under
+    (GET /api/svar-tail) — protokollen er den samme, bare metoden skiller."""
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        databuf = []
+        for raalinje in resp:
+            linje = raalinje.decode("utf-8", errors="replace").rstrip("\r\n")
+            if linje == "":
+                if databuf:
+                    yield _parse_sse_data(databuf)
+                    databuf = []
+            elif linje.startswith("data:"):
+                databuf.append(linje[5:].lstrip())
+            # andre SSE-felt (event:, id:, kommentarer) ignoreres
+        if databuf:
+            yield _parse_sse_data(databuf)
+
+
 def post_sse(payload: dict, passord: str, timeout: float):
     """POST JSON og yield parsede SSE-events (data: {...}-linjer) som dicts."""
     data = json.dumps(payload).encode("utf-8")
@@ -96,26 +125,46 @@ def post_sse(payload: dict, passord: str, timeout: float):
             "Accept": "text/event-stream",
         },
     )
+    yield from _sse_events(req, timeout)
 
-    def _parse(buf):
-        try:
-            return json.loads("\n".join(buf))
-        except json.JSONDecodeError:
-            return {"type": "_parsefeil", "raw": "\n".join(buf)[:500]}
 
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        databuf = []
-        for raalinje in resp:
-            linje = raalinje.decode("utf-8", errors="replace").rstrip("\r\n")
-            if linje == "":
-                if databuf:
-                    yield _parse(databuf)
-                    databuf = []
-            elif linje.startswith("data:"):
-                databuf.append(linje[5:].lstrip())
-            # andre SSE-felt (event:, id:, kommentarer) ignoreres
-        if databuf:
-            yield _parse(databuf)
+def post_sse_med_tail(payload: dict, passord: str, timeout: float):
+    """Som post_sse, men følger {type:'tail'}-overleveringer helt til en
+    "ekte" event avslutter hoppet — mirrorer consumeMedTail i js/ai-chat.js.
+    jobb-tail.ts gir seg selv etter 45 s (fristMs, komfortabelt under
+    Netlifys ~60 s-vegg) og sender {type:'tail', job, cursor} i stedet for
+    å fullføre; uten dette faller det eventet gjennom hver eneste gren i
+    kjor_sporsmal, og et spørsmål som svarer sent (balanced/best — akkurat
+    arbeidsmengden denne branchen finnes for) rapporteres som ERROR selv om
+    jobben lever videre i bakgrunnen (se Fix 1 i sluttfiks-planen)."""
+    neste = None
+    for ev in post_sse(payload, passord, timeout):
+        if ev.get("type") == "tail":
+            neste = ev
+            continue
+        yield ev
+    overleveringer = 0
+    while neste:
+        overleveringer += 1
+        if overleveringer > MAKS_OVERLEVERINGER:
+            yield {"type": "_parsefeil", "raw": "for mange tail-overleveringer"}
+            return
+        url = (f"{TAIL_URL}?job={urllib.parse.quote(str(neste.get('job', '')))}"
+               f"&from={urllib.parse.quote(str(neste.get('cursor', 0)))}")
+        neste = None
+        req = urllib.request.Request(
+            url,
+            method="GET",
+            headers={
+                "Authorization": "Bearer " + passord,
+                "Accept": "text/event-stream",
+            },
+        )
+        for ev in _sse_events(req, timeout):
+            if ev.get("type") == "tail":
+                neste = ev
+                continue
+            yield ev
 
 
 # ---------------------------------------------------------------- kjøreløkka
@@ -147,7 +196,7 @@ def kjor_sporsmal(sp: dict, passord: str, quality: str, timeout: float) -> dict:
         pending_script = False
 
         try:
-            for ev in post_sse(payload, passord, timeout):
+            for ev in post_sse_med_tail(payload, passord, timeout):
                 t = ev.get("type", "?")
                 h["eventtyper"].append(t)
                 if t == "progress":

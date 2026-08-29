@@ -4,22 +4,16 @@
 // Strukturmal: askstats svar.ts, minus ruter/packs/keys/discover — microdata
 // har ikke askstats finn-data-problem; kunnskapen er front-lastet i prefiksen
 // og detaljer hentes med variabel_info.
-import { gate, timingSafeEqual, upstreamErrorResponse, extractByokKey, type IpContext } from "./_lib/auth.ts";
-import { type AgenticResumeState, runAgenticStream } from "./_lib/anthropic.ts";
+import { timingSafeEqual, type IpContext } from "./_lib/auth.ts";
+import { type AgenticResumeState } from "./_lib/anthropic.ts";
 import { coerceQuality, resolveLlm } from "./_lib/llm-choice.ts";
-import { runProviderAgenticStream } from "./_lib/providers/agentic.ts";
-import { makeOpenAiCompatTurn } from "./_lib/providers/openai-compat.ts";
-import { makeOpenAiResponsesTurn } from "./_lib/providers/openai-responses.ts";
 import {
-  coerceRunOkCalls, filtrerRunCode, klassifiserRunResult, medPaaminnelse,
+  coerceRunOkCalls, klassifiserRunResult, medPaaminnelse,
 } from "./_lib/run-disiplin.ts";
-import {
-  buildSvarSystem, coerceUserInstructions, progressLabel, questionTurn,
-  RUN_CODE_TOOL, svarBudsjett, VARIABEL_INFO_TOOL,
-} from "./_lib/svar-instruks.ts";
 import { type GenMode } from "./_lib/prefiks.ts";
-import { variabelInfo } from "./_lib/tools/variabel-info.ts";
-import { feiljournalStore, journalfor } from "./_lib/feiljournal.ts";
+import { journalfor } from "./_lib/feiljournal.ts";
+import { denoEnv, feiljournalStore, gate, jobbStore } from "./_lib/deno-kabling.ts";
+import { SSE_HEADERS, tailStream } from "./_lib/jobb-tail.ts";
 
 interface ResumeBody { state?: AgenticResumeState; run_ok_calls?: unknown; }
 interface RequestBody {
@@ -96,8 +90,11 @@ export default async (request: Request, context: IpContext): Promise<Response> =
     resumeState = rebuildResumeState(body.resume.state);
   }
 
-  const byokKey = extractByokKey(request);
-  const choice = resolveLlm(request, body, "svar");
+  // Kjøres her (i tillegg til inne i jobb-funksjonen) for RASK avvisning:
+  // en ugyldig leverandørkonfig eller manglende servernøkkel skal svare med
+  // riktig statuskode med én gang, ikke først etter at klienten har ventet
+  // ventPaaHeadMs (10 s) på en jobb som aldri fikk skrevet sin første head.
+  const choice = resolveLlm(request, body, "svar", denoEnv);
   if (choice instanceof Response) return choice;
 
   // Personlig-autentisert kall (Hans' private passord): oppstrøms-feildetaljer
@@ -108,7 +105,7 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   const bearer = (request.headers.get("authorization") ?? "").startsWith("Bearer ")
     ? (request.headers.get("authorization") ?? "").slice(7).trim()
     : "";
-  const personligToken = Deno.env.get("M2PY_ACCESS_TOKEN_PERSONAL") ?? "";
+  const personligToken = denoEnv("M2PY_ACCESS_TOKEN_PERSONAL") ?? "";
   const erPersonlig = bearer.length > 0 && personligToken.length > 0 &&
     timingSafeEqual(bearer, personligToken);
 
@@ -122,12 +119,10 @@ export default async (request: Request, context: IpContext): Promise<Response> =
     runOkCalls++;
     if (runOkCalls === 1) runResultTilLopet = medPaaminnelse(runResultTilLopet);
   }
-  const tools = filtrerRunCode([RUN_CODE_TOOL, VARIABEL_INFO_TOOL], runOkCalls);
 
   const origin = new URL(request.url).origin;
   const mode = coerceMode(body.mode);
   const kvalitet = coerceQuality(body.quality) ?? "balanced";
-  const budsjett = svarBudsjett(kvalitet);
 
   // Feiljournalen (selvforbedringssløyfen 2026-08-28): KUN personlig-
   // autentisert trafikk journalføres — Hans' egen bruk, hans data. Alt er
@@ -141,76 +136,46 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   if (runResultTilLopet !== undefined && klassifiserRunResult(runResultTilLopet) === "feil") {
     journalHendelse("run_feil", runResultTilLopet);
   }
-  let system: string;
-  try {
-    system = await buildSvarSystem(origin, mode, {
-      userInstructions: coerceUserInstructions(body.instructions),
-    });
-  } catch (e) {
-    console.error("svar: prefiks-bygging feilet:", e);
-    return new Response("Systemreferansen er utilgjengelig", { status: 502 });
+  const jobId = crypto.randomUUID();
+  const jobbNokkel = denoEnv("SVAR_JOBB_SECRET") ?? "";
+  if (!jobbNokkel) {
+    console.error("SVAR_JOBB_SECRET is not set");
+    return new Response("Server configuration error", { status: 500 });
   }
-
-  const executeTool = async (name: string, input: Record<string, unknown>): Promise<string> => {
-    if (name === "variabel_info") {
-      return await variabelInfo(origin, String(input.navn ?? ""));
-    }
-    throw new Error(`ukjent verktøy: ${name}`);
+  // Videresend brukerens egen legitimasjon UENDRET — jobb-funksjonen kjører
+  // hele porten på nytt, og BYOK-nøkkelen må nå fram dit den faktisk brukes.
+  const videre: Record<string, string> = {
+    "content-type": "application/json",
+    "x-jobb-nokkel": jobbNokkel,
   };
-
-  const commonOpts = {
-    system,
-    userContent: questionTurn(question, body.script),
-    tools,
-    executeTool,
-    progressLabel,
-    maxTokens: 8192,
-    maxClientToolCalls: budsjett.clientCalls,
-    clientTools: ["run_code"],
-    maxRunCode: budsjett.runCalls,
-    runResult: runResultTilLopet,
-    resume: resumeState,
-    continueExtra: () => ({ run_ok_calls: runOkCalls }),
-    // Feiljournal-avlytting: error-events fra løkka. Providers-veien (askstat-
-    // identisk fil) kjenner ikke onEmit og ignorerer nøkkelen — bevisst.
-    onEmit: (ev: Record<string, unknown>) => {
-      if (ev.type === "error") journalHendelse("feil", String(ev.message ?? ""));
-    },
-  };
-  const providerDeps = { timeoutMs: 180_000, retries: 1 };
-  let inner: ReadableStream<Uint8Array>;
-  try {
-    if (choice.provider?.type === "openai-compat") {
-      inner = runProviderAgenticStream({
-        ...commonOpts,
-        deps: providerDeps,
-        runTurn: makeOpenAiCompatTurn(choice.provider),
-      });
-    } else if (choice.provider?.type === "openai-responses") {
-      inner = runProviderAgenticStream({
-        ...commonOpts,
-        deps: providerDeps,
-        runTurn: makeOpenAiResponsesTurn(choice.provider),
-      });
-    } else {
-      // KUN den anthropic-native grenen får verboseUpstream: providers-veien
-      // (runProviderAgenticStream/_lib/providers/*) er byte-identisk med
-      // askstat og skal ikke divergere for et microdata-tillegg.
-      inner = runAgenticStream({
-        ...commonOpts,
-        deps: { verboseUpstream: erPersonlig },
-        apiKey: choice.apiKey,
-        model: choice.provider ? choice.provider.model : choice.model,
-        cacheTtl: "1h",
-        effort: choice.effort,
-        apiBase: choice.provider?.type === "anthropic-compat" ? choice.provider.baseUrl : undefined,
-      });
-    }
-  } catch (e) {
-    return upstreamErrorResponse(e, byokKey);
+  for (const h of ["authorization", "x-anthropic-key", "x-llm-key"]) {
+    const v = request.headers.get(h);
+    if (v) videre[h] = v;
   }
-
-  return new Response(inner, {
-    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+  // resume kastes ut av spreaden med vilje: den bærer HELE samtalen én gang
+  // til, ved siden av resumeState under. Doblingen halverte det effektive
+  // 2 MB-budsjettet, og en resume over ~1 MB døde som en usynlig 413 inne i
+  // bakgrunnsinvokasjonen — platformens 202 kastet svaret, og klienten så
+  // «Svarjobben startet aldri» ti sekunder senere, umulig å skille fra et
+  // reelt krasj (Task 6 review-funn 2). Den uvaliderte kopien skal heller
+  // ikke reise videre: resumeState er den validerte/rekonstruerte utgaven.
+  const { resume: _uvalidert, ...offentlig } = body;
+  const spawn = await fetch(new URL("/api/svar-jobb", origin), {
+    method: "POST",
+    headers: videre,
+    body: JSON.stringify({
+      ...offentlig, jobId, runOkCalls, runResultTilLopet,
+      resumeState, quality: kvalitet,
+      // erPersonlig sendes IKKE — jobb-funksjonen regner den ut fra tokenet
+      // selv. Et klientsatt flagg ville vært en innsyns-bypass.
+    }),
   });
+  if (spawn.status !== 202) {
+    console.error(`svar: jobbstart feilet med ${spawn.status}`);
+    return new Response("Kunne ikke starte svarjobben", { status: 502 });
+  }
+  return new Response(
+    tailStream({ store: jobbStore(), jobId, fra: 0 }),
+    { headers: SSE_HEADERS },
+  );
 };

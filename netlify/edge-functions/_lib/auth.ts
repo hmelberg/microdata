@@ -13,7 +13,6 @@
 // de to konfigurerte passordene (M2PY_ACCESS_TOKEN og
 // M2PY_ACCESS_TOKEN_PERSONAL). Feil token gir umiddelbar 401 i stedet for en
 // 4-sekunders nettverksrundtur mot Anvil.
-import { checkRateLimit as defaultCheckRateLimit } from "./rate-limit.ts";
 
 /** Constant-time string comparison (no early return on first mismatch). */
 export function timingSafeEqual(a: string, b: string): boolean {
@@ -87,7 +86,13 @@ export interface GateOptions {
    * Accept a well-formed X-Anthropic-Key in place of token/admin auth — only
    * for endpoints that forward the key to Anthropic, which validates it.
    * Never set this on endpoints that don't consume the key (they would
-   * become effectively anonymous).
+   * become effectively anonymous) — with ONE documented exception:
+   * svar-tail.ts, which makes no model call and spends no server key at all.
+   * A BYOK caller has no bearer token, so without this flag it could never
+   * reconnect to its own stream; the real capability check there is the job
+   * UUID in the URL (36 chars, minted by /api/svar), not the key. Any other
+   * handler that sets this without consuming the key is a bug, not a second
+   * instance of this exception.
    */
   allowByok?: boolean;
   /**
@@ -98,7 +103,10 @@ export interface GateOptions {
    * X-Llm-Key-authenticated request that lacks a complete parsed `provider`
    * body, or it would fall through to the server's own env-configured API key
    * as an anonymous bypass. In this repo that check lives in resolveLlm
-   * (_lib/llm-choice.ts); never set this flag on a handler that skips it.
+   * (_lib/llm-choice.ts); never set this flag on a handler that skips it —
+   * with the SAME one documented exception as allowByok above: svar-tail.ts,
+   * where resolveLlm is simply not in the picture (no model call, no key
+   * spent), and the job UUID is the real capability check.
    */
   allowLlmKey?: boolean;
 }
@@ -236,15 +244,6 @@ export async function runGate(
   return null;
 }
 
-/** Env-wired gate used by the handlers. */
-export function gate(request: Request, opts: GateOptions, context?: IpContext): Promise<Response | null> {
-  return runGate(request, opts, {
-    sharedToken: Deno.env.get("M2PY_ACCESS_TOKEN") ?? undefined,
-    personalToken: Deno.env.get("M2PY_ACCESS_TOKEN_PERSONAL") ?? undefined,
-    checkRateLimit: defaultCheckRateLimit,
-  }, context);
-}
-
 export interface AdminGateDeps {
   sharedToken?: string;
   /** Se GateDeps.personalToken — samme rolle, teller også som admin. */
@@ -282,13 +281,4 @@ export async function runAdminGate(
     return new Response("Unauthorized", { status: 401 });
   }
   return null;
-}
-
-/** Env-wired admin gate used by data-svar and hent. */
-export function adminGate(request: Request, opts: GateOptions, context?: IpContext): Promise<Response | null> {
-  return runAdminGate(request, opts, {
-    sharedToken: Deno.env.get("M2PY_ACCESS_TOKEN") ?? undefined,
-    personalToken: Deno.env.get("M2PY_ACCESS_TOKEN_PERSONAL") ?? undefined,
-    checkRateLimit: defaultCheckRateLimit,
-  }, context);
 }

@@ -67,8 +67,8 @@ kabling må derfor samles ett sted som Node-siden aldri importerer.
   - `deno-kabling.ts`: `denoEnv(k: string): string | undefined`,
     `gate(request, opts, context?): Promise<Response|null>`,
     `adminGate(request, opts, context?): Promise<Response|null>`,
-    `feiljournalStore(): JournalStore`, `rateLimitStore(name: string): RateStore`,
-    `jobbStore(): BlobbStore`
+    `feiljournalStore(): JournalStore`, `rateLimitStore(name: string): RateStore`
+    (`jobbStore()` legges til i Task 6 — se rulingen der)
   - `auth.ts` beholder `runGate`, `runAdminGate`, `timingSafeEqual`,
     `extractByokKey`, `extractLlmKey`, `clientIp`, `upstreamErrorResponse`,
     `type IpContext`, `type GateOptions`, `type GateDeps` — alle rene.
@@ -131,7 +131,6 @@ import {
 } from "./auth.ts";
 import { checkRateLimit } from "./rate-limit.ts";
 import { type JournalStore } from "./feiljournal.ts";
-import { type BlobbStore } from "./jobb-blobb.ts";
 
 export const denoEnv = (k: string): string | undefined => Deno.env.get(k);
 
@@ -149,12 +148,8 @@ export function feiljournalStore(): JournalStore {
   return (getStore as unknown as StoreFabrikk)({ name: "feiljournal" }) as JournalStore;
 }
 
-export function jobbStore(): BlobbStore {
-  return (getStore as unknown as StoreFabrikk)({
-    name: "svarjobb",
-    consistency: "strong",
-  }) as BlobbStore;
-}
+// MERK: `jobbStore()` hører hjemme her, men opprettes først i Task 6 — den
+// importerer `BlobbStore` fra `jobb-blobb.ts`, som ikke finnes før Task 2.
 
 const rateLimitDep = (endpoint: string, ip: string) =>
   checkRateLimit(endpoint, ip, rateLimitStore);
@@ -798,6 +793,13 @@ Alt annet — `commonOpts`, `providerDeps`, `executeTool`, `cacheTtl: "1h"`,
 
 - [ ] **Step 4: Kall den nye funksjonen fra svar.ts**
 
+Legg til importen `svar.ts` nå trenger:
+
+```ts
+import { SSE_HEADERS } from "./_lib/jobb-tail.ts";
+import { byggLop } from "./_lib/svar-lop.ts";
+```
+
 `svar.ts` beholder alt før blokken (gate, body-parsing, resume-validering,
 `resolveLlm`, `erPersonlig`, run-disiplin, journal) og avslutter med:
 
@@ -1046,7 +1048,23 @@ Erstatt `byggLop`-kallet fra Task 4 Step 4 med avfyring + tailing:
   );
 ```
 
-- [ ] **Step 2: Nytt tail-endepunkt**
+- [ ] **Step 2: Legg `jobbStore()` til i `deno-kabling.ts`**
+
+Task 1 lot den bevisst stå igjen: den importerer `BlobbStore` fra
+`jobb-blobb.ts`, som ikke fantes da. Nå gjør den det.
+
+```ts
+import { type BlobbStore } from "./jobb-blobb.ts";
+
+export function jobbStore(): BlobbStore {
+  return (getStore as unknown as StoreFabrikk)({
+    name: "svarjobb",
+    consistency: "strong",   // se Global Constraints — ikke valgfritt
+  }) as BlobbStore;
+}
+```
+
+- [ ] **Step 3: Nytt tail-endepunkt**
 
 ```ts
 // netlify/edge-functions/svar-tail.ts — plukker opp en svarjobb der forrige
@@ -1083,7 +1101,7 @@ Merk: `gate` sjekker i dag metode POST. Legg til et `metode`-felt i
 GET-endepunktet slipper gjennom. Oppdater `_lib/auth.test.ts` med en test som
 viser at `metode: "GET"` avviser POST og omvendt.
 
-- [ ] **Step 3: Registrer endepunktet**
+- [ ] **Step 4: Registrer endepunktet**
 
 ```toml
 [[edge_functions]]
@@ -1091,12 +1109,12 @@ viser at `metode: "GET"` avviser POST og omvendt.
   path = "/api/svar-tail"
 ```
 
-- [ ] **Step 4: Kjør hele suiten**
+- [ ] **Step 5: Kjør hele suiten**
 
 Run: `cd netlify/edge-functions && deno check *.ts _lib/*.ts && deno test --allow-all _lib/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add netlify/edge-functions netlify.toml
@@ -1118,7 +1136,13 @@ git commit -m "feat(edge): /api/svar avfyrer jobb og tailer; /api/svar-tail gjen
 
 - [ ] **Step 1: Legg inn tail-følgeren**
 
-Rett under `consumeSse` (`ai-chat.js:575`):
+**Skop-regelen (avgjort i forhåndsskanningen):** `consumeMedTail` bruker
+`markdown`, `bubble`, `signal` og `streamRenderMd`. `markdown` og `bubble` er
+LOKALE i svar-funksjonen (`ai-chat.js:592-596`), ikke synlige der `consumeSse`
+er definert på linje 555-575. Legg derfor `consumeMedTail` **rett etter
+`handleSvarEvent`** (~linje 640), inne i samme funksjonsskop — ikke ved
+`consumeSse`. Plasseres den ved `consumeSse`, kaster den ReferenceError på
+første overlevering.
 
 ```js
       // Overleveringen: taileren gir fra seg på 45 s med {type:'tail'}, og vi
@@ -1465,9 +1489,12 @@ I `handleSvarEvent`, ny gren før `delta`:
             scrollToBottom();
 ```
 
-Og i `delta`-grenen, øverst:
+Og i `delta`-grenen, øverst. **NB:** Task 8 la allerede en linje her
+(`if (pulsTimer) { clearInterval(pulsTimer); pulsTimer = null; }`) — den skal
+BLI STÅENDE. Legg forord-oppryddingen ved siden av, ikke i stedet for:
 
 ```js
+            if (pulsTimer) { clearInterval(pulsTimer); pulsTimer = null; }
             const f = thinkingNode.querySelector('.ai-forord');
             if (f) f.remove();
 ```

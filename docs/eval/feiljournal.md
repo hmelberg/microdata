@@ -38,6 +38,21 @@ ingenting (målt 32.5 s stillhet), så én effort-high-tur sprengte taket.
 medium/high, 50 s-frist per tur med forklart feilmelding. Dypere effort
 krever background-transport (utsatt, spec §Utsatt).
 
+**Endelig lukket denne runden:** background-transporten fjerner
+60-sekundersveggen helt — /api/svar-jobb kjører som Netlify Background
+Function (15 min budsjett), relayet gjennom Netlify Blobs til en edge-tailer
+som overleverer hvert 45. sekund (godt under edge-veggen) og gjenopptas
+transparent av klienten. Målingen bak effort-endringen viste dessuten at
+tenketeksten er kryptert — thinking_delta kommer én gang, med 0 tegn, ved
+slutten av tenkefasen — så stillheten kunne aldri fylles med modellens egen
+tenking uansett hvor mye tak man fjernet. Løst i stedet med effort av på
+balansert (målt 1,12 s til første tekst mot 26-31 s stum), en levende
+statuslinje (lokal klokke i stedet for serverens 10 s-heartbeat), og et
+Haiku-forord på Grundig (kun første tur, kun den native Anthropic-veien —
+portet mot `!choice.provider` etter et review-funn om at et forord på en
+egendefinert-leverandør-tur ville sendt brukerens fremmede nøkkel til
+api.anthropic.com; se `_lib/forord-provider-vakt.test.ts`).
+
 ## 2026-08-28 — 400 på resume etter tenke-tur                  [LUKKET f.o.m. thinking-fiksen]
 **Symptom:** «Anthropic API error 400» på hop 1, begge kvalitetsnivåer, etter
 at streaming-turene kom inn.

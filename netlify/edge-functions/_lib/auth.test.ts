@@ -115,6 +115,19 @@ Deno.test("runAdminGate: shared token passes, wrong token 401", async () => {
   assertEquals(r401?.status, 401);
 });
 
+// svar-tail (Task 6) er GET-only via runGate (ikke runAdminGate, i motsetning
+// til hent) — samme allowedMethods-mekanisme, men verdt en egen test siden
+// runGate og runAdminGate er to separate funksjoner som begge kaller
+// runBaseChecks; en regresjon i den ene fanges ikke av en test på den andre.
+Deno.test("runGate: allowedMethods ['GET'] avviser POST, slipper GET gjennom", async () => {
+  const opts = { endpoint: "svar-tail", maxBodyBytes: 0, allowedMethods: ["GET"] };
+  const deps = makeDeps({ sharedToken: "t" });
+  const getResp = await runGate(req({ token: "t", method: "GET" }), opts, deps);
+  assertEquals(getResp, null);
+  const postResp = await runGate(req({ token: "t", method: "POST" }), opts, deps);
+  assertEquals(postResp?.status, 405);
+});
+
 Deno.test("runAdminGate: allowedMethods lets GET through when configured", async () => {
   const opts = { endpoint: "hent", maxBodyBytes: 0, allowedMethods: ["GET"] };
   const getReq = req({ token: "t", method: "GET" });
