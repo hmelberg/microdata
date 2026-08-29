@@ -10,6 +10,7 @@ import type { Config } from "@netlify/functions";
 import { extractByokKey, runGate, timingSafeEqual } from "../edge-functions/_lib/auth.ts";
 import { coerceQuality, resolveLlm } from "../edge-functions/_lib/llm-choice.ts";
 import { lagSkriver } from "../edge-functions/_lib/jobb-blobb.ts";
+import { skrivForord } from "../edge-functions/_lib/forord.ts";
 import { byggLop } from "../edge-functions/_lib/svar-lop.ts";
 import { journalfor } from "../edge-functions/_lib/feiljournal.ts";
 import {
@@ -99,6 +100,19 @@ export default async (request: Request): Promise<Response> => {
     })}\n\n`);
     await skriver.avslutt("feil");
     return new Response(null, { status: 202 });
+  }
+
+  // Bare når turen faktisk kommer til å tenke (altså «Grundig»), og bare på
+  // første tur — et resume har allerede vist brukeren tekst.
+  //
+  // Sekvensielt, ikke parallelt: lagSkriver serialiserer alt gjennom en intern
+  // kjede, så to samtidige skrivere ville IKKE flettet frames inn i hverandre
+  // lenger — det er ikke grunnen. Grunnen er at parallelt ville lagt
+  // samtidighet til den mest risikofylte filen i denne planen for å spare
+  // ~1,5 s på en tur som uansett tar 30+, og brukeren kan ikke merke
+  // forskjellen på et forord ved 1 s og ett ved 1,5 s.
+  if (choice.effort && !body.resumeState) {
+    await skrivForord(skriver, { apiKey: choice.apiKey, question: String(body.question ?? "") });
   }
 
   // Ren bytepumpe: strømmen ER allerede «data: {...}\n\n»-frames, så ingenting

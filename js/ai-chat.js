@@ -632,8 +632,20 @@
             // engangsmeldinger og skal stå stille.
             if (ev.replace && !pynt) startPuls(line, ev.text);
             scrollToBottom();
+          } else if (ev.type === 'forord') {
+            // Dempet, og ryddes bort så snart det ekte svaret begynner.
+            let f = thinkingNode.querySelector('.ai-forord');
+            if (!f) {
+              f = document.createElement('div');
+              f.className = 'ai-forord';
+              thinkingNode.insertBefore(f, bubble);
+            }
+            f.textContent = ev.text;
+            scrollToBottom();
           } else if (ev.type === 'delta' || ev.type === 'text') {
             if (pulsTimer) { clearInterval(pulsTimer); pulsTimer = null; }
+            const f = thinkingNode.querySelector('.ai-forord');
+            if (f) f.remove();
             markdown += ev.text;
             const _now = Date.now();
             if (_now - _lastRender > 70) {
@@ -757,6 +769,10 @@
             }, hop);
 
             if (pendingRun != null) {
+              // Løpet går videre til å kjøre scriptet — den tikkende
+              // "Tenker … 47 s"-linja er ikke lenger sann og skal ikke stå
+              // og telle videre på en fase vi har forlatt.
+              if (pulsTimer) { clearInterval(pulsTimer); pulsTimer = null; }
               if (signal && signal.aborted) {
                 throw Object.assign(new Error('Stopped'), { name: 'AbortError' });
               }

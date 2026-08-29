@@ -10,13 +10,16 @@ import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 // transitive lukningen (catalog-format.ts via prefiks.ts, sse-frames.ts via
 // anthropic.ts) og la til de to siste. Manuell verifisering holder bare til
 // neste endring — vakten er det som gjør det varig (task-4-report-rulingen).
+//
+// forord.ts (Task 9) importeres DIREKTE av svar-jobb.mts (Node), akkurat som
+// jobb-blobb.ts og svar-lop.ts — samme begrunnelse gjelder uendret.
 const NODE_TRYGGE = [
   "anthropic.ts", "auth.ts", "llm-choice.ts", "rate-limit.ts",
   "feiljournal.ts", "run-disiplin.ts", "svar-instruks.ts", "prefiks.ts",
   "providers/agentic.ts", "providers/openai-compat.ts",
   "providers/openai-responses.ts", "providers/config.ts",
   "tools/variabel-info.ts", "ssrf.ts", "svar-lop.ts", "jobb-blobb.ts",
-  "catalog-format.ts", "sse-frames.ts",
+  "catalog-format.ts", "sse-frames.ts", "forord.ts",
 ];
 
 Deno.test("Node-trygge moduler har ingen URL-importer", async () => {
