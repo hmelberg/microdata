@@ -47,6 +47,10 @@ export function tailStream(opts: TailOpts): ReadableStream<Uint8Array> {
   } = opts;
 
   const enc = new TextEncoder();
+  // Satt av cancel() når klienten kobler fra (nettbrudd, faneskift, avbryt-
+  // knapp). Uten den poller en forlatt tailer Blobs hvert 120 ms helt til sin
+  // 45 s-frist — ren bortkastet arbeid ingen leser resultatet av.
+  let avbrutt = false;
   return new ReadableStream({
     async start(controller) {
       const send = (s: string) => controller.enqueue(enc.encode(s));
@@ -54,6 +58,7 @@ export function tailStream(opts: TailOpts): ReadableStream<Uint8Array> {
       let cursor = fra;
       try {
         while (true) {
+          if (avbrutt) return;
           const head = await lesHead(store, jobId);
           if (!head) {
             if (now() - start >= ventPaaHeadMs) {
@@ -113,6 +118,14 @@ export function tailStream(opts: TailOpts): ReadableStream<Uint8Array> {
       } finally {
         controller.close();
       }
+    },
+    // Kalles av streams-runtimen når konsumenten kobler fra (reader.cancel(),
+    // eller fetch-signalet som avbryter responsen). Selve modellkallet i
+    // bakgrunnsfunksjonen lever videre uberørt — det krever en egen
+    // avbryt-nøkkel i Blobs-protokollen, bevisst utsatt (se sluttfiks-planen
+    // 2026-08-28, Fix 3). Dette stanser BARE denne tailerens egen polling.
+    cancel() {
+      avbrutt = true;
     },
   });
 }

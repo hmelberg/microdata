@@ -22,6 +22,8 @@ export interface JobbHead {
 }
 
 export interface JobbSkriver {
+  /** Skriver head UBETINGET, uansett bufferstatus — se lagSkriver for hvorfor. */
+  start(): Promise<void>;
   skriv(sse: string): Promise<void>;
   avslutt(state: "ferdig" | "feil"): Promise<void>;
 }
@@ -71,6 +73,21 @@ export function lagSkriver(
   };
 
   return {
+    // Skriver head FØR byggLop/prefiks-oppbyggingen engang starter — se
+    // svar-jobb.mts. Uten dette venter taileren (ventPaaHeadMs, default 10 s)
+    // på den FØRSTE flush()-en fra skriv(), som ikke skjer før modellen har
+    // produsert noe å sende: en kald bakgrunns-invokasjon + runGate/resolveLlm
+    // + buildCachedPrefix (tre fetch + 652 KB JSON.parse) kan alene bruke opp
+    // det budsjettet, og brukeren får «Svarjobben startet aldri» mens jobben
+    // faktisk kjører videre i bakgrunnen i opptil 13 minutter til (Fix 2,
+    // sluttfiks-planen 2026-08-28). Går gjennom iKo som alt annet, slik at en
+    // skriv() som rekker å starte FØR denne (bør aldri skje, men iKo gjør det
+    // ufarlig uansett) ikke kan skrive en head med lavere seq etterpå.
+    start(): Promise<void> {
+      return iKo(async () => {
+        await store.setJSON(headNokkel(jobId), { seq: 0, state: "kjorer", start });
+      });
+    },
     skriv(sse: string): Promise<void> {
       return iKo(async () => {
         buffer += sse;

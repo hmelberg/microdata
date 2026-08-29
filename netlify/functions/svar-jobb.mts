@@ -44,6 +44,20 @@ export default async (request: Request): Promise<Response> => {
     return new Response("Ugyldig jobId", { status: 400 });
   }
 
+  // Skriveren opprettes og head skrives HER — rett etter porten og
+  // jobId-valideringen, FØR resolveLlm eller byggLop. Grunnen: tailerens
+  // ventPaaHeadMs (10 s, jobb-tail.ts) starter å telle idet klienten fikk
+  // 202 fra /api/svar, altså FØR denne bakgrunnsinvokasjonen i det hele tatt
+  // er kald-startet. Alt herfra og ned mot byggLop → buildSvarSystem →
+  // buildCachedPrefix (tre sekvensielle fetch, deriblant en 652 KB
+  // variable_metadata.json + JSON.parse + katalogrendring — se
+  // sluttfiks-planen 2026-08-28, Fix 2) kan alene bruke opp budsjettet på en
+  // kald, lavtrafikkert bakgrunnsfunksjon. Uten en tidlig head venter
+  // taileren forgjeves og forteller brukeren «Svarjobben startet aldri» mens
+  // en full-pris jobb kjører videre i opptil 13 minutter til.
+  const skriver = lagSkriver(jobbStore(), jobId, () => Date.now());
+  await skriver.start();
+
   // byokKey beregnes HER (ikke bare inne i resolveLlm) fordi byggLop trenger
   // sin egen kopi til upstreamErrorResponse(e, byokKey) — se svar.ts, som gjør
   // det samme. LopInput.byokKey er PÅKREVD (task-4-report-rulingen): utelates
@@ -53,7 +67,17 @@ export default async (request: Request): Promise<Response> => {
   // (typefeil, ikke bundlefeil).
   const byokKey = extractByokKey(request);
   const choice = resolveLlm(request, body, "svar", nodeEnv);
-  if (choice instanceof Response) return choice;
+  if (choice instanceof Response) {
+    // Uten dette blir jobben stående som «kjorer» ved seq 0 helt til
+    // dødjobb-vakten (16 min, jobb-tail.ts) rydder den — resolveLlm feiler
+    // her praktisk talt aldri (svar.ts har alt validert samme body), men når
+    // den gjør det, skal taileren få vite det i sekunder, ikke minutter.
+    await skriver.skriv(`data: ${JSON.stringify({
+      type: "error", message: `Kunne ikke starte løpet (HTTP ${choice.status})`,
+    })}\n\n`);
+    await skriver.avslutt("feil");
+    return choice;
+  }
 
   // erPersonlig regnes ut HER, fra tokenet — den kommer ALDRI fra bodyen.
   // Den styrer `verboseUpstream` (skrubbede oppstrøms-feildetaljer) og
@@ -84,7 +108,6 @@ export default async (request: Request): Promise<Response> => {
     }
   };
 
-  const skriver = lagSkriver(jobbStore(), jobId, () => Date.now());
   const lop = await byggLop({
     origin: new URL(request.url).origin,
     question, mode, script: body.script, instructions: body.instructions,

@@ -69,6 +69,26 @@ Deno.test("avslutt flusher resten og setter slutt-tilstanden", async () => {
   assertEquals(head, { seq: 1, state: "ferdig", start: 1000 });
 });
 
+// Fix 2 (sluttfiks-planen 2026-08-28): head må finnes FØR byggLop/
+// buildCachedPrefix rekker å bruke opp tailerens ventPaaHeadMs. start()
+// skriver den UBETINGET, uten at en eneste skriv() har skjedd.
+Deno.test("start() skriver en lesbar kjorer-head ved seq 0 uten at skriv() er kalt", async () => {
+  const { store, rekkefolge } = fakeStore();
+  const s = lagSkriver(store, "j1", () => 1000);
+  await s.start();
+  assertEquals(await lesHead(store, "j1"), { seq: 0, state: "kjorer", start: 1000 });
+  // Ingen buffer å flushe → ingen chunk-nøkkel, bare selve headen.
+  assertEquals(rekkefolge, ["j1/head"]);
+});
+
+Deno.test("start() går gjennom samme kø som skriv() — rekkefølgen står ved lag", async () => {
+  const { store, rekkefolge } = fakeStore();
+  const s = lagSkriver(store, "j1", () => 1000);
+  await s.start();
+  await s.skriv('data: {"type":"done"}\n\n');   // kontroll-event tvinger flush
+  assertEquals(rekkefolge, ["j1/head", "j1/000001", "j1/head"]);
+});
+
 Deno.test("avslutt uten buffret innhold lager ingen tom chunk", async () => {
   const { store, rekkefolge } = fakeStore();
   const s = lagSkriver(store, "j1", () => 1000);

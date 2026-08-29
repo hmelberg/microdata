@@ -600,16 +600,21 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
             ? "🧠 Tolker spørsmålet og planlegger"
             : `🤔 Arbeider med svaret (tur ${state.turn + 1})`;
           emit({ type: "progress", text: `${turnLabel} …`, replace: true });
-          const turnStart = Date.now();
           // Heartbeat trengs bare til første delta — deretter holder deltaene
           // SSE-strømmen i live.
           let sawDelta = false;
           let turnHadText = false;
+          // Samme tekst som åpningseventet over (linje ~602) — MED VILJE,
+          // ikke bare "ingen (s)": klienten (js/ai-chat.js, startPuls) eier
+          // sekundtellingen lokalt og bruker tekstlikhet til å skille en NY
+          // fase (restart klokka) fra en heartbeat for SAMME fase (la klokka
+          // stå). Sendte vi et eget sekundtall her, telte to klokker samtidig
+          // og den lokale hoppet tilbake til 0 hvert 10. sekund — nøyaktig
+          // buggen Fix 4 (sluttfiks-planen 2026-08-28) fjerner.
           const beat = setInterval(() => {
             if (sawDelta) return;
-            const s = Math.round((Date.now() - turnStart) / 1000);
             try {
-              emit({ type: "progress", text: `${turnLabel} … (${s} s)`, replace: true });
+              emit({ type: "progress", text: `${turnLabel} …`, replace: true });
             } catch (_) { /* stream already closed */ }
           }, HEARTBEAT_MS);
           let turn: TurnResult;

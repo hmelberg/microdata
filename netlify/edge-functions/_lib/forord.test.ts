@@ -5,6 +5,7 @@ function fangSkriver() {
   const skrevet: string[] = [];
   return {
     skriver: {
+      start: () => Promise.resolve(),
       skriv: (s: string) => { skrevet.push(s); return Promise.resolve(); },
       avslutt: () => Promise.resolve(),
     },

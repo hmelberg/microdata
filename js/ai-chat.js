@@ -603,34 +603,54 @@
 
         // Serverens heartbeat kommer hvert 10. sekund. En linje som står
         // bom stille i ti sekunder leses som «hengt», ikke «jobber» — så
-        // sekundene telles her, av en lokal klokke.
+        // sekundene telles her, av en lokal klokke — klienten eier tellingen
+        // ALENE (Fix 4, sluttfiks-planen 2026-08-28). Serveren sender bevisst
+        // IDENTISK tekst for fase-åpningen og hver heartbeat innenfor samme
+        // fase (anthropic.ts:602 vs. ~612) — pulsTekst husker hvilken tekst
+        // klokka sist ble startet for, slik at en heartbeat for SAMME fase
+        // lar klokka stå, mens en NY fase (annen tekst, eller en fersk linje)
+        // starter den på nytt. Uten dette hoppet linja tilbake til 0 hvert
+        // 10. sekund — to klokker som talte samtidig, og brukeren så aldri
+        // monoton medgått tid.
         let pulsTimer = null;
+        let pulsTekst = null;
         function startPuls(line, tekst) {
           const t0 = Date.now();
           if (pulsTimer) clearInterval(pulsTimer);
+          pulsTekst = tekst;
           pulsTimer = setInterval(() => {
             const s = Math.round((Date.now() - t0) / 1000);
             line.textContent = '⏳ ' + tekst + (s >= 3 ? ' … ' + s + ' s' : '');
           }, 1000);
         }
+        function stoppPuls() {
+          if (pulsTimer) { clearInterval(pulsTimer); pulsTimer = null; }
+          pulsTekst = null;
+        }
 
         function handleSvarEvent(ev) {
           if (ev.type === 'progress') {
             const last = progressBox.lastElementChild;
-            let line;
+            let line, nyLinje;
             if (ev.replace && last && last.dataset.replace === '1') {
               line = last;
+              nyLinje = false;
             } else {
               line = document.createElement('div');
               line.className = 'ai-progress-line';
               if (ev.replace) line.dataset.replace = '1';
               progressBox.appendChild(line);
+              nyLinje = true;
             }
             const pynt = (ev.text && (ev.text.startsWith('▶') || ev.text.startsWith('⚠️')));
             line.textContent = pynt ? ev.text : '⏳ ' + ev.text;
             // Bare de utskiftbare fase-linjene teller sekunder; ▶/⚠️ er
-            // engangsmeldinger og skal stå stille.
-            if (ev.replace && !pynt) startPuls(line, ev.text);
+            // engangsmeldinger og skal stå stille. En fersk linje ELLER en
+            // endret fasetekst starter klokka på nytt; en heartbeat med
+            // NØYAKTIG samme tekst som sist (samme fase) lar den stå.
+            if (ev.replace && !pynt && (nyLinje || ev.text !== pulsTekst)) {
+              startPuls(line, ev.text);
+            }
             scrollToBottom();
           } else if (ev.type === 'forord') {
             // Dempet, og ryddes bort så snart det ekte svaret begynner.
@@ -643,7 +663,7 @@
             f.textContent = ev.text;
             scrollToBottom();
           } else if (ev.type === 'delta' || ev.type === 'text') {
-            if (pulsTimer) { clearInterval(pulsTimer); pulsTimer = null; }
+            stoppPuls();
             const f = thinkingNode.querySelector('.ai-forord');
             if (f) f.remove();
             markdown += ev.text;
@@ -659,7 +679,7 @@
             markdown = '';
             streamRenderMd(bubble, '');
           } else if (ev.type === 'error') {
-            if (pulsTimer) { clearInterval(pulsTimer); pulsTimer = null; }
+            stoppPuls();
             let msg = ev.message || 'ukjent feil';
             // 401 fra oppstrøms betyr brukerens EGEN nøkkel er avvist —
             // uansett hvilken av de tre veiene som bar den.
@@ -772,7 +792,7 @@
               // Løpet går videre til å kjøre scriptet — den tikkende
               // "Tenker … 47 s"-linja er ikke lenger sann og skal ikke stå
               // og telle videre på en fase vi har forlatt.
-              if (pulsTimer) { clearInterval(pulsTimer); pulsTimer = null; }
+              stoppPuls();
               // Samme grunn: run_code fanges opp FØR handleSvarEvent ser det,
               // så delta-grenens opprydding aldri kjører for denne turen.
               // Uten dette blir forordet stående under "▶ Kjører scriptet …"
@@ -809,7 +829,7 @@
             resume = cont;
           }
         } finally {
-          if (pulsTimer) { clearInterval(pulsTimer); pulsTimer = null; }
+          stoppPuls();
         }
 
         streamRenderMd(bubble, markdown);

@@ -127,6 +127,27 @@ Deno.test("overlevering rydder IKKE — jobben lever videre", async () => {
   assertEquals(data.has("j1/head"), true);
 });
 
+// Fix 2 (sluttfiks-planen 2026-08-28): en skriver som har kalt start() men
+// ALDRI skriv() (byggLop/buildCachedPrefix ennå ikke ferdig) skal presentere
+// en lesbar «kjorer»-head — taileren venter/overleverer, den sier IKKE
+// «Svarjobben startet aldri» selv om ventPaaHeadMs er lenge passert.
+Deno.test("start() uten noen skriv() gjør at taileren venter, ikke rapporterer 'startet aldri'", async () => {
+  const { store } = fakeStore();
+  const s = lagSkriver(store, "j1", () => 0);
+  await s.start();
+  // Klokken ruller forbi BÅDE ventPaaHeadMs (10 s) og fristMs (45 s) — uten
+  // start() ville lesHead vært null gjennom hele løpet og løkken ville
+  // sluppet ut med "startet aldri" straks ventPaaHeadMs var passert.
+  const k = klokke(20_000);
+  const ut = await lesAlt(tailStream({
+    store, jobId: "j1", fra: 0, now: k.now, sleep: k.sleep,
+    fristMs: 45_000, ventPaaHeadMs: 10_000,
+  }));
+  assertEquals(ut.includes("startet aldri"), false);
+  assertStringIncludes(ut, '"type":"tail"');
+  assertStringIncludes(ut, '"cursor":0');
+});
+
 // ── Dødjobb-vakten (Task 6, ruling 5) ──────────────────────────────────────
 
 Deno.test("jobb «kjorer» over 16 minutter dør med feil, ikke overlevering", async () => {
@@ -184,4 +205,48 @@ Deno.test("fersk «kjorer»-jobb forbi 45s-fristen overleverer likevel normalt",
   assertEquals(ut.includes('"type":"error"'), false);
   // Jobben ryddes IKKE ved overlevering — lever videre til neste tailer.
   assertEquals(data.has("j1/head"), true);
+});
+
+// ── cancel() (Fix 3, sluttfiks-planen 2026-08-28) ──────────────────────────
+
+Deno.test("cancel() stanser en forlatt tailer i stedet for å polle videre mot fristen", async () => {
+  const { store } = fakeStore();
+  // head skrives DIREKTE (som i dødjobb-testene over), IKKE via lagSkriver:
+  // lagSkriver flusher først når FLUSH_MS har gått eller et kontroll-event
+  // tvinger det, og denne testens klokke (now: () => 0) står bevisst stille
+  // — en lagSkriver-buffer ville aldri flushet, og taileren ville ventet på
+  // en head som aldri kom.
+  await store.set(chunkNokkel("j1", 1), 'data: {"type":"delta","text":"en"}\n\n');
+  await store.setJSON(headNokkel("j1"), { seq: 1, state: "kjorer", start: 0 });
+  // "kjorer", ufullført — akkurat tilstanden en forlatt tailer ville sittet
+  // og pollet mot helt til fristMs (45 s) uten cancel()-fiksen.
+  let sleepKall = 0;
+  // Objekt, ikke en bar `let` — en `let`-variabel som BARE tildeles inne i en
+  // Promise-executor-closure fikk `deno check` (TS' kontrollflyt-analyse) til
+  // å feilaktig konkludere `never` ved bruk lenger ned. Feltet unngår kvirken.
+  const holder: { slipp: (() => void) | null } = { slipp: null };
+  // `sleep` henger til vi selv slipper den — det gir oss et deterministisk
+  // punkt å kalle cancel() på MENS løkken venter, i stedet for å gjette
+  // riktig tidspunkt med ekte timere.
+  const sleep = (_ms: number): Promise<void> => {
+    sleepKall++;
+    return new Promise<void>((resolve) => { holder.slipp = () => resolve(); });
+  };
+  const stream = tailStream({
+    store, jobId: "j1", fra: 0, now: () => 0, sleep, fristMs: 45_000, ventPaaHeadMs: 10_000,
+  });
+  const reader = stream.getReader();
+  const forste = await reader.read();   // henter den ene chunken
+  assertEquals(new TextDecoder().decode(forste.value), 'data: {"type":"delta","text":"en"}\n\n');
+  // Løkken har nå funnet "kjorer" uten noe nytt å hente, og henger i sitt
+  // (kontrollerte) sleep()-kall — én runde er alt som skal til.
+  await new Promise((r) => setTimeout(r, 0));
+  assertEquals(sleepKall, 1);
+  await reader.cancel();
+  const kallVedCancel = sleepKall;
+  holder.slipp?.();   // slipp løkken videre — med fiksen treffer den avbrutt-sjekken FØR neste lesHead/sleep
+  await new Promise((r) => setTimeout(r, 0));
+  await new Promise((r) => setTimeout(r, 0));
+  assertEquals(sleepKall, kallVedCancel,
+    "løkken kalte sleep() på nytt etter cancel() — den forlatte tailerens polling stanset ikke");
 });
