@@ -56,6 +56,39 @@
     throw lastError;
   }
 
+  var MAKS_OVERLEVERINGER = 40;   // speiler hop > 40-vakten i ai-chat.js sin ytre løkke
+
+  // Ren beslutning, uten DOM og uten nettverk: gitt hvor mange overleveringer
+  // som er brukt og om DENNE overleveringen alt er forsøkt på nytt, hva gjør vi?
+  // Ligger her og ikke i ai-chat.js fordi consumeMedTail med vilje er bundet til
+  // DOM-closuren (markdown/bubble) og derfor ikke kan node-testes — mens nettopp
+  // denne logikken er den eneste i overleveringskjeden som kan miste HELE svaret.
+  //
+  // Kalles fra to steder i consumeMedTail, med to ulike state-former:
+  //   1. Før hvert forsøk (feilet:false) — er det budsjett igjen?
+  //   2. I catch-blokken rett etter et mislykket forsøk (feilet:true) — prøv
+  //      denne overleveringen på nytt én gang, eller gi opp med feilen?
+  //
+  // Tellersemantikk (bevisst, ikke opplagt): `overleveringer` teller FORSØK,
+  // ikke distinkte overleveringer — et retry-forsøk på samme markør bruker
+  // OGSÅ ett budsjett-hakk. Grunnen: 'prov-igjen' sender kallstedet tilbake
+  // til beslutning 1 (feilet:false) FØR neste fetch, og den kalles med
+  // `overleveringer` alt økt med det mislykkede forsøket. Uten det kunne en
+  // flaky forbindelse som feiler annethvert forsøk holdt løkka i live langt
+  // forbi de tiltenkte ~30 minuttene (40 × 45s).
+  function nesteTailSteg(state) {
+    state = state || {};
+    var overleveringer = state.overleveringer || 0;
+    var maks = typeof state.maks === 'number' ? state.maks : MAKS_OVERLEVERINGER;
+    if (state.feilet) {
+      // Andre feil på SAMME overlevering (samme markør) — gi opp med den
+      // underliggende feilen. Budsjettet spiller ingen rolle her: et forsøk
+      // som allerede har brukt sin ene omkamp, skal ikke få en til.
+      return state.forsokt ? 'gi-opp-feil' : 'prov-igjen';
+    }
+    return overleveringer < maks ? 'hent' : 'gi-opp-overleveringer';
+  }
+
   // Nettleseren sier «tilkoblingen røk» på tre dialekter.
   function isNetworkError(e) {
     var m = (e && e.message) || '';
@@ -76,8 +109,8 @@
     return msg;   // bevisst kastet, allerede forståelig — ikke pakk inn
   }
 
-  global.AiTransport = { postWithRetry: postWithRetry, describeError: describeError };
+  global.AiTransport = { postWithRetry: postWithRetry, describeError: describeError, nesteTailSteg: nesteTailSteg };
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { postWithRetry: postWithRetry, describeError: describeError };
+    module.exports = { postWithRetry: postWithRetry, describeError: describeError, nesteTailSteg: nesteTailSteg };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);

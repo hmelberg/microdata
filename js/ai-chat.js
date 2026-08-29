@@ -662,16 +662,17 @@
           };
           await consumeSse(resp, wrap).catch((e) => rethrowDescribed(e, 'svar', 'stream', hop));
           while (neste) {
-            // Klient-side speil av `hop > 40`-vakten under: server-siden har
-            // en dødjobb-vakt (jobb-tail.ts, 16 min «kjorer» → forklart feil),
-            // men den dekker kun ÉN patologi (en drept bakgrunnsprosess).
-            // Denne grensen er billig forsikring mot enhver annen overleverings-
+            // Skal vi overhodet forsøke? Ren beslutning (AiTransport.nesteTailSteg,
+            // node-testet i tests/js/ai-tail.test.js) — server-siden har en egen
+            // dødjobb-vakt (jobb-tail.ts, 16 min «kjorer» → forklart feil), men
+            // den dekker kun ÉN patologi (en drept bakgrunnsprosess). Denne
+            // grensen er billig forsikring mot enhver annen overleverings-
             // patologi den vakten ikke modellerer. 40 × 45 s ≈ 30 min — et ekte
             // svar overleverer aldri i nærheten av så mange ganger.
-            overleveringer++;
-            if (overleveringer > 40) {
+            if (AiTransport.nesteTailSteg({ overleveringer: overleveringer, feilet: false }) === 'gi-opp-overleveringer') {
               throw new Error(T('Avbrutt: svaret ble ikke ferdig etter 40 overleveringer.'));
             }
+            overleveringer++;
             const t = neste;
             neste = null;
             markdownVedGrense = markdown;
@@ -691,8 +692,12 @@
               // Spol tilbake til segmentgrensen og prøv samme markør én gang til.
               markdown = markdownVedGrense;
               streamRenderMd(bubble, markdown);
+              // Prøv denne overleveringen på nytt én gang, eller gi opp med
+              // den underliggende feilen — også dette avgjøres av nesteTailSteg.
+              if (AiTransport.nesteTailSteg({ forsokt: !!t._forsokt, feilet: true }) === 'gi-opp-feil') {
+                rethrowDescribed(e, 'svar-tail', 'stream', hop);
+              }
               neste = t;
-              if (t._forsokt) rethrowDescribed(e, 'svar-tail', 'stream', hop);
               t._forsokt = true;
             }
           }
