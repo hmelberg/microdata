@@ -69,3 +69,34 @@ Deno.test("de gamle hendelsene får ALDRI de nye feltene som tomme nøkler", asy
   assertEquals("oppslag" in p, false);
   assertEquals("usage" in p, false);
 });
+
+Deno.test("svar-posten bærer sporring, varighet, modell og effort", async () => {
+  let skrevet = "";
+  const store = { set: (_k: string, v: string) => { skrevet = v; return Promise.resolve(); } };
+  await journalfor(store, {
+    type: "svar", sporsmal: "q", sporring: "abc-123",
+    varighetMs: 41300, modell: "claude-opus-5", effort: "high",
+    slutt: "done", usage: { outputTokens: 8192 },
+  }, new Date("2026-08-29T09:23:21.777Z"), "test");
+  const p = JSON.parse(skrevet);
+  assertEquals(p.sporring, "abc-123");
+  assertEquals(p.varighetMs, 41300);
+  assertEquals(p.modell, "claude-opus-5");
+  assertEquals(p.effort, "high");
+});
+
+Deno.test("sporring knytter hoppene i ETT spørsmål sammen på tvers av hendelsestyper", async () => {
+  // Dette er hele poenget: et spørsmål gir én sporsmal-post, kanskje en
+  // run_feil-post, og én svar-post per hopp. Uten felles id måtte de gjettes
+  // sammen på tidsstempel + tekst — som ryker når samme spørsmål stilles to
+  // ganger, altså nøyaktig når noe har hengt og brukeren prøvde igjen.
+  const poster: string[] = [];
+  const store = { set: (_k: string, v: string) => { poster.push(v); return Promise.resolve(); } };
+  const id = "sporring-1";
+  await journalfor(store, { type: "sporsmal", sporsmal: "q", sporring: id }, new Date(), "a");
+  await journalfor(store, { type: "run_feil", sporsmal: "q", detalj: "FEIL: x", sporring: id }, new Date(), "b");
+  await journalfor(store, { type: "svar", sporsmal: "q", sporring: id, slutt: "done" }, new Date(), "c");
+  const ider = poster.map((p) => JSON.parse(p).sporring);
+  assertEquals(ider, [id, id, id]);
+  assertEquals(poster.map((p) => JSON.parse(p).type), ["sporsmal", "run_feil", "svar"]);
+});

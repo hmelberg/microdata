@@ -65,6 +65,7 @@ export default async (request: Request): Promise<Response> => {
   // Samler opp hva dette hoppet faktisk gjorde. Skrives til journalen ETTER
   // pumpen — ikke fra onEmit, som er synkron og hvis feil svelges, og som
   // dessuten kjører mens strømmen er i ferd med å lukkes.
+  const hoppStart = Date.now();
   const samler = nyHopSamler();
 
   const skriver = lagSkriver(jobbStore(), jobId, () => Date.now());
@@ -182,6 +183,16 @@ export default async (request: Request): Promise<Response> => {
       sporsmal: question,
       mode,
       quality: kvalitet,
+      // Valideres HER også, ikke bare på edge: denne funksjonen er offentlig
+      // nåbar, og en lang streng ville ellers blåst opp journalposten.
+      sporring: typeof body.sporring === "string" && body.sporring.length <= 64
+        ? body.sporring
+        : undefined,
+      varighetMs: Date.now() - hoppStart,
+      // Modellen som FAKTISK kjørte: på leverandørveien er provider.model
+      // sannheten, ikke choice.model (llm-choice.ts sier det eksplisitt).
+      modell: choice.provider ? choice.provider.model : choice.model,
+      effort: choice.effort,
       svar: samler.tekst,
       script: samler.script,
       oppslag: samler.oppslag,

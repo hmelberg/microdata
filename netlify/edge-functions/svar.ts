@@ -25,6 +25,7 @@ interface RequestBody {
   provider?: unknown;
   resume?: ResumeBody;
   run_result?: unknown;
+  sporring?: unknown;
 }
 
 // Resume-bodies bærer hele samtaletilstanden (tool-results, kjøringsoutput).
@@ -128,9 +129,18 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   // autentisert trafikk journalføres — Hans' egen bruk, hans data. Alt er
   // best-effort og fire-and-glem (journalfor feiler åpent; isolatet lever så
   // lenge svarstrømmen gjør, så skrivingene rekker frem).
+  // Korrelasjons-id fra klienten: samme verdi på ALLE hopp i ett spørsmål,
+  // så journalpostene kan settes sammen i ettertid.
+  const sporring = typeof body.sporring === "string" && body.sporring.length <= 64
+    ? body.sporring
+    : undefined;
   const journal = erPersonlig ? feiljournalStore() : null;
   const journalHendelse = (type: string, detalj?: string): void => {
-    if (journal) void journalfor(journal, { type, sporsmal: question, detalj, mode, quality: kvalitet });
+    if (journal) {
+      void journalfor(journal, {
+        type, sporsmal: question, detalj, mode, quality: kvalitet, sporring,
+      });
+    }
   };
   if (!body.resume) journalHendelse("sporsmal");
   if (runResultTilLopet !== undefined && klassifiserRunResult(runResultTilLopet) === "feil") {

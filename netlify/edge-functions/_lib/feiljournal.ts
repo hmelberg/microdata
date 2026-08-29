@@ -34,6 +34,16 @@ export interface JournalHendelse {
   // den slo opp (forankret den seg i katalogen, eller gjettet?), hvordan
   // hoppet endte, og forbruket — der `stopReason: max_tokens` med tomt svar
   // ville avslørt dagens feil på ett blikk.
+  /** Korrelasjons-id: SAMME verdi på alle poster i ett spørsmål. Uten den
+   * er hoppene bare løsrevne poster som må gjettes sammen på tidsstempel og
+   * spørsmålstekst — og det ryker i det øyeblikket samme spørsmål stilles to
+   * ganger, som er nøyaktig det som skjer når noe henger og brukeren prøver
+   * igjen. Mintes i klienten, sendes på hvert hopp. */
+  sporring?: string;
+  /** Millisekunder for DETTE hoppet (ikke hele spørsmålet — summer på sporring). */
+  varighetMs?: number;
+  modell?: string;
+  effort?: string;
   svar?: string;
   script?: string;
   oppslag?: string[];
@@ -72,6 +82,10 @@ export async function journalfor(
       detalj: (h.detalj ?? "").slice(0, MAX_DETALJ) || undefined,
       mode: h.mode,
       quality: h.quality,
+      sporring: h.sporring,
+      varighetMs: h.varighetMs,
+      modell: h.modell,
+      effort: h.effort,
       svar: h.svar ? h.svar.slice(0, MAX_SVAR) : undefined,
       script: h.script ? h.script.slice(0, MAX_SCRIPT) : undefined,
       oppslag: h.oppslag?.length ? h.oppslag.slice(0, MAX_OPPSLAG) : undefined,

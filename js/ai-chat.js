@@ -594,6 +594,13 @@
 
         const em = (typeof activeEditorMode !== 'undefined' && activeEditorMode) ? activeEditorMode : 'microdata';
         const mode = (em === 'python' || em === 'r') ? em : 'microdata';
+        // Én id per SPØRSMÅL, ikke per hopp. Feiljournalen skriver én post per
+        // hopp (spørsmål, kjørefeil, svar), og uten dette er eneste måte å
+        // koble dem sammen på tidsstempel + spørsmålstekst — som ryker så
+        // snart du stiller samme spørsmål to ganger, slik det skjedde
+        // 2026-08-29 da en heng ga to identiske sporsmal-poster.
+        const sporringId = (crypto.randomUUID ? crypto.randomUUID()
+          : String(Date.now()) + Math.random().toString(36).slice(2));
         let markdown = '';
         let _lastRender = 0;
         let resume = null;
@@ -768,6 +775,7 @@
               body: JSON.stringify(Object.assign({
                 question,
                 mode,
+                sporring: sporringId,
                 script: includeScript ? scrubScript(dom.scriptInput.value) : undefined,
                 instructions: lsGet('md_ai_instructions') || undefined,
                 resume: resume || undefined,
