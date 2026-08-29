@@ -105,3 +105,30 @@ analysekjøring, og **ingen analysespørsmål har noensinne fullført** i denne
 pipelinen. Evalsettets resultatlogg er tom av samme grunn. Runden kan derfor
 ikke uttale seg om kjernen: om modellen leser utskriften og svarer på
 spørsmålet i stedet for på «lag et script». Neste runde må starte der.
+
+## 2026-08-29 — FØRSTE fullførte analysekjøring: pipelinen holder   [LUKKET]
+**Kontekst:** Hans' eget forskningsspørsmål — effekten på voksne barns
+yrkesinntekt når en forelder blir syk — kjørt gjennom motoren etter at
+60 s-veggen og max_tokens-hengen var fikset. 174 s, 3 turer, 2 kjøringer, OK.
+Rapport: `docs/eval/kjoringer/motor-2026-08-29-1317.md`.
+**Mot kriteriene:** 1 ✅ (kjørt via run_code, script i editoren) · 2 ✅ (første
+kjøring komplett: import + tilrettelegging + DiD i ett) · 3 ikke utøvd (ingen
+kjørefeil) · 4 ✅ (syntetisk-forbeholdet både i åpningssetningen og som eget
+avsnitt) · 5 ✅ (Svar → Slik leser du utskriften → Vurderinger og forslag) ·
+6 ✅ (UFOERP2011FDT_MOTTAK og INNTEKT_WYRKINNT slått opp, og modellen merket
+selv at NPR-katalogen kun dekker 2023 og derfor ikke egner seg til før/etter)
+· 7 ✅ (pseudonymer kun i merge-on, sysmiss brukt).
+**Metodereglene traff.** INFERENCE_RULES' «avtrykk i registeret» ga proxyen
+(nytt uføremottak 2013→2020 hos far ELLER mor i stedet for en direkte
+sykdomsvariabel); rå og justert modell ble begge kjørt; personvernsgrensen ble
+eksplisitt sjekket (199 mot 4 786, over 1000); heterogenitet ble foreslått i
+prosa i stedet for å sprenge utvalget.
+**Sterkeste enkeltobservasjon:** modellen leste `parent_sick = +33 200,
+p=0,235` ut av tabellen og identifiserte det som en nivåforskjell FØR
+behandling som truer parallelle-trender-antakelsen. Det er å lese utskriften,
+ikke bare å produsere den — nøyaktig gevinsten den samlede pipelinen ble
+bygget for.
+**To småfeil funnet av kjøringen, begge fikset:** eval-motorens høsting
+plukket nøstede bobler to ganger så svaret sto duplisert i rapporten; og
+progress-linja viste «… … 101 s» fordi serverens fase-tekst allerede ender
+på ellipse.

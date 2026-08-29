@@ -86,7 +86,10 @@ async function kjorEn(side, sp, timeoutMs) {
 
   const høst = await side.evaluate(() => {
     const tråd = document.getElementById("aiThread");
-    const bobler = tråd ? [...tråd.querySelectorAll(".ai-msg, .ai-bubble, .ai-thinking")] : [];
+    // DIREKTE barn, ikke querySelectorAll: bobler er nøstet inne i
+    // thinking-noder, så et bredt selektor-treff plukket samme tekst to
+    // ganger og rapporten viste hele svaret duplisert (funnet 2026-08-29).
+    const bobler = tråd ? [...tråd.children] : [];
     const kjøring = (typeof window.mdRunHarvest === "function")
       ? window.mdRunHarvest()
       : { ok: null, output: "" };

@@ -632,7 +632,11 @@
           pulsTekst = tekst;
           pulsTimer = setInterval(() => {
             const s = Math.round((Date.now() - t0) / 1000);
-            line.textContent = '⏳ ' + tekst + (s >= 3 ? ' … ' + s + ' s' : '');
+            // Serverens fase-tekst ender allerede på « …», så et nytt « … »
+            // ga «Tolker spørsmålet og planlegger … … 101 s» (sett i
+            // motorkjøringen 2026-08-29). Strip den før vi legger på telleren.
+            const basis = tekst.replace(/\s*…\s*$/, '');
+            line.textContent = '⏳ ' + basis + (s >= 3 ? ' … ' + s + ' s' : ' …');
           }, 1000);
         }
         function stoppPuls() {
