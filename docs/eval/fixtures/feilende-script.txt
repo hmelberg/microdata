@@ -1,0 +1,6 @@
+require no.ssb.fdb:53 as db
+
+create-dataset lonn
+import db/BEFOLKNING_KJOENN as kjonn
+import db/INNTEKT_WLONN_2022 as lonn2022
+collapse (mean) lonn2022, by(kjonn)

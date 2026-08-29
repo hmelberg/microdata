@@ -26,6 +26,12 @@ const ROT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const STD_URL = "https://microstat.melberg.app";
 const EVALSETT = join(ROT, "docs/eval/svar-evalsett.md");
 
+// Spørsmål som forutsetter et script i editoren. #10 tester at modellen leser
+// konteksten den får — og er det eneste spørsmålet i settet som kan utøve
+// kriterium 3 (kjørefeil → synlig ⚠️ → reparasjonsrunde), fordi de andre
+// scriptene stort sett går gjennom på første forsøk.
+const FIXTURES = { 10: "docs/eval/fixtures/feilende-script.txt" };
+
 // ── Evalsett-parseren ────────────────────────────────────────────────────
 // Eksportert og testet mot den EKTE fila: tabellformatet er en kontrakt med
 // et dokument et menneske redigerer, og endres kolonnene der, skal testen
@@ -58,15 +64,40 @@ function argv(navn, standard) {
 }
 const harFlagg = (n) => process.argv.includes(`--${n}`);
 
-// ── Én spørring gjennom appen ────────────────────────────────────────────
-async function kjorEn(side, sp, timeoutMs) {
-  const t0 = Date.now();
-  await side.evaluate(() => {
-    // Nullstill tråden mellom spørsmål, ellers vokser DOM-en og høstingen
-    // plukker opp forrige svar.
-    const b = document.getElementById("aiClearBtn");
-    if (b) b.click();
+/** Alle forekomster av et flagg — `--sporsmal A --sporsmal B` blir en samtale. */
+function argvAlle(navn) {
+  const ut = [];
+  process.argv.forEach((a, i) => {
+    if (a === `--${navn}` && process.argv[i + 1]) ut.push(process.argv[i + 1]);
   });
+  return ut;
+}
+
+// ── Én spørring gjennom appen ────────────────────────────────────────────
+async function kjorEn(side, sp, timeoutMs, tomTraad = true) {
+  const t0 = Date.now();
+  if (tomTraad) {
+    // Nullstill tråden mellom spørsmål, ellers vokser DOM-en og høstingen
+    // plukker opp forrige svar. I --samtale-modus er det nettopp poenget at
+    // den IKKE tømmes: da bærer state.history videre, og oppfølgingen tester
+    // samtalehukommelsen.
+    await side.evaluate(() => {
+      const b = document.getElementById("aiClearBtn");
+      if (b) b.click();
+    });
+  }
+  // Editoren fylles FØR spørsmålet stilles, og «Inkluder skript» hukes av —
+  // ellers når scriptet aldri modellen, og #10 tester ingenting.
+  await side.evaluate((script) => {
+    const ed = document.getElementById("scriptInput");
+    if (ed) {
+      ed.value = script || "";
+      ed.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    const kryss = document.getElementById("aiIncludeScript");
+    if (kryss) kryss.checked = !!script;
+  }, sp.script || "");
+
   await side.fill("#aiInput", sp.sporsmal);
   await side.click("#aiSendFastBtn");
 
@@ -121,10 +152,17 @@ async function main() {
     sporsmal = bare
       ? alle.filter((s) => bare.split(",").map(Number).includes(s.nr))
       : alle;
+    for (const sp of sporsmal) {
+      if (FIXTURES[sp.nr]) sp.script = readFileSync(join(ROT, FIXTURES[sp.nr]), "utf8");
+    }
   } else {
-    const q = argv("sporsmal", null);
-    if (!q) { console.error("Trenger --sporsmal «…» eller --evalsett"); process.exit(2); }
-    sporsmal = [{ nr: 0, mode: argv("mode", "microdata"), sporsmal: q, forventning: "" }];
+    const qs = argvAlle("sporsmal");
+    if (!qs.length) { console.error("Trenger --sporsmal «…» eller --evalsett"); process.exit(2); }
+    const scriptSti = argv("script", null);
+    const script = scriptSti ? readFileSync(join(ROT, scriptSti), "utf8") : "";
+    sporsmal = qs.map((q, i) => ({
+      nr: i + 1, mode: argv("mode", "microdata"), sporsmal: q, forventning: "", script,
+    }));
   }
   if (!sporsmal.length) { console.error("Ingen spørsmål valgt"); process.exit(2); }
 
@@ -153,10 +191,12 @@ async function main() {
   await side.click("#aiToggleBtn");
   await side.waitForSelector("#aiInput", { timeout: 30000 });
 
+  const samtale = harFlagg("samtale");
   const resultater = [];
   for (const sp of sporsmal) {
     process.stderr.write(`… #${sp.nr} ${sp.sporsmal.slice(0, 60)}\n`);
-    const r = await kjorEn(side, sp, timeoutMs);
+    // I samtalemodus tømmes tråden bare foran det FØRSTE spørsmålet.
+    const r = await kjorEn(side, sp, timeoutMs, !samtale || sp === sporsmal[0]);
     r.konsoll = konsoll.splice(0);
     resultater.push(r);
     process.stderr.write(`  → ${r.utfall} (${r.sekunder.toFixed(1)} s)\n`);
@@ -166,7 +206,7 @@ async function main() {
   const stempel = new Date().toISOString().slice(0, 16).replace("T", "-").replace(":", "");
   const ut = join(ROT, `docs/eval/kjoringer/motor-${stempel}.md`);
   mkdirSync(dirname(ut), { recursive: true });
-  writeFileSync(ut, rapport(resultater, { url, quality, stempel }));
+  writeFileSync(ut, rapport(resultater, { url, quality, stempel, samtale }));
   console.log(ut);
 }
 
@@ -174,7 +214,7 @@ function rapport(res, meta) {
   const l = [
     `# Eval gjennom motoren — ${meta.stempel}`,
     "",
-    `- URL: ${meta.url} · Quality: ${meta.quality}`,
+    `- URL: ${meta.url} · Quality: ${meta.quality}${meta.samtale ? " · SAMTALE (tråden beholdes)" : ""}`,
     "- Scriptene er FAKTISK kjørt i emulatoren (Brython/Pyodide/DuckDB-WASM).",
     "- Utfall er kun teknisk. Vurdering mot evalsettets kriterier gjøres av /forbedringsrunde.",
     "",
@@ -189,6 +229,7 @@ function rapport(res, meta) {
   for (const r of res) {
     l.push(`## ${r.nr}. ${r.sporsmal}`, "");
     if (r.forventning) l.push(`- Forventning: ${r.forventning}`);
+    if (r.script) l.push("- Script FORHÅNDSLAGT i editoren («Inkluder skript» på)");
     l.push(`- Utfall: **${r.utfall}** · ${r.sekunder.toFixed(1)} s · sporring: \`${r.sporring || "–"}\``, "");
     if (r.prosesslogg.length) l.push("### Prosesslogg", "", ...r.prosesslogg.map((p) => `- ${p}`), "");
     if (r.script) l.push("### Script i editoren", "", "```", r.script, "```", "");

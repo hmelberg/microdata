@@ -38,3 +38,13 @@ til promptregler i _lib/svar-instruks.ts (og felles kjerneregler vurderes
 portert til microdata-api/server_code/prompts.py per synk-kontrakten).
 
 ## Resultatlogg
+
+### Fixture for spørsmål 10
+
+`docs/eval/fixtures/feilende-script.txt` er scriptet som legges i editoren før
+spørsmål 10 stilles. Feilen er den DOKUMENTERTE årssuffiks-fella som prefiksen
+advarer eksplisitt mot: `import db/INNTEKT_WLONN_2022` skriver året inn i
+variabelnavnet i stedet for å gi det som dato (`import db/INNTEKT_WLONN
+2022-12-31 as lonn22`). Valgt fordi det er en feil et menneske faktisk gjør,
+ikke en konstruert syntaksfeil — og fordi den gir kjørefeil, ikke parsefeil,
+så kriterium 3 (synlig ⚠️ + reparasjonsrunde) faktisk utøves.

@@ -62,6 +62,43 @@ på tvers av moduser; output-rens ved inngang.
 
 ## AI-assistenten
 
+### Evalsettet — status og neste steg (oppdatert 2026-08-30)
+
+Fire av ti spørsmål er kjørt gjennom appens egen motor
+(`node scripts/eval-motor.mjs`, som driver en ekte nettleser så scriptene
+faktisk kjøres). Alle fire bestod:
+
+| # | Tid | Observasjon |
+|---|-----|-------------|
+| 1 | 14 s | Ingen kjøring, ingen oppslag — kriterium 5s unntak oppfylt presist |
+| 2 | 34 s | Én kjøring; syntetisk-forbeholdet i andre linje, før første tall |
+| 5 | 120 s | Kjørte, slo opp `BEFOLKNING_KOMMNR_FORMELL`, kjørte igjen — verktøykall MIDT i løpet som svar på hva utskriften viste |
+| 10 | 37 s | Leste scriptet i editoren, forklarte regelen bak feilen (Akkumulert-variabler tar året som importdato), viste rettelsen |
+
+Kriteriene 1, 2, 4, 5, 6 og 7 er dermed observert i praksis.
+
+- [ ] **Kjør 3, 4, 6, 7, 8 og 9** — ikke kjørt ennå. #9 (ærlighetstesten: «hvor
+      mange har byttet kjønn?») og #6 (python-modus) er de mest informative.
+      Koster reelle penger; ~2-3 min per analysespørsmål på `balanced`.
+
+- [ ] **Kriterium 3 er ALDRI utøvt** — at en kjørefeil vises som ⚠️ og at
+      modellen retter og kjører på nytt. Grunnen er lærerik: modellen er god nok
+      til å unngå feilene vi klarer å konstruere. Fixturen til #10
+      (`docs/eval/fixtures/feilende-script.txt`, årssuffiks-fella) ble oppdaget
+      ved LESING — modellen skrev korrigert script direkte og kjørte det én gang
+      uten feil.
+      Skal reparasjonsrunden utøves, må feilen være usynlig i koden og først
+      vise seg mot dataene: en variabel som finnes men har feil temporalitet, en
+      merge på en nøkkel som ikke matcher, eller et filter som tømmer utvalget.
+      Uten en slik fixture vet vi ikke om reparasjonsløkka konvergerer.
+
+- [ ] **`MAX_OUTPUT = 6000` i `js/run-result.js` kappet et halvferdig svar.**
+      Målt 2026-08-29: en kjøring med to modeller (far/mor) fikk mor-modellens
+      koeffisienter klippet bort før modellen så dem. Den nektet ærlig å gjette
+      på tallene — riktig oppførsel, men brukeren satt igjen med et halvt svar.
+      Vurder å heve grensen, eller å instruere om én modell per kjøring.
+
+
 - [ ] **Auto-retting for python- og r-modus i v2-flyten** (i dag kun microdata).
       Backend er klar (`kode-svar-v2` tar `prior_script`+`errors` uansett modus);
       det som mangler er klientvalidator. To nivåer:
