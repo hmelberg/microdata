@@ -4,7 +4,7 @@ import { chooseModel, coerceQuality } from "./llm-choice.ts";
 const noEnv = (_k: string) => undefined;
 
 Deno.test("per-call defaults when the user expressed no preference", () => {
-  assertEquals(chooseModel("svar", null, noEnv), { model: "claude-sonnet-5", effort: "medium" });
+  assertEquals(chooseModel("svar", null, noEnv), { model: "claude-sonnet-5" });
   assertEquals(chooseModel("dm-vurder", null, noEnv), { model: "claude-sonnet-5", effort: "medium" });
   assertEquals(chooseModel("tolk-resultat", null, noEnv), { model: "claude-sonnet-5", effort: "medium" });
 });
@@ -16,7 +16,7 @@ Deno.test("fast tier never emits effort — it errors on Haiku 4.5", () => {
 });
 
 Deno.test("quality tiers move the model", () => {
-  assertEquals(chooseModel("svar", "balanced", noEnv), { model: "claude-sonnet-5", effort: "medium" });
+  assertEquals(chooseModel("svar", "balanced", noEnv), { model: "claude-sonnet-5" });
   assertEquals(chooseModel("svar", "best", noEnv), { model: "claude-opus-5", effort: "high" });
 });
 
@@ -160,15 +160,35 @@ Deno.test("byok key wins over the personal password", () => {
 });
 
 // ── svar-kallstedet (samlet pipeline 2026-08-28) ──────────────────────────
-Deno.test("svar: default sonnet-5 medium; SVAR_MODEL vinner over ANTHROPIC_MODEL", () => {
+Deno.test("svar: default sonnet-5 uten effort; SVAR_MODEL vinner over ANTHROPIC_MODEL", () => {
   assertEquals(chooseModel("svar", null, () => undefined),
-    { model: "claude-sonnet-5", effort: "medium" });
+    { model: "claude-sonnet-5" });
   const env = (k: string) =>
     k === "SVAR_MODEL" ? "pinned-svar" : k === "ANTHROPIC_MODEL" ? "pinned-generelt" : undefined;
   assertEquals(chooseModel("svar", null, env).model, "pinned-svar");
 });
 
 Deno.test("svar: kvalitet flytter modellen som for andre kallsteder", () => {
+  assertEquals(chooseModel("svar", "best", () => undefined),
+    { model: "claude-opus-5", effort: "high" });
+});
+
+// ── fjern stillheten (2026-08-28) ─────────────────────────────────────────
+Deno.test("balanced sender ikke effort — tenkefasen er ren stillhet for brukeren", () => {
+  const c = chooseModel("svar", "balanced", () => undefined);
+  assertEquals(c, { model: "claude-sonnet-5" });
+});
+
+Deno.test("svar-defaulten sender heller ikke effort", () => {
+  // resolveLlm bruker coerceQuality(body.quality), som er null når klienten
+  // ikke sender quality — mens svar.ts velger budsjett med ?? "balanced".
+  // Lot vi DEFAULTS beholde effort, ville default-veien beholdt nøyaktig den
+  // stillheten vi fjerner.
+  const c = chooseModel("svar", null, () => undefined);
+  assertEquals(c, { model: "claude-sonnet-5" });
+});
+
+Deno.test("best beholder effort high", () => {
   assertEquals(chooseModel("svar", "best", () => undefined),
     { model: "claude-opus-5", effort: "high" });
 });

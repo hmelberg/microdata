@@ -601,20 +601,39 @@
         let confirmed = false;
         const includeScript = dom.aiIncludeScript.checked && dom.scriptInput && dom.scriptInput.value.trim();
 
+        // Serverens heartbeat kommer hvert 10. sekund. En linje som står
+        // bom stille i ti sekunder leses som «hengt», ikke «jobber» — så
+        // sekundene telles her, av en lokal klokke.
+        let pulsTimer = null;
+        function startPuls(line, tekst) {
+          const t0 = Date.now();
+          if (pulsTimer) clearInterval(pulsTimer);
+          pulsTimer = setInterval(() => {
+            const s = Math.round((Date.now() - t0) / 1000);
+            line.textContent = '⏳ ' + tekst + (s >= 3 ? ' … ' + s + ' s' : '');
+          }, 1000);
+        }
+
         function handleSvarEvent(ev) {
           if (ev.type === 'progress') {
             const last = progressBox.lastElementChild;
+            let line;
             if (ev.replace && last && last.dataset.replace === '1') {
-              last.textContent = '⏳ ' + ev.text;
+              line = last;
             } else {
-              const line = document.createElement('div');
+              line = document.createElement('div');
               line.className = 'ai-progress-line';
               if (ev.replace) line.dataset.replace = '1';
-              line.textContent = (ev.text && (ev.text.startsWith('▶') || ev.text.startsWith('⚠️'))) ? ev.text : '⏳ ' + ev.text;
               progressBox.appendChild(line);
             }
+            const pynt = (ev.text && (ev.text.startsWith('▶') || ev.text.startsWith('⚠️')));
+            line.textContent = pynt ? ev.text : '⏳ ' + ev.text;
+            // Bare de utskiftbare fase-linjene teller sekunder; ▶/⚠️ er
+            // engangsmeldinger og skal stå stille.
+            if (ev.replace && !pynt) startPuls(line, ev.text);
             scrollToBottom();
           } else if (ev.type === 'delta' || ev.type === 'text') {
+            if (pulsTimer) { clearInterval(pulsTimer); pulsTimer = null; }
             markdown += ev.text;
             const _now = Date.now();
             if (_now - _lastRender > 70) {
@@ -628,6 +647,7 @@
             markdown = '';
             streamRenderMd(bubble, '');
           } else if (ev.type === 'error') {
+            if (pulsTimer) { clearInterval(pulsTimer); pulsTimer = null; }
             let msg = ev.message || 'ukjent feil';
             // 401 fra oppstrøms betyr brukerens EGEN nøkkel er avvist —
             // uansett hvilken av de tre veiene som bar den.
@@ -703,63 +723,71 @@
           }
         }
 
-        for (let hop = 0; ; hop++) {
-          if (hop > 40) throw new Error(T('Avbrutt: svaret ble ikke ferdig etter 40 fortsettelses-runder.'));
-          const resp = await AiTransport.postWithRetry('/api/svar', {
-            method: 'POST',
-            headers: edgeAuthHeaders(),
-            body: JSON.stringify(Object.assign({
-              question,
-              mode,
-              script: includeScript ? scrubScript(dom.scriptInput.value) : undefined,
-              instructions: lsGet('md_ai_instructions') || undefined,
-              resume: resume || undefined,
-              run_result: runResult == null ? undefined : runResult,
-            }, edgeBodyExtras())),
-            signal,
-          }).catch((e) => rethrowDescribed(e, 'svar', 'request', hop));
-          runResult = null;
-          if (resp.status === 401) {
-            throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
-          }
-          if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()));
-
-          let cont = null, pendingRun = null;
-          await consumeMedTail(resp, (ev) => {
-            if (ev.type === 'continue') { cont = { state: ev.state, run_ok_calls: ev.run_ok_calls }; return; }
-            if (ev.type === 'run_code') { pendingRun = ev.script || ''; return; }
-            handleSvarEvent(ev);
-          }, hop);
-
-          if (pendingRun != null) {
-            if (signal && signal.aborted) {
-              throw Object.assign(new Error('Stopped'), { name: 'AbortError' });
+        // try/finally: pulsTimer overlever ellers en avbrutt (Stopp-knapp)
+        // eller nettverksfeilet forespørsel — uten dette ville en heartbeat som
+        // startet midt i tenkefasen fortsette å telle sekunder for alltid på en
+        // linje ingen lenger følger med på.
+        try {
+          for (let hop = 0; ; hop++) {
+            if (hop > 40) throw new Error(T('Avbrutt: svaret ble ikke ferdig etter 40 fortsettelses-runder.'));
+            const resp = await AiTransport.postWithRetry('/api/svar', {
+              method: 'POST',
+              headers: edgeAuthHeaders(),
+              body: JSON.stringify(Object.assign({
+                question,
+                mode,
+                script: includeScript ? scrubScript(dom.scriptInput.value) : undefined,
+                instructions: lsGet('md_ai_instructions') || undefined,
+                resume: resume || undefined,
+                run_result: runResult == null ? undefined : runResult,
+              }, edgeBodyExtras())),
+              signal,
+            }).catch((e) => rethrowDescribed(e, 'svar', 'request', hop));
+            runResult = null;
+            if (resp.status === 401) {
+              throw new Error(T('Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.'));
             }
-            insertScriptIntoEditor(pendingRun);
-            if (!confirmed) {
-              const ok = await confirmAutoRun();
-              if (!ok) {
-                handleSvarEvent({ type: 'progress', text: T('Kjøring avslått — scriptet står i editoren.') });
-                break;
+            if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status + ' ' + (await resp.text()));
+
+            let cont = null, pendingRun = null;
+            await consumeMedTail(resp, (ev) => {
+              if (ev.type === 'continue') { cont = { state: ev.state, run_ok_calls: ev.run_ok_calls }; return; }
+              if (ev.type === 'run_code') { pendingRun = ev.script || ''; return; }
+              handleSvarEvent(ev);
+            }, hop);
+
+            if (pendingRun != null) {
+              if (signal && signal.aborted) {
+                throw Object.assign(new Error('Stopped'), { name: 'AbortError' });
               }
-              confirmed = true;
+              insertScriptIntoEditor(pendingRun);
+              if (!confirmed) {
+                const ok = await confirmAutoRun();
+                if (!ok) {
+                  handleSvarEvent({ type: 'progress', text: T('Kjøring avslått — scriptet står i editoren.') });
+                  break;
+                }
+                confirmed = true;
+              }
+              handleSvarEvent({ type: 'progress', text: '▶ ' + T('Kjører scriptet i emulatoren …') });
+              const err = await runScriptAndCaptureError();
+              const h = (typeof window.mdRunHarvest === 'function') ? window.mdRunHarvest() : { ok: !err, output: err || '' };
+              const res = (err || !h.ok) ? { ok: false, output: err || h.output } : h;
+              runResult = RunResult.format(res);
+              if (!res.ok) {
+                // FEIL-linja (askstat-spec 2026-08-15 §1): kjørefeil skal være
+                // synlige for MENNESKER i prosessloggen, ikke bare for modellen.
+                const fl = String(res.output || '').split('\n')[0].slice(0, 160);
+                if (fl) handleSvarEvent({ type: 'progress', text: '⚠️ ' + T('Kjøring feilet: ') + fl });
+              }
+              resume = cont;   // run_code ender alltid invokasjonen med en continue
+              continue;
             }
-            handleSvarEvent({ type: 'progress', text: '▶ ' + T('Kjører scriptet i emulatoren …') });
-            const err = await runScriptAndCaptureError();
-            const h = (typeof window.mdRunHarvest === 'function') ? window.mdRunHarvest() : { ok: !err, output: err || '' };
-            const res = (err || !h.ok) ? { ok: false, output: err || h.output } : h;
-            runResult = RunResult.format(res);
-            if (!res.ok) {
-              // FEIL-linja (askstat-spec 2026-08-15 §1): kjørefeil skal være
-              // synlige for MENNESKER i prosessloggen, ikke bare for modellen.
-              const fl = String(res.output || '').split('\n')[0].slice(0, 160);
-              if (fl) handleSvarEvent({ type: 'progress', text: '⚠️ ' + T('Kjøring feilet: ') + fl });
-            }
-            resume = cont;   // run_code ender alltid invokasjonen med en continue
-            continue;
+            if (!cont) break;
+            resume = cont;
           }
-          if (!cont) break;
-          resume = cont;
+        } finally {
+          if (pulsTimer) { clearInterval(pulsTimer); pulsTimer = null; }
         }
 
         streamRenderMd(bubble, markdown);
