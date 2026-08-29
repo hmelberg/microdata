@@ -22,6 +22,7 @@
             <button type="button" id="menuOpenUrl" data-i18n>&#197;pne fra URL</button>
             <button type="button" id="menuLoad" data-i18n>&#197;pne lokal fil</button>
             <button type="button" id="menuShareLink" data-i18n>Del (kopier lenke)</button>
+            <button type="button" id="menuCopyScript" data-i18n>Kopier script</button>
             <button type="button" id="menuSave" data-i18n>Last ned kode</button>
           </div>
         </div>
@@ -167,6 +168,7 @@
     <input type="text" class="script-name" id="scriptName" data-i18n-placeholder placeholder="Script navn" value="Script navn">
     <button type="button" class="help-icon" id="helpBtn" data-i18n-aria data-i18n-title aria-label="Hjelp" title="Hjelp" style="margin-left:auto">&#63;</button>
     <button type="button" class="help-icon" id="clearOutputTopBtn" data-i18n-aria data-i18n-title aria-label="Tøm output" title="Tøm output"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6"/></svg></button>
+    <button type="button" class="help-icon" id="copyScriptTopBtn" data-i18n-aria data-i18n-title aria-label="Kopier script" title="Kopier scriptet til utklippstavlen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg></button>
     <div class="topbar-export-wrap">
       <button type="button" class="export-icon" id="exportBtn" data-i18n-aria data-i18n-title aria-label="Eksporter resultat" title="Eksporter resultat">&#8689;</button>
       <div class="export-dropdown" id="exportDropdown">
@@ -277,9 +279,23 @@
         <textarea id="aiInput" class="ai-input" rows="1" data-i18n-placeholder
           placeholder="Spør om noe... (Enter = send, Shift+Enter = ny linje)"></textarea>
         <button type="button" class="ai-abort-btn" id="aiAbortBtn" style="display:none;" data-i18n data-i18n-title data-i18n-aria title="Avbryt pågående svar" aria-label="Avbryt">⏹ Avbryt</button>
-        <button type="button" class="ai-send-fast-btn" id="aiSendFastBtn" data-i18n-title
-          title="Send: AI-en skriver script, kjører dem i emulatoren og svarer basert på resultatene"
-          aria-label="Send">Send</button>
+        <!-- Delt knapp: hovedklikket sender med gjeldende grundighet, pila
+             velger nivå OG sender med én gang. Nivået er samme md_ai_quality
+             som «Kvalitet» i innstillingene — én sannhet, to innganger. -->
+        <div class="split-btn">
+          <button type="button" class="ai-send-fast-btn split-main" id="aiSendFastBtn" data-i18n-title
+            title="Send: AI-en skriver script, kjører dem i emulatoren og svarer basert på resultatene"
+            aria-label="Send">Send</button>
+          <button type="button" class="ai-send-fast-btn split-caret" id="aiSendMoreBtn"
+            aria-haspopup="true" aria-expanded="false" data-i18n-title data-i18n-aria
+            title="Velg hvor grundig svaret skal jobbe" aria-label="Velg grundighet">&#9662;</button>
+          <div class="split-menu split-menu--radio" id="aiSendMenu" role="menu">
+            <div class="split-menu-title" data-i18n>Send med grundighet</div>
+            <button type="button" role="menuitemradio" data-quality="fast" data-i18n>Rask &#8212; billigst, enklere svar</button>
+            <button type="button" role="menuitemradio" data-quality="balanced" data-i18n>Balansert &#8212; anbefalt</button>
+            <button type="button" role="menuitemradio" data-quality="best" data-i18n>Best &#8212; dyrest, grundigst</button>
+          </div>
+        </div>
       </div>
     </div>
   </aside>
@@ -338,6 +354,22 @@
     </div>
   </div>
 
+  <!-- Fallback for «Lim inn fra utklippstavlen»: default er å gå RETT gjennom
+       når nettleseren tillater clipboard-lesing. Denne åpnes bare når lesingen
+       faktisk feiler (Firefox/Safari, avslått tillatelse, tom utklippstavle) —
+       da skal veien aldri ende blindt. Samme modal brukes ikke av fil-veien. -->
+  <div class="ai-modal-backdrop" id="tolkPasteBackdrop">
+    <div class="ai-modal" style="max-width:640px;">
+      <h3 data-i18n>Lim inn resultater</h3>
+      <div class="ai-modal-help" style="margin-bottom:10px;" data-i18n>Nettleseren lot oss ikke lese utklippstavlen. Lim inn utskriften fra microdata.no her (Ctrl+V). Den tolkes som ekte registerdata, ikke som &#248;vingsdata.</div>
+      <textarea id="tolkPasteText" class="tolk-paste-text" rows="12" spellcheck="false" data-i18n-placeholder placeholder="Lim inn utskriften her &#8230;"></textarea>
+      <div class="ai-modal-actions" style="margin-top:12px;">
+        <button type="button" class="ai-modal-btn" id="tolkPasteCancel" data-i18n>Avbryt</button>
+        <button type="button" class="ai-modal-btn primary" id="tolkPasteGo" data-i18n>Tolk</button>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="tolkFilInput" accept=".txt,.log,.out,.csv,.tsv,.md,text/plain" style="display:none">
   <div class="ai-modal-backdrop" id="keyPromptBackdrop">
     <div class="ai-modal" style="max-width:420px;">
       <h3 data-i18n>Dekrypteringsnøkkel</h3>
@@ -440,7 +472,21 @@
     </div>
     <div class="bottombar-right">
       <span class="status" id="rightStatus"></span>
-      <button type="button" class="btn btn-tolk" id="btnTolkFooter" style="display:none" data-i18n data-i18n-title title="Tolk resultatene (output) med AI i sidemenyen">Tolk resultat</button>
+      <!-- Delt knapp (Gmail-stil): hovedklikket tolker utskriften i appen —
+           pila åpner de to veiene for resultater fra det EKTE microdata.no
+           (utklippstavle/fil), som tolkes uten øvingsdata-forbeholdet. -->
+      <div class="split-btn" id="tolkSplit" style="display:none">
+        <button type="button" class="btn btn-tolk split-main" id="btnTolkFooter" data-i18n data-i18n-title title="Tolk resultatene (output) med AI i sidemenyen">Tolk resultat</button>
+        <button type="button" class="btn btn-tolk split-caret" id="btnTolkCaret" aria-haspopup="true" aria-expanded="false" data-i18n-title data-i18n-aria title="Flere tolkevalg: utklippstavle eller fil" aria-label="Flere tolkevalg">&#9662;</button>
+        <div class="split-menu" id="tolkMenu" role="menu">
+          <div class="split-menu-title" data-i18n>Tolk resultater</div>
+          <button type="button" role="menuitem" id="tolkFraApp" data-i18n>Utskriften i appen</button>
+          <div class="split-menu-sep"></div>
+          <div class="split-menu-title" data-i18n>Fra ekte microdata.no</div>
+          <button type="button" role="menuitem" id="tolkFraUtklipp" data-i18n>Lim inn fra utklippstavlen &#8230;</button>
+          <button type="button" role="menuitem" id="tolkFraFil" data-i18n>&#197;pne fra fil &#8230;</button>
+        </div>
+      </div>
       <button class="btn btn-primary btn-run" id="btnRunFooter" type="button" disabled>
         <span class="btn-run-inner">
           <span class="btn-run-icon-slot" aria-hidden="true"><span class="btn-run-spinner"></span></span>
@@ -2451,24 +2497,190 @@
       showDmOptions();
     });
 
-    function triggerTolkResultat() {
-      document.getElementById('hamburgerDropdown').classList.remove('open');
-      var outEl = document.getElementById('outputArea');
-      var outText = (outEl ? (outEl.innerText || '') : '').trim() || (lastOutput || '').trim();
-      if (!outText) { alert(t('Ingen output å tolke. Kjør et script først.')); return; }
-      if (outText.length > 30000) outText = outText.slice(0, 30000) + '\n…(forkortet)';
+    // ── Delte knapper (Gmail-stil) ────────────────────────────────────────
+    // Felles åpne/lukke-logikk for «Tolk resultat» (bunnlinja) og «Send»
+    // (AI-panelet): et klikk utenfor, Escape, eller den andre delte knappen
+    // lukker menyen. De fire eldre dropdownene i topplinja lukker hverandre
+    // manuelt (N² av remove('open')-linjer) og er bevisst ikke rørt her.
+    var mdSplitMenus = [];
+    function mdCloseSplitMenus() {
+      for (var i = 0; i < mdSplitMenus.length; i++) {
+        mdSplitMenus[i].menu.classList.remove('open');
+        mdSplitMenus[i].trigger.setAttribute('aria-expanded', 'false');
+      }
+    }
+    function mdSplitMenu(trigger, menu) {
+      if (!trigger || !menu) return;
+      mdSplitMenus.push({ trigger: trigger, menu: menu });
+      trigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var skalApne = !menu.classList.contains('open');
+        mdCloseSplitMenus();
+        if (skalApne) {
+          menu.classList.add('open');
+          trigger.setAttribute('aria-expanded', 'true');
+        }
+      });
+      // Klikk på et menyvalg: valgets egen handler kjører først (target-fasen),
+      // så lukker vi på vei opp.
+      menu.addEventListener('click', mdCloseSplitMenus);
+    }
+    document.addEventListener('click', mdCloseSplitMenus);
+    // js/ai-chat.js (lastet etter denne blokka) kobler Send-menyen med samme hjelper.
+    window.mdSplitMenu = mdSplitMenu;
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') mdCloseSplitMenus();
+    });
+
+    // ── Kopier scriptet ───────────────────────────────────────────────────
+    // Den vanligste handlingen i arbeidsflyten «lag script her → kjør det på
+    // ekte microdata.no»: ett klikk i topplinjas handlingsrad (og en linje i
+    // Fil-menyen for oppdagbarhet).
+    function mdCopyScript(btn) {
+      var si = document.getElementById('scriptInput');
+      var text = (si && si.value) || '';
+      if (!text.trim()) { alert(t('Editoren er tom — ingenting å kopiere.')); return; }
+      copyPlainTextToClipboard(text).then(function () { flashCopyBtn(btn); });
+    }
+    (function initCopyScript() {
+      var topBtn = document.getElementById('copyScriptTopBtn');
+      if (topBtn) topBtn.addEventListener('click', function () { mdCopyScript(topBtn); });
+      var menuBtn = document.getElementById('menuCopyScript');
+      if (menuBtn) {
+        menuBtn.addEventListener('click', function () {
+          document.getElementById('hamburgerDropdown').classList.remove('open');
+          mdCopyScript(topBtn);
+        });
+      }
+    })();
+
+    // ── Tolk resultat ─────────────────────────────────────────────────────
+    // Tre veier inn, én utgang. `kilde` følger med til /api/tolk-resultat og
+    // bestemmer HELE innrammingen der (_lib/tolk-prompt.ts):
+    //   'emulator' — appens egen utskrift, syntetiske øvingsdata
+    //   'ekte'     — resultater brukeren har kjørt på ekte microdata.no og
+    //                limt inn / lastet opp; da er øvingsdata-forbeholdet feil.
+    var TOLK_MAX_CHARS = 30000;
+
+    function tolkSend(outText, opts) {
+      opts = opts || {};
+      outText = (outText || '').trim();
+      if (!outText) { alert(opts.tomMelding || t('Ingen output å tolke. Kjør et script først.')); return; }
+      if (outText.length > TOLK_MAX_CHARS) outText = outText.slice(0, TOLK_MAX_CHARS) + '\n…(forkortet)';
       var si = document.getElementById('scriptInput');
       var script = (si && si.value || '').trim().slice(0, 20000);
       var lang = (typeof activeEditorMode !== 'undefined' && activeEditorMode) ? activeEditorMode : 'auto';
       if (typeof window.mdInterpretResults === 'function') {
-        window.mdInterpretResults({ script: script, output: outText, lang: lang });
+        window.mdInterpretResults({
+          script: script, output: outText, lang: lang,
+          kilde: opts.kilde || 'emulator', kildenavn: opts.kildenavn || ''
+        });
       }
     }
+
+    function triggerTolkResultat() {
+      document.getElementById('hamburgerDropdown').classList.remove('open');
+      var outEl = document.getElementById('outputArea');
+      var outText = (outEl ? (outEl.innerText || '') : '').trim() || (lastOutput || '').trim();
+      tolkSend(outText, { kilde: 'emulator' });
+    }
+
+    function tolkEksternTekst(tekst, kildenavn) {
+      tolkSend(tekst, {
+        kilde: 'ekte',
+        kildenavn: kildenavn,
+        tomMelding: t('Ingenting å tolke — teksten er tom.')
+      });
+    }
+
+    function openTolkPaste() {
+      var bd = document.getElementById('tolkPasteBackdrop');
+      var ta = document.getElementById('tolkPasteText');
+      if (!bd || !ta) return;
+      ta.value = '';
+      bd.classList.add('open');
+      setTimeout(function () { ta.focus(); }, 30);
+    }
+    function closeTolkPaste() {
+      var bd = document.getElementById('tolkPasteBackdrop');
+      var ta = document.getElementById('tolkPasteText');
+      if (bd) bd.classList.remove('open');
+      if (ta) ta.value = '';
+    }
+
+    // Default er å gå RETT gjennom når nettleseren tillater clipboard-lesing.
+    // Firefox og Safari (og en avslått tillatelse i Chrome) kaster i stedet —
+    // da åpner lim-inn-modalen, så veien aldri ender blindt.
+    function tolkFraUtklippstavle() {
+      var lest = null;
+      try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          lest = navigator.clipboard.readText();
+        }
+      } catch (e) { lest = null; }
+      if (!lest) { openTolkPaste(); return; }
+      lest.then(function (tekst) {
+        if (tekst && tekst.trim()) tolkEksternTekst(tekst, t('utklippstavlen'));
+        else openTolkPaste();
+      }).catch(function () { openTolkPaste(); });
+    }
+
+    function tolkFraFil() {
+      var inp = document.getElementById('tolkFilInput');
+      if (!inp) return;
+      inp.value = '';   // samme fil to ganger på rad skal også utløse change
+      inp.click();
+    }
+
     (function initTolkResultat() {
       var menuBtn = document.getElementById('menuTolkResultat');
       if (menuBtn) menuBtn.addEventListener('click', triggerTolkResultat);
       var footBtn = document.getElementById('btnTolkFooter');
       if (footBtn) footBtn.addEventListener('click', triggerTolkResultat);
+
+      mdSplitMenu(document.getElementById('btnTolkCaret'), document.getElementById('tolkMenu'));
+      var appBtn = document.getElementById('tolkFraApp');
+      if (appBtn) appBtn.addEventListener('click', triggerTolkResultat);
+      var clipBtn = document.getElementById('tolkFraUtklipp');
+      if (clipBtn) clipBtn.addEventListener('click', tolkFraUtklippstavle);
+      var filBtn = document.getElementById('tolkFraFil');
+      if (filBtn) filBtn.addEventListener('click', tolkFraFil);
+
+      var filInput = document.getElementById('tolkFilInput');
+      if (filInput) {
+        filInput.addEventListener('change', function () {
+          var f = filInput.files && filInput.files[0];
+          if (!f) return;
+          f.text().then(function (tekst) {
+            tolkEksternTekst(tekst, f.name);
+          }).catch(function (e) {
+            alert(t('Kunne ikke lese filen: {msg}', { msg: (e && e.message) || String(e) }));
+          }).then(function () { filInput.value = ''; });
+        });
+      }
+
+      var pasteGo = document.getElementById('tolkPasteGo');
+      var pasteCancel = document.getElementById('tolkPasteCancel');
+      var pasteBd = document.getElementById('tolkPasteBackdrop');
+      var pasteTa = document.getElementById('tolkPasteText');
+      if (pasteGo && pasteTa) {
+        pasteGo.addEventListener('click', function () {
+          var v = pasteTa.value;
+          if (!v.trim()) { pasteTa.focus(); return; }
+          closeTolkPaste();
+          tolkEksternTekst(v, t('innlimt tekst'));
+        });
+        pasteTa.addEventListener('keydown', function (e) {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); pasteGo.click(); }
+        });
+      }
+      if (pasteCancel) pasteCancel.addEventListener('click', closeTolkPaste);
+      if (pasteBd) {
+        pasteBd.addEventListener('click', function (e) { if (e.target === pasteBd) closeTolkPaste(); });
+      }
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && pasteBd && pasteBd.classList.contains('open')) closeTolkPaste();
+      });
     })();
 
 
@@ -3868,7 +4080,7 @@
         }
       });
       ask.style.display = '';
-      const tolk = document.getElementById('btnTolkFooter');
+      const tolk = document.getElementById('tolkSplit');
       if (tolk) tolk.style.display = '';
       // btnDmQuick visibility is handled by applyMicroGating() (URL-gated).
     })();

@@ -1034,6 +1034,67 @@
     }
     .ai-abort-btn:hover { background: #c0392b; color: #fff; }
 
+    /* ── Delte knapper (Gmail-stil): hovedhandling + pil med meny ─────────
+       Brukt av «Tolk resultat» (bunnlinja) og «Send» (AI-panelet). Menyene
+       åpner OPPOVER — begge knappene står nederst i sitt panel. Visuelt
+       språk arvet fra .export-dropdown; lukkelogikken er felles i
+       mdSplitMenu() (index.html), ikke N² gjensidig utelukking som de
+       eldre dropdownene i topplinja. */
+    .split-btn { position: relative; display: inline-flex; align-items: stretch; flex-shrink: 0; }
+    .split-btn > .split-main { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+    .split-btn > .split-caret {
+      border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px;
+      padding-left: 8px; padding-right: 8px; font-size: 10px; gap: 0;
+    }
+    .split-btn > .split-caret.ai-send-fast-btn { border-left-color: rgba(255,255,255,0.45); }
+    .split-menu {
+      display: none; position: absolute; bottom: 100%; right: 0; margin-bottom: 6px;
+      z-index: 250; background: var(--bg-panel); border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 0; min-width: 240px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .split-menu.open { display: block; }
+    .split-menu-title {
+      font-size: 11px; text-transform: uppercase; color: var(--text-muted);
+      padding: 4px 14px 6px 14px;
+    }
+    .split-menu button {
+      display: block; width: 100%; padding: 8px 14px; border: none; background: none;
+      color: var(--text); cursor: pointer; font-size: 13px; text-align: left; font-weight: 400;
+    }
+    .split-menu button:hover { background: var(--border); }
+    .split-menu-sep { height: 1px; background: var(--border); margin: 6px 0; }
+    .split-menu button .split-menu-hint { color: var(--text-muted); font-size: 12px; }
+    /* Radiomeny (effort): haken ligger i sin egen kolonne, så etikettene
+       verken hopper sidelengs når valget flyttes eller får hengende innrykk
+       når de brytes over to linjer. */
+    .split-menu--radio { min-width: 264px; }
+    .split-menu--radio button { position: relative; padding-left: 32px; }
+    .split-menu--radio button::before {
+      content: "\2713"; position: absolute; left: 14px; top: 8px;
+      color: var(--accent); visibility: hidden;
+    }
+    .split-menu--radio button[aria-checked="true"]::before { visibility: visible; }
+
+    /* Forhåndsvisning av ekstern nyttelast (utklippstavle/fil) i brukerboblen:
+       det som tolkes kommer ikke fra noe brukeren ser i appen. */
+    .ai-kilde-preview { margin-top: 6px; }
+    .ai-kilde-preview summary { cursor: pointer; font-size: 12px; opacity: 0.85; }
+    .ai-kilde-preview pre {
+      margin: 6px 0 0; max-height: 200px; overflow: auto; white-space: pre-wrap;
+      word-break: break-word; font-size: 11px; line-height: 1.4;
+      background: rgba(0,0,0,0.12); border-radius: 4px; padding: 6px 8px;
+    }
+
+    /* Lim inn-fallback for «Tolk fra utklippstavlen» når nettleseren nekter
+       clipboard-lesing (Firefox/Safari, eller avslått tillatelse). */
+    .tolk-paste-text {
+      width: 100%; resize: vertical; font-family: var(--mono, ui-monospace, monospace);
+      font-size: 12px; line-height: 1.45; color: var(--text); background: var(--bg-code);
+      border: 1px solid var(--border); border-radius: 6px; padding: 8px;
+    }
+    .tolk-paste-text:focus { outline: none; border-color: var(--accent); }
+
     .ai-modal-backdrop {
       position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.4);
       display: none; align-items: center; justify-content: center;

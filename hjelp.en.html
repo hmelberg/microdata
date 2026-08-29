@@ -648,6 +648,18 @@ summarize kjonn
       <li><strong>+ Add</strong> — appends the script to the bottom of the editor</li>
     </ul>
 
+    <h3>Workflow: write the script here, run it on the real microdata.no</h3>
+    <p>This app runs on synthetic practice data. The usual workflow is therefore: write and debug the script here, run it on the real microdata.no, and bring the results back here to be interpreted.</p>
+    <ul>
+      <li><strong>The copy icon in the top bar</strong> (⧉, next to export) puts the whole script on the clipboard. The same action is available as <strong>File → Copy script</strong>.</li>
+      <li><strong>Interpret results</strong> at the bottom right interprets the output shown in the app. The arrow next to the button opens the two paths for real results: <strong>Paste from clipboard</strong> and <strong>Open from file</strong>.</li>
+    </ul>
+    <p>The difference is not just where the text comes from: the app's own output is framed as synthetic practice numbers, while pasted and uploaded results are interpreted as real register data — with microdata.no's disclosure control (rounding, suppressed small cells) as the caveat instead of the practice-data one.</p>
+    <p>If the browser refuses to read the clipboard (Firefox and Safari ask or refuse), a paste box opens instead. The script currently in the editor is sent as context, with instructions to the model to disregard it if it clearly does not match the output.</p>
+
+    <h3>How thoroughly the answer should work</h3>
+    <p>The arrow on the <strong>Send</strong> button picks Fast, Balanced or Best for that request — and remembers the choice. It is the same setting as <strong>Quality</strong> under the gear icon, and it governs the model, its thinking depth, and how many tool calls and runs the answer loop may spend.</p>
+
     <h3>Validation warnings</h3>
     <p>Generated scripts are run through static validation before being shown. If there are unknown variables, unknown commands or parsing errors, these are shown as clickable chips under the script. Click a chip to compose a follow-up message asking the assistant to fix that specific error.</p>
 
@@ -663,7 +675,7 @@ summarize kjonn
     </ul>
 
     <h3>Privacy</h3>
-    <p>What is sent to the API is only your question text, and — if checked — the content of the script editor. Data files, run results, output and widget content are not sent. Norwegian or English language is guessed automatically from the question.</p>
+    <p>What is sent to the API is your question text, and — if checked — the content of the script editor. Data files and widget content are not sent. Two things send more, and only when you trigger them yourself: <strong>Send</strong> lets the model run scripts in the emulator and reads the output back, and <strong>Interpret results</strong> sends the output (or the text you paste / the file you pick) together with the script in the editor. Norwegian or English language is guessed automatically from the question.</p>
 
     <div class="callout">
       <strong>Experimental.</strong> The AI assistant can be wrong, suggest variables that don't exist, or generate scripts that don't run. Always check the result before use.

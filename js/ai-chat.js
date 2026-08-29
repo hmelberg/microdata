@@ -54,6 +54,27 @@
         return (q === 'fast' || q === 'balanced' || q === 'best') ? q : 'balanced';
       }
 
+      function kvalitetsNavn(q) {
+        if (q === 'fast') return T('Rask');
+        if (q === 'best') return T('Best');
+        return T('Balansert');
+      }
+
+      /** Haken i grundighetsmenyen + pil-knappens tittel følger md_ai_quality —
+       *  samme verdi som «Kvalitet» i innstillingene skriver. Kalles fra begge
+       *  stedene, så de to inngangene aldri viser hver sin sannhet. */
+      function markerKvalitet() {
+        const q = aiQuality();
+        if (dom.aiSendMenu) {
+          dom.aiSendMenu.querySelectorAll('button[data-quality]').forEach(b => {
+            b.setAttribute('aria-checked', b.dataset.quality === q ? 'true' : 'false');
+          });
+        }
+        if (dom.aiSendMoreBtn) {
+          dom.aiSendMoreBtn.title = T('Grundighet: {niva}. Klikk for å velge.', { niva: kvalitetsNavn(q) });
+        }
+      }
+
       /**
        * Har brukeren i det hele tatt legitimasjon? Tre veier gir tilgang:
        * egen leverandør, egen Anthropic-nøkkel, eller det skjulte
@@ -71,7 +92,7 @@
       const dom = {};
       function cacheDom() {
         ['aiToggleBtn','aiSidebar','aiCloseBtn','aiSettingsBtn','aiClearBtn',
-         'aiThread','aiInput','aiSendFastBtn','aiAbortBtn',
+         'aiThread','aiInput','aiSendFastBtn','aiSendMoreBtn','aiSendMenu','aiAbortBtn',
          'aiIncludeScript',
          'aiSettingsBackdrop','aiCfgAnthropicKey','aiCfgSave','aiCfgCancel',
          'aiCfgByokStored','aiCfgByokRemove',
@@ -138,13 +159,37 @@
         });
       }
 
-      function appendUserMessage(text) {
+      // `preview` brukes av de eksterne tolkeveiene (utklippstavle/fil):
+      // nyttelasten kommer ikke fra noe brukeren ser i appen, så den skal være
+      // etterprøvbar i tråden — ellers tolker vi noe usynlig for ham.
+      function appendUserMessage(text, preview) {
         const wrap = document.createElement('div');
         wrap.className = 'ai-msg ai-msg-user';
         wrap.innerHTML = '<div class="ai-bubble"></div>';
-        wrap.querySelector('.ai-bubble').textContent = text;
+        const bubble = wrap.querySelector('.ai-bubble');
+        bubble.textContent = text;
+        if (preview) {
+          const det = document.createElement('details');
+          det.className = 'ai-kilde-preview';
+          const sum = document.createElement('summary');
+          sum.textContent = T('Vis det som ble sendt');
+          const pre = document.createElement('pre');
+          pre.textContent = preview;
+          det.appendChild(sum);
+          det.appendChild(pre);
+          bubble.appendChild(det);
+        }
         dom.aiThread.appendChild(wrap);
         scrollToBottom();
+      }
+
+      /** Første 40 linjer / 1500 tegn av en ekstern nyttelast, til <details>. */
+      function forhandsvisning(text) {
+        const linjer = String(text || '').split('\n');
+        let ut = linjer.slice(0, 40).join('\n');
+        if (ut.length > 1500) ut = ut.slice(0, 1500);
+        if (ut.length < String(text).length) ut += '\n…';
+        return ut;
       }
 
       function appendThinking() {
@@ -474,6 +519,10 @@
             script: payload.script || '',
             output: payload.output || '',
             språk: payload.lang || 'auto',
+            // 'emulator' (syntetiske øvingsdata) eller 'ekte' (resultater
+            // brukeren har kjørt på microdata.no). Bestemmer innrammingen
+            // serverside — se netlify/edge-functions/_lib/tolk-prompt.ts.
+            kilde: payload.kilde === 'ekte' ? 'ekte' : 'emulator',
             ui_lang: (window.M2PY_LANG === 'en') ? 'en' : 'no',
           }, edgeBodyExtras())),
           signal,
@@ -874,6 +923,7 @@
         }
         state.sending = true;
         if (dom.aiSendFastBtn) dom.aiSendFastBtn.disabled = true;
+        if (dom.aiSendMoreBtn) dom.aiSendMoreBtn.disabled = true;
         if (state.history.length === 0) dom.aiThread.innerHTML = '';
         appendUserMessage(text);
         state.history.push({ role: 'user', text });
@@ -903,6 +953,7 @@
           if (dom.aiAbortBtn) dom.aiAbortBtn.style.display = 'none';
           state.sending = false;
           if (dom.aiSendFastBtn) dom.aiSendFastBtn.disabled = false;
+          if (dom.aiSendMoreBtn) dom.aiSendMoreBtn.disabled = false;
           dom.aiInput.focus();
         }
       }
@@ -1165,6 +1216,7 @@
           if (instr) localStorage.setItem('md_ai_instructions', instr);
           else localStorage.removeItem('md_ai_instructions');
         } catch (e) {}
+        markerKvalitet();   // haken i Send-menyen følger «Kvalitet»-valget
 
         closeSettings();
       }
@@ -1220,6 +1272,23 @@
         // ingen URL-ruting, ingen fast/web-splitt.
         function sendCurrent() { sendSvarMessage(); }
         if (dom.aiSendFastBtn) dom.aiSendFastBtn.addEventListener('click', sendCurrent);
+
+        // Grundighetsmenyen bak pila på Send (delt knapp, Gmail-stil). Et valg
+        // setter md_ai_quality OG sender med én gang — det er poenget med å ha
+        // den her framfor i innstillingene. Åpne/lukke-logikken er delt med
+        // «Tolk resultat» via mdSplitMenu (index.html).
+        if (window.mdSplitMenu) window.mdSplitMenu(dom.aiSendMoreBtn, dom.aiSendMenu);
+        if (dom.aiSendMenu) {
+          dom.aiSendMenu.addEventListener('click', (e) => {
+            const b = e.target.closest('button[data-quality]');
+            if (!b) return;
+            try { localStorage.setItem(LS_KEY_QUALITY, b.dataset.quality); } catch (_) {}
+            markerKvalitet();
+            if (dom.aiCfgQuality) dom.aiCfgQuality.value = aiQuality();
+            sendCurrent();
+          });
+        }
+        markerKvalitet();
         if (dom.aiAbortBtn) dom.aiAbortBtn.addEventListener('click', () => { if (state.abortCtrl) state.abortCtrl.abort(); });
         dom.aiInput.addEventListener('input', autoresize);
         dom.aiInput.addEventListener('keydown', (e) => {
@@ -1266,7 +1335,10 @@
           sendSvarMessage();
         };
 
-        // Offentlig: åpne AI-panelet og tolk resultatene (output) fra forrige kjøring.
+        // Offentlig: åpne AI-panelet og tolk resultater. Kilden avgjør både
+        // hva boblen sier og hvordan serveren rammer inn tallene:
+        //   kilde 'emulator' — utskriften fra forrige kjøring (syntetiske data)
+        //   kilde 'ekte'     — limt inn / lastet opp fra det ekte microdata.no
         window.mdInterpretResults = function(payload) {
           payload = payload || {};
           if (!payload.output || !payload.output.trim()) return;
@@ -1274,12 +1346,22 @@
           if (!hasAiCredentials()) { openSettings(); return; }
           setOpen(true);
           if (state.history.length === 0) dom.aiThread.innerHTML = '';
-          appendUserMessage(T('Tolk resultatene fra forrige kjøring.'));
-          state.history.push({ role: 'user', text: 'Tolk resultatene' });
+          const ekte = payload.kilde === 'ekte';
+          const etikett = ekte
+            ? T('Tolk resultater fra {kilde} — ekte data, {n} tegn.', {
+                kilde: payload.kildenavn || T('ekstern kilde'),
+                n: payload.output.length.toLocaleString('no-NO'),
+              })
+            : T('Tolk resultatene fra forrige kjøring.');
+          // Forhåndsvisningen er kun for de eksterne veiene; utskriften i appen
+          // står allerede synlig i resultatpanelet.
+          appendUserMessage(etikett, ekte ? forhandsvisning(payload.output) : '');
+          state.history.push({ role: 'user', text: etikett });
           const thinkingNode = appendThinking();
           state.sending = true;
           if (dom.aiSendFastBtn) dom.aiSendFastBtn.disabled = true;
-            const ctrl = new AbortController();
+          if (dom.aiSendMoreBtn) dom.aiSendMoreBtn.disabled = true;
+          const ctrl = new AbortController();
           state.abortCtrl = ctrl;
           if (dom.aiAbortBtn) dom.aiAbortBtn.style.display = '';
           runInterpretQuery(payload, thinkingNode, ctrl.signal)
@@ -1289,7 +1371,8 @@
               if (dom.aiAbortBtn) dom.aiAbortBtn.style.display = 'none';
               state.sending = false;
               if (dom.aiSendFastBtn) dom.aiSendFastBtn.disabled = false;
-                    if (dom.aiInput) dom.aiInput.focus();
+              if (dom.aiSendMoreBtn) dom.aiSendMoreBtn.disabled = false;
+              if (dom.aiInput) dom.aiInput.focus();
             });
         };
       }

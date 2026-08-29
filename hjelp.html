@@ -648,6 +648,18 @@ summarize kjonn
       <li><strong>+ Legg til</strong> — føyer skriptet til nederst i editoren</li>
     </ul>
 
+    <h3>Arbeidsflyt: script her, kjøring på ekte microdata.no</h3>
+    <p>Appen kjører på syntetiske øvingsdata. Den vanlige arbeidsflyten er derfor: lag og feilsøk scriptet her, kjør det på det ekte microdata.no, og ta resultatene med tilbake hit for tolkning.</p>
+    <ul>
+      <li><strong>Kopier-ikonet i topplinja</strong> (⧉, ved siden av eksport) legger hele scriptet på utklippstavlen. Samme handling finnes som <strong>Fil → Kopier script</strong>.</li>
+      <li><strong>Tolk resultat</strong> nede til høyre tolker utskriften i appen. Pila ved siden av knappen åpner de to veiene for ekte resultater: <strong>Lim inn fra utklippstavlen</strong> og <strong>Åpne fra fil</strong>.</li>
+    </ul>
+    <p>Forskjellen er ikke bare hvor teksten kommer fra: tolkning av appens egen utskrift rammes inn som syntetiske øvingstall, mens innlimte og opplastede resultater tolkes som ekte registerdata — med forbehold om microdata.nos avsløringskontroll (avrunding, skjulte små celler) i stedet for øvingsdata-forbeholdet.</p>
+    <p>Nekter nettleseren å lese utklippstavlen (Firefox og Safari spør eller nekter), åpnes et lim-inn-felt i stedet. Scriptet som ligger i editoren sendes med som kontekst, med beskjed til modellen om å se bort fra det hvis det åpenbart ikke passer til utskriften.</p>
+
+    <h3>Hvor grundig svaret skal jobbe</h3>
+    <p>Pila på <strong>Send</strong>-knappen velger Rask, Balansert eller Best for den forespørselen — og husker valget. Det er samme innstilling som <strong>Kvalitet</strong> i tannhjulet, og den styrer både modell, tenkedybde og hvor mange verktøykall og kjøringer svar-løpet får bruke.</p>
+
     <h3>Valideringsadvarsler</h3>
     <p>Genererte skript kjøres gjennom statisk validering før de vises. Hvis det finnes ukjente variabler, ukjente kommandoer eller parsingsfeil, vises disse som klikkbare brikker (chips) under skriptet. Klikk på en brikke for å forfatte en oppfølgingsmelding som ber assistenten fikse akkurat den feilen.</p>
 
@@ -663,7 +675,7 @@ summarize kjonn
     </ul>
 
     <h3>Personvern</h3>
-    <p>Det som sendes til API-et er kun spørsmålsteksten din, og — hvis avhuket — innholdet i skripteditoren. Datafiler, kjøreresultater, output og widget-innhold sendes ikke. Norsk eller engelsk språk gjettes automatisk fra spørsmålet.</p>
+    <p>Det som sendes til API-et er spørsmålsteksten din, og — hvis avhuket — innholdet i skripteditoren. Datafiler og widget-innhold sendes ikke. To ting sender mer, og bare når du selv utløser dem: <strong>Send</strong> lar modellen kjøre script i emulatoren og leser utskriften tilbake, og <strong>Tolk resultat</strong> sender utskriften (eller teksten du limer inn / filen du velger) sammen med scriptet i editoren. Norsk eller engelsk språk gjettes automatisk fra spørsmålet.</p>
 
     <div class="callout">
       <strong>Eksperimentell.</strong> AI-assistenten kan ta feil, foreslå variabler som ikke finnes, eller generere skript som ikke kjører. Sjekk alltid resultatet før bruk.
