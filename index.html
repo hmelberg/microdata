@@ -788,7 +788,7 @@
     window.t = window.t || function (s) { return s; };
     window.i18nField = window.i18nField || function (obj, field) { return obj && obj[field]; };
 
-    window.M2PY_VERSION = '2026-09-26a';
+    window.M2PY_VERSION = '2026-09-26b';
 
     // One-time migration: remove obsolete localStorage keys from previous milestones
     // Safe to delete this snippet after a few months when most users have re-loaded
@@ -3332,13 +3332,16 @@
             String(names[i]).replace(/"/g, '""') + '"');
         }
       },
-      async registerTable(name, parquetBytes) {
+      // asTable: materialiser som TABELL i stedet for view — brukes når
+      // scriptet selv gjør CREATE OR REPLACE TABLE på samme navn (et view
+      // kan ikke erstattes av en tabell).
+      async registerTable(name, parquetBytes, asTable) {
         if (!this.conn) throw new Error('__duck: call begin() before registerTable()');
         const db = await __ensureDuckDB();
         const ident = String(name).replace(/"/g, '""');   // SQL identifier escape
         const fname = String(name).replace(/'/g, "''") + '.parquet';  // SQL string-literal escape
         await db.registerFileBuffer(String(name) + '.parquet', new Uint8Array(parquetBytes));
-        await this.conn.query('CREATE OR REPLACE VIEW "' + ident +
+        await this.conn.query('CREATE OR REPLACE ' + (asTable ? 'TABLE' : 'VIEW') + ' "' + ident +
           '" AS SELECT * FROM read_parquet(\'' + fname + '\')');
       },
       async exec(sql) { if (!this.conn) throw new Error('__duck: call begin() first'); await this.conn.query(sql); },
@@ -7442,22 +7445,27 @@ async def _run_duck_sql(_sql):
     _preview = _duck_db.build_preview_select(_stmts)
     # Created tables win over a same-named existing dataset: don't register the
     # old dataset as a view, or the CREATE TABLE collides with that view.
+    # Unntak: SQL som også LESER tabellen den lager (filtrer på stedet,
+    # CREATE OR REPLACE TABLE df AS SELECT * FROM df WHERE …) trenger det
+    # gamle datasettet — det registreres da som TABELL, som CREATE OR
+    # REPLACE TABLE kan erstatte.
     _created_lower = {c.lower() for c in _created}
-    _refs = [r for r in _refs if r.lower() not in _created_lower]
+    _selfref_lower = {c.lower() for c in _duck_db.extract_self_referencing_created(_stmts)}
+    _refs = [r for r in _refs if r.lower() not in _created_lower or r.lower() in _selfref_lower]
     _out = []
     try:
         await _duck_js.__duck.begin()
         try:
             for _name in _refs:
                 _buf = _duck_db.df_to_parquet_bytes(_datasets[_name])
-                await _duck_js.__duck.registerTable(_name, _duck_to_js(_buf))
+                await _duck_js.__duck.registerTable(_name, _duck_to_js(_buf), _name.lower() in _selfref_lower)
             if _sql.strip():
                 await _duck_js.__duck.exec(_sql)
             if _preview:
-                _cnt = (await _duck_js.__duck.query("SELECT count(*) AS n FROM (" + _preview + ") _q")).to_py()
+                _cnt = (await _duck_js.__duck.query("SELECT count(*) AS n FROM (" + _preview + "\\n) _q")).to_py()
                 _nlist = _cnt.get("n") or [0]
                 _total = int(_nlist[0]) if _nlist else 0
-                _cols = (await _duck_js.__duck.query("SELECT * FROM (" + _preview + ") _q LIMIT 400")).to_py()
+                _cols = (await _duck_js.__duck.query("SELECT * FROM (" + _preview + "\\n) _q LIMIT 400")).to_py()
                 _pv = pd.DataFrame(_cols)
                 _out.append(_pv.to_string(index=False) if len(_pv) else "(0 rader)")
                 if _total > 400:
@@ -7569,9 +7577,9 @@ async def _run_duck_sql(_sql):
           var _stmts = DN.splitSqlStatements(_sql);
           var _preview = DN.buildPreviewSelect(_stmts);
           if (_preview) {
-            var _cnt = await window.__duck.query('SELECT count(*) AS n FROM (' + _preview + ') _q');
+            var _cnt = await window.__duck.query('SELECT count(*) AS n FROM (' + _preview + '\n) _q');
             var _total = Number((_cnt.n || [0])[0] || 0);
-            var _cols = await window.__duck.query('SELECT * FROM (' + _preview + ') _q LIMIT 400');
+            var _cols = await window.__duck.query('SELECT * FROM (' + _preview + '\n) _q LIMIT 400');
             var _keys = Object.keys(_cols);
             var _shown = _keys.length ? _cols[_keys[0]].length : 0;
             _out.push(_shown ? DN.formatColumnsText(_cols) : '(0 rader)');

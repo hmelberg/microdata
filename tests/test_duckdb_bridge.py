@@ -130,3 +130,20 @@ def test_df_to_parquet_blandet_objektkolonne_blir_tekst():
     df = pd.DataFrame({"x": [1, "x", None]})
     back = pd.read_parquet(io.BytesIO(df_to_parquet_bytes(df)))
     assert back.x.tolist() == ["1", "x", None]
+
+
+def test_split_dropper_rene_kommentarbiter():
+    assert split_sql_statements("SELECT * FROM iris;\n-- ferdig") == ["SELECT * FROM iris"]
+    assert build_preview_select(split_sql_statements("SELECT * FROM iris;\n-- ferdig")) == "SELECT * FROM iris"
+
+
+def test_created_kvalifisert_og_kvotert_navn():
+    assert extract_created_tables(['CREATE TABLE main.res AS SELECT 1']) == ["res"]
+    assert extract_created_tables(['CREATE TABLE "my-t" AS SELECT 1']) == ["my-t"]
+
+
+def test_filtrer_paa_stedet_er_selvrefererende():
+    import duckdb_bridge as d
+    stmts = split_sql_statements("CREATE OR REPLACE TABLE df AS SELECT * FROM df WHERE x > 0")
+    assert d.extract_self_referencing_created(stmts) == ["df"]
+    assert d.extract_self_referencing_created(split_sql_statements("CREATE TABLE res AS SELECT * FROM df")) == []

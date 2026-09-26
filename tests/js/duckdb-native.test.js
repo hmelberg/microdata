@@ -99,3 +99,12 @@ test('format: aligns columns and renders null as NaN', () => {
 test('format: empty result gives empty string', () => {
   assert.equal(DN.formatColumnsText({}), '');
 });
+
+test('splitSqlStatements: rene kommentarbiter etter siste ; droppes', () => {
+  assert.deepEqual(DN.splitSqlStatements('SELECT * FROM iris;\n-- ferdig'), ['SELECT * FROM iris']);
+});
+
+test('extractCreatedTables: kvalifisert og kvotert navn', () => {
+  assert.deepEqual(DN.extractCreatedTables(['CREATE TABLE main.res AS SELECT 1']), ['res']);
+  assert.deepEqual(DN.extractCreatedTables(['CREATE TABLE "my-t" AS SELECT 1']), ['my-t']);
+});

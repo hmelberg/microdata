@@ -37,20 +37,21 @@
       else if (c === '"') { inDouble = true; buf.push(c); i += 1; }
       else if (c === ';') {
         var s = buf.join('').trim();
-        if (s) stmts.push(s);
+        // Rene kommentar-biter («-- ferdig» etter siste ;) er ikke setninger.
+        if (s && scrub(s).trim()) stmts.push(s);
         buf = [];
         i += 1;
       } else { buf.push(c); i += 1; }
     }
     var tail = buf.join('').trim();
-    if (tail) stmts.push(tail);
+    if (tail && scrub(tail).trim()) stmts.push(tail);
     return stmts;
   }
 
   // sql med -- og /* */-kommentarer fjernet, innholdet i '…'-strenger erstattet
   // med mellomrom, og "-tegn droppet (kvoterte identifikatorer overlever som
   // bare tokens). Brukes til identifikator-skanning og tom-script-sjekken.
-  function scrub(sql) {
+  function scrub(sql, keepDquotes) {
     var out = [];
     var i = 0, n = sql.length;
     var inSingle = false, inLine = false, inBlock = false;
@@ -70,7 +71,7 @@
       } else if (c === '-' && nxt === '-') { inLine = true; i += 2; }
       else if (c === '/' && nxt === '*') { inBlock = true; i += 2; }
       else if (c === "'") { inSingle = true; i += 1; }
-      else if (c === '"') { i += 1; }
+      else if (c === '"') { if (keepDquotes) out.push(c); i += 1; }
       else { out.push(c); i += 1; }
     }
     return out.join('');
@@ -79,18 +80,25 @@
   // NB: \w er ASCII-only i JS men unicode i Python — fortsettelsestegnene må
   // derfor være \p{L}\p{N}_ (med u-flagg) for at «lønn» o.l. skal matche som
   // i duckdb_bridge.py (review 2026-07-11 funn 3).
-  var CREATE_RE = /\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:TEMP(?:ORARY)?\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"?([A-Za-z_][\p{L}\p{N}_]*)"?/giu;
+  var IDENT = '(?:"(?:[^"]|"")+"|[A-Za-z_][\\p{L}\\p{N}_]*)';
+  var CREATE_RE = new RegExp('\\bCREATE\\s+(?:OR\\s+REPLACE\\s+)?(?:TEMP(?:ORARY)?\\s+)?TABLE\\s+' +
+    '(?:IF\\s+NOT\\s+EXISTS\\s+)?((?:' + IDENT + '\\s*\\.\\s*){0,2}' + IDENT + ')', 'giu');
+  var IDENT_RE = new RegExp(IDENT, 'gu');
 
   // Targets of CREATE [OR REPLACE] [TEMP] TABLE [IF NOT EXISTS] name.
-  // Order-preserving, deduped, unquoted.
+  // Order-preserving, deduped, unquoted. Kvalifisert navn (main.res) → siste
+  // del; kvotert ("my-t") → hele teksten.
   function extractCreatedTables(statements) {
     var names = [];
     statements.forEach(function (stmt) {
-      var scrubbed = scrub(stmt);
+      var scrubbed = scrub(stmt, true);
       var m;
       CREATE_RE.lastIndex = 0;
       while ((m = CREATE_RE.exec(scrubbed)) !== null) {
-        if (names.indexOf(m[1]) === -1) names.push(m[1]);
+        var parts = m[1].match(IDENT_RE);
+        var nm = parts[parts.length - 1];
+        if (nm.charAt(0) === '"') nm = nm.slice(1, -1).replace(/""/g, '"');
+        if (names.indexOf(nm) === -1) names.push(nm);
       }
     });
     return names;

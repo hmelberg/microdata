@@ -15,6 +15,7 @@ __all__ = [
     "split_sql_statements",
     "extract_referenced_tables",
     "extract_created_tables",
+    "extract_self_referencing_created",
     "build_preview_select",
     "df_to_parquet_bytes",
 ]
@@ -23,7 +24,9 @@ __all__ = [
 def split_sql_statements(sql):
     """Split a SQL script on top-level semicolons, ignoring those inside string
     literals ('…'/"…"), -- line comments and /* … */ block comments. Returns a
-    list of non-empty, stripped statements (their own comments preserved)."""
+    list of non-empty, stripped statements (their own comments preserved).
+    Pieces that are only comments (e.g. "-- done" after the last ;) are not
+    statements and are dropped — otherwise they hid the preview."""
     stmts, buf = [], []
     i, n = 0, len(sql)
     in_single = in_double = in_line = in_block = False
@@ -76,7 +79,7 @@ def split_sql_statements(sql):
             i += 1
         elif c == ";":
             s = "".join(buf).strip()
-            if s:
+            if s and _scrub(s).strip():
                 stmts.append(s)
             buf = []
             i += 1
@@ -84,15 +87,16 @@ def split_sql_statements(sql):
             buf.append(c)
             i += 1
     tail = "".join(buf).strip()
-    if tail:
+    if tail and _scrub(tail).strip():
         stmts.append(tail)
     return stmts
 
 
-def _scrub(sql):
+def _scrub(sql, keep_dquotes=False):
     """Return sql with -- and /* */ comments removed, single-quoted string
     contents replaced by a space, and double-quote characters dropped (so quoted
-    identifiers survive as bare tokens). Used for identifier scanning."""
+    identifiers survive as bare tokens). Used for identifier scanning.
+    keep_dquotes=True keeps the quotes, so a quoted identifier stays one token."""
     out = []
     i, n = 0, len(sql)
     in_single = in_line = in_block = False
@@ -130,6 +134,8 @@ def _scrub(sql):
             in_single = True
             i += 1
         elif c == '"':
+            if keep_dquotes:
+                out.append(c)
             i += 1  # drop the quote char, keep inner identifier text
         else:
             out.append(c)
@@ -150,23 +156,52 @@ def extract_referenced_tables(statements, known):
     return found
 
 
+_IDENT = r'(?:"(?:[^"]|"")+"|[A-Za-z_]\w*)'
 _CREATE_RE = re.compile(
     r"\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:TEMP(?:ORARY)?\s+)?TABLE\s+"
-    r"(?:IF\s+NOT\s+EXISTS\s+)?\"?([A-Za-z_]\w*)\"?",
+    r"(?:IF\s+NOT\s+EXISTS\s+)?((?:" + _IDENT + r"\s*\.\s*){0,2}" + _IDENT + r")",
     re.IGNORECASE,
 )
 
 
+def _unquote_ident(tok):
+    if tok.startswith('"') and tok.endswith('"'):
+        return tok[1:-1].replace('""', '"')
+    return tok
+
+
 def extract_created_tables(statements):
     """Targets of CREATE [OR REPLACE] [TEMP] TABLE [IF NOT EXISTS] name.
-    Order-preserving, deduped, unquoted."""
+    Order-preserving, deduped, unquoted. A qualified name (main.res) gives
+    its last part; a quoted one ("my-t") keeps its full text."""
     names = []
     for stmt in statements:
-        for m in _CREATE_RE.finditer(_scrub(stmt)):
-            nm = m.group(1)
+        for m in _CREATE_RE.finditer(_scrub(stmt, keep_dquotes=True)):
+            nm = _unquote_ident(re.findall(_IDENT, m.group(1))[-1])
             if nm not in names:
                 names.append(nm)
     return names
+
+
+def extract_self_referencing_created(statements):
+    """Created tables that the SQL also reads from (e.g. filter in place:
+    CREATE OR REPLACE TABLE df AS SELECT * FROM df WHERE …). The existing
+    dataset must then be registered, even though the script creates it."""
+    created = extract_created_tables(statements)
+    if not created:
+        return []
+    scrubbed = _scrub(" ; ".join(statements))
+    targets = {}
+    for stmt in statements:
+        for m in _CREATE_RE.finditer(_scrub(stmt, keep_dquotes=True)):
+            nm = _unquote_ident(re.findall(_IDENT, m.group(1))[-1]).lower()
+            targets[nm] = targets.get(nm, 0) + 1
+    out = []
+    for name in created:
+        uses = len(re.findall(r"(?<![\w])" + re.escape(name) + r"(?![\w])", scrubbed, re.IGNORECASE))
+        if uses > targets.get(name.lower(), 0):
+            out.append(name)
+    return out
 
 
 def build_preview_select(statements):
