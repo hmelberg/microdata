@@ -51,3 +51,14 @@ Deno.test("non-pxweb source throws with probe guidance", async () => {
   try { await tableMetadata("owid", "co2", { registry: REG }); } catch (e) { threw = String(e); }
   if (!threw.includes("probe")) throw new Error("ventet probe-henvisning: " + threw);
 });
+
+Deno.test("ugyldig table_id avvises før fetch (SSRF/sti-vakt)", async () => {
+  for (const id of ["http://10.0.0.5/admin", "//evil.example/x", "../../admin", "05839?x=1", "05839#f", ""]) {
+    let fetched = false;
+    const fetchImpl = (() => { fetched = true; return Promise.resolve(new Response("{}")); }) as typeof fetch;
+    let threw = "";
+    try { await tableMetadata("ssb", id, { registry: REG, fetchImpl }); } catch (e) { threw = String(e); }
+    if (!threw.includes("ugyldig table_id")) throw new Error(`${id}: ventet avvisning, fikk '${threw}'`);
+    if (fetched) throw new Error(`${id}: fetch ble kalt`);
+  }
+});

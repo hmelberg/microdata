@@ -1,6 +1,6 @@
 import { detectLanguage } from "./_lib/parse-script-context.ts";
 import { streamAnthropic } from "./_lib/anthropic.ts";
-import { extractByokKey, upstreamErrorResponse, type IpContext } from "./_lib/auth.ts";
+import { cappedJsonError, extractByokKey, readJsonCapped, upstreamErrorResponse, type IpContext } from "./_lib/auth.ts";
 import { resolveLlm } from "./_lib/llm-choice.ts";
 import { streamProvider } from "./_lib/providers/single.ts";
 import { denoEnv, gate } from "./_lib/deno-kabling.ts";
@@ -35,12 +35,9 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   const gateResp = await gate(request, { endpoint: "tolk-resultat", maxBodyBytes: 120_000, allowByok: true, allowLlmKey: true }, context);
   if (gateResp) return gateResp;
 
-  let body: RequestBody;
-  try {
-    body = await request.json();
-  } catch (_) {
-    return new Response("Invalid JSON", { status: 400 });
-  }
+  const parsed = await readJsonCapped(request, 120_000);
+  if (!parsed.ok) return cappedJsonError(parsed.tooLarge);
+  const body = (parsed.value ?? {}) as RequestBody;
   if (!body.output || typeof body.output !== "string" || !body.output.trim()) {
     return new Response("Missing output", { status: 400 });
   }

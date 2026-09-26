@@ -20,6 +20,19 @@ export interface TableMeta {
 
 const MAX_VALUES = 40;
 
+// Strukturell sjekk av table_id FØR den bygges inn i en URL (port fra
+// openstat, review 2026-09-26). data-svar sin table_metadata-tool gir
+// modellens table_id rett hit; ".." / "?" / "#" / skjema-tegn ville ellers
+// kunne styre forespørselen til andre stier på kildens vert. Første tegn
+// alfanumerisk; resten et tegnsett som dekker reelle id-former.
+const TABLE_ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9/_.@,-]*$/;
+export function isValidTableId(s: string): boolean {
+  if (!s || s.length > 128) return false;
+  if (!TABLE_ID_RE.test(s)) return false;
+  if (s.includes("..")) return false;
+  return true;
+}
+
 export async function tableMetadata(
   sourceId: string,
   tableId: string,
@@ -27,6 +40,7 @@ export async function tableMetadata(
 ): Promise<TableMeta> {
   const src = findSource(deps.registry, sourceId);
   if (!src) throw new Error(`ukjent kilde '${sourceId}'`);
+  if (!isValidTableId(tableId)) throw new Error(`ugyldig table_id '${tableId.slice(0, 80)}'`);
   if (src.tilgang !== "pxweb") {
     throw new Error(
       `table_metadata støtter bare pxweb-kilder ennå — for '${sourceId}': bruk probe på data-URL-en for å se kolonner`,

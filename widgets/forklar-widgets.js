@@ -18,15 +18,19 @@
   // defineres i delte script (#s=-lenker), så payloaden er angriper-leverbar —
   // og siden holder bl.a. GitHub-tokens i localStorage. Dette er ikke en full
   // DOMPurify, men fjerner de praktiske skript-kjørings-vektorene
-  // (script/iframe/object/embed, on*-handlere, javascript:-URLer, og for SVG
-  // også foreignObject).
-  function sanitizeMarkup(markup, opts) {
-    opts = opts || {};
+  // (script/iframe/object/embed, on*-handlere, javascript:-URLer,
+  // foreignObject, og SVG-animasjonselementer — <animate>/<set> kan ellers
+  // sette href=javascript: på en lenke uten at noen URL-attributt synes).
+  // Returnerer et DocumentFragment som kallerne henger inn direkte: å
+  // serialisere tilbake til streng og re-parse åpner for mutation-XSS.
+  var BANNED = {
+    script: 1, iframe: 1, frame: 1, frameset: 1, object: 1, embed: 1,
+    link: 1, meta: 1, base: 1, template: 1, foreignobject: 1,
+    animate: 1, set: 1, animatemotion: 1, animatetransform: 1, discard: 1
+  };
+  function sanitizeMarkup(markup) {
     var tpl = document.createElement('template');
     tpl.innerHTML = String(markup == null ? '' : markup);
-    var BANNED = opts.svg
-      ? { script: 1, foreignobject: 1, iframe: 1, object: 1, embed: 1 }
-      : { script: 1, iframe: 1, object: 1, embed: 1, link: 1, meta: 1, base: 1 };
     var URL_ATTRS = { href: 1, 'xlink:href': 1, src: 1, action: 1, formaction: 1, 'xml:base': 1 };
     var nodes = tpl.content.querySelectorAll('*');
     for (var i = 0; i < nodes.length; i++) {
@@ -50,7 +54,7 @@
         }
       }
     }
-    return tpl.innerHTML;
+    return tpl.content;
   }
 
   function parseWidgetLine(line) {
@@ -904,7 +908,7 @@
     body.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'forklar-w-html-wrap';
-    wrap.innerHTML = sanitizeMarkup(html);
+    wrap.appendChild(sanitizeMarkup(html));
     body.appendChild(wrap);
     const canHideOk = p.hide_ok === true && p.auto_advance_ms != null;
     const userDone = new Promise(function (resolve) {
@@ -940,7 +944,8 @@
     const holder = document.createElement('div');
     holder.className = 'forklar-w-svg-holder';
     holder.style.maxHeight = maxH;
-    holder.innerHTML = svg ? sanitizeMarkup(svg, { svg: true }) : '<p>SVG mangler.</p>';
+    if (svg) holder.appendChild(sanitizeMarkup(svg));
+    else holder.innerHTML = '<p>SVG mangler.</p>';
     const svgEl = holder.querySelector('svg');
     if (svgEl) {
       if (!svgEl.getAttribute('width') && !svgEl.style.width) svgEl.style.maxWidth = '100%';

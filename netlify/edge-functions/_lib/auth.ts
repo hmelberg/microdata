@@ -210,6 +210,48 @@ function matchesConfiguredToken(
 }
 
 /**
+ * Read and parse a JSON body, aborting once more than maxBytes have arrived.
+ * The content-length guard in runBaseChecks only sees the header — a chunked
+ * body (no content-length) would otherwise be buffered in full by
+ * request.json(). Returns ok:false on oversize or invalid JSON; `tooLarge`
+ * tells the caller which status to send.
+ */
+export async function readJsonCapped(
+  request: Request,
+  maxBytes: number,
+): Promise<{ ok: true; value: unknown } | { ok: false; tooLarge: boolean }> {
+  if (!request.body) return { ok: false, tooLarge: false };
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return { ok: false, tooLarge: true };
+    }
+    chunks.push(value);
+  }
+  const buf = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { buf.set(c, off); off += c.byteLength; }
+  try {
+    return { ok: true, value: JSON.parse(new TextDecoder().decode(buf)) };
+  } catch {
+    return { ok: false, tooLarge: false };
+  }
+}
+
+/** Standard 413/400 response for a failed readJsonCapped. */
+export function cappedJsonError(tooLarge: boolean): Response {
+  return tooLarge
+    ? new Response("Payload too large", { status: 413 })
+    : new Response("Invalid JSON", { status: 400 });
+}
+
+/**
  * Core gate logic with injected dependencies (testable). Returns a Response to
  * short-circuit the request, or null when the caller should proceed.
  */

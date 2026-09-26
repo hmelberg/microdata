@@ -77,3 +77,11 @@ Deno.test("handleHent never echoes upstream fetch errors (key leak) to the clien
   if (text.includes("K123")) throw new Error("nøkkel lekket i feilrespons: " + text);
   if (text.includes("stlouisfed")) throw new Error("kilde-URL lekket i feilrespons: " + text);
 });
+
+Deno.test("handleHent: envKeysAllowed=false injiserer aldri site-nøkkel (BYOK)", async () => {
+  const log: string[] = [];
+  const d = { ...deps(log, { FRED_API_KEY: "SECRET" }), envKeysAllowed: false };
+  const r = await handleHent(req("url=" + encodeURIComponent("https://api.stlouisfed.org/fred/series?series_id=UNRATE")), d);
+  assertEquals(r.status, 403);
+  assertEquals(log.length, 0);
+});

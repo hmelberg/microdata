@@ -12,6 +12,9 @@ export interface HentDeps {
   registry: DataSource[];
   getEnv: (k: string) => string | undefined;
   fetchImpl?: typeof fetch;
+  // false for BYOK callers: the BYOK key is only format-checked, so it must
+  // never unlock the site's own env keys (e.g. FRED_API_KEY). Default true.
+  envKeysAllowed?: boolean;
 }
 
 export async function handleHent(request: Request, deps: HentDeps): Promise<Response> {
@@ -30,6 +33,9 @@ export async function handleHent(request: Request, deps: HentDeps): Promise<Resp
   const headers: Record<string, string> = {};
   const src = sourceForUrl(deps.registry, target);
   if (src?.auth) {
+    if (deps.envKeysAllowed === false) {
+      return new Response(`Kilden ${src.id} krever admin-innlogging`, { status: 403 });
+    }
     const key = deps.getEnv(src.auth.env);
     if (!key) return new Response(`Nøkkel for ${src.id} er ikke konfigurert`, { status: 502 });
     const [kind, name] = src.auth.plassering.split(":");

@@ -4,7 +4,7 @@
 // Strukturmal: askstats svar.ts, minus ruter/packs/keys/discover — microdata
 // har ikke askstats finn-data-problem; kunnskapen er front-lastet i prefiksen
 // og detaljer hentes med variabel_info.
-import { timingSafeEqual, type IpContext } from "./_lib/auth.ts";
+import { cappedJsonError, readJsonCapped, timingSafeEqual, type IpContext } from "./_lib/auth.ts";
 import { type AgenticResumeState } from "./_lib/anthropic.ts";
 import { coerceQuality, resolveLlm } from "./_lib/llm-choice.ts";
 import {
@@ -99,8 +99,11 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   }, context);
   if (gateResp) return gateResp;
 
-  let body: RequestBody;
-  try { body = await request.json(); } catch { return new Response("Invalid JSON", { status: 400 }); }
+  // Kroppstaket håndheves på selve strømmen: gate-sjekken ser bare
+  // content-length-headeren, og en chunked kropp uten den ble lest ubegrenset.
+  const parsed = await readJsonCapped(request, MAX_BODY_BYTES);
+  if (!parsed.ok) return cappedJsonError(parsed.tooLarge);
+  const body = (parsed.value ?? {}) as RequestBody;
   const question = (body.question ?? "").trim();
   if (!question) return new Response("Missing question", { status: 400 });
 
