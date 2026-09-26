@@ -5669,13 +5669,11 @@ class RegressionHandler:
         control(x) også truffet en rad for x1."""
         if not hidden:
             return summary_text
-        rx = re.compile(r'^\s*(\S+)((?:\s+-?\d+\.?\d*(?:[eE][-+]?\d+)?){3,})\s*$')
-        keep = []
-        for line in summary_text.splitlines():
-            m = rx.match(line)
-            if m and m.group(1) in hidden:
-                continue
-            keep.append(line)
+        # Navnene matches eksakt, ikke som første ord: dummyer fra
+        # kategoriverdier med mellomrom (kat_c d) ville ellers sluppet gjennom.
+        names = '|'.join(re.escape(h) for h in sorted(hidden, key=len, reverse=True))
+        rx = re.compile(r'^\s*(?:' + names + r')((?:\s+-?\d+\.?\d*(?:[eE][-+]?\d+)?){3,})\s*$')
+        keep = [line for line in summary_text.splitlines() if not rx.match(line)]
         return "\n".join(keep)
 
     def _with_control_note(self, summary_text, control_raw, hidden):
@@ -5974,12 +5972,15 @@ class RegressionHandler:
             re_g = re_dict[gval]
             effects.loc[idx] += mat @ np.array([float(re_g.get(c, 0.0)) for c in cn])
         predicted = pd.Series(np.asarray(model.fittedvalues), index=clean.index) + effects
+        sizes = [clean.groupby(groups[:i + 1]).size() for i in range(len(groups))]
 
         return {
             'model': model, 'index': clean.index, 'dep': dep_var, 'groups': groups,
             'control': control_raw, 'hidden': hidden_terms,
-            'n_groups': [int(clean[g].nunique()) for g in groups],
-            'group_sizes': [clean.groupby(g).size() for g in groups],
+            # Nedre nivå er nøstet i øverste nivå (VCSpec bygges per toppgruppe),
+            # så klasse 1 i skole A og klasse 1 i skole B er ulike grupper.
+            'n_groups': [len(s) for s in sizes],
+            'group_sizes': sizes,
             'predicted': predicted, 'observed': Y,
         }
 
@@ -6283,6 +6284,10 @@ class RegressionHandler:
         return model, dep_var, indep_vars, df_clean
 
     def execute(self, cmd, df, args, options):
+        if self._control_vars(options) and cmd not in self._CONTROL_COMMANDS:
+            raise ValueError(
+                _t("control() støttes ikke for {cmd} — skriv variablene i "
+                   "variabellista i stedet.", cmd=cmd))
         # IV-regresjon har dict-args med dep/exog/endog/instruments
         if cmd in ('ivregress', 'ivregress-predict'):
             return self._execute_iv(cmd, df, args, options)
@@ -6307,10 +6312,6 @@ class RegressionHandler:
         control_raw = self._control_vars(options)
         hidden_terms = set()
         if control_raw:
-            if cmd not in self._CONTROL_COMMANDS:
-                raise ValueError(
-                    _t("control() støttes ikke for {cmd} — skriv variablene i "
-                       "variabellista i stedet.", cmd=cmd))
             _c_vars, _c_computed, _c_bases = self._expand_factor_design(control_raw, df)
             hidden_terms = set(_c_vars) - set(indep_vars)
             for _v in _c_vars:

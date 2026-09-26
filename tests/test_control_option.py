@@ -86,6 +86,15 @@ class TestControlSkjulerMenBeholderIModellen:
         med = _coef(_run("regress y x1 x", df), "x1")
         assert _coef(out, "x1") == pytest.approx(med)
 
+    def test_kategoriverdi_med_mellomrom_skjules_ogsaa(self):
+        """i.kat med verdien "c d" gir dummyen `kat_c d`. Radfilteret tok
+        tidligere første ord som navn, så denne raden slapp gjennom."""
+        df = _df()
+        df["kat"] = np.array(["a", "b", "c d"])[np.arange(len(df)) % 3]
+        out = _run("regress y x, control(i.kat)", df)
+        assert "kat_c d" not in out and "kat_b" not in out
+        assert _coef(out, "x") is not None
+
     def test_ukjent_kontrollvariabel_feiler_hoeyt(self):
         out = _run("regress y x, control(finnesikke)")
         assert "FEIL" in out and "finnesikke" in out
@@ -108,10 +117,27 @@ class TestControlIFlernivaamodell:
         assert "p" in it.datasets["d"].columns
 
 
+class TestFlernivaaGruppestoerrelser:
+    def test_nedre_nivaa_telles_noestet_i_oevre(self):
+        """Klasse-ID-er gjenbrukes på tvers av skoler (klasse 1-5 i hver
+        skole). Modellen behandler dem som ulike grupper, og headeren må gjøre
+        det samme: 4 skoler x 5 klasser = 20 grupper, ikke 5."""
+        df = _df()
+        df["skole"] = np.arange(len(df)) % 4 + 1
+        df["klasse"] = (np.arange(len(df)) // 4) % 5 + 1
+        out = _run("regress-mml y x by skole klasse", df)
+        assert re.search(r"klasse — 20 grupper \(min 20, maks 20", out), out
+        assert re.search(r"skole — 4 grupper \(min 100, maks 100", out), out
+
+
 class TestControlAvvisesDerDenIkkeStoettes:
     @pytest.mark.parametrize("line", [
         "logit yb x, control(x1)",
         "poisson cnt x, control(x1)",
+        "ivregress y (x = x1), control(bosted)",
+        "ivregress-predict y (x = x1), control(bosted)",
+        "rdd y x, cutoff(0) control(x1)",
+        "oaxaca y x by naering, control(x1)",
     ])
     def test_stille_ignorering_er_erstattet_av_klar_feil(self, line):
         df = _df()
