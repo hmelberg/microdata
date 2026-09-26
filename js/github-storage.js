@@ -405,13 +405,13 @@
         const pat = getPatForRepo(e.repo);
         if (!pat) { openSettings(T('Sett opp GitHub-tilgang for {repo} først.', { repo: e.repo })); return; }
         try {
-          const resp = await fetch(ghContentsUrlFor(e.repo, e.path) + '?ref=' + encodeURIComponent(e.branch), { headers: ghHeaders(pat) });
+          const resp = await fetch(ghContentsUrlFor(e.repo, e.path) + '?ref=' + encodeURIComponent(e.branch), { headers: ghHeaders(pat), cache: 'no-store' });
           if (!resp.ok) throw new Error('HTTP ' + resp.status);
           const data = await resp.json();
           setEditor(b64ToUtf8(data.content), langFromPath(e.path));
           const nameEl = $('scriptName');
           if (nameEl) nameEl.value = (e.path.split('/').pop() || '').replace(/\.(txt|py|r)$/i, '');
-          setCurrent({ repo: e.repo, branch: e.branch, path: e.path });
+          setCurrent({ repo: e.repo, branch: e.branch, path: e.path, sha: data.sha });
           markSaved();
           toast(T('Hentet fra GitHub: {path}', { path: e.path }));
         } catch (err) { alert(T('Kunne ikke åpne: {msg}', { msg: err.message || err })); }
@@ -600,7 +600,7 @@
       // Filvelger
       async function fetchTree(s) {
         const url = 'https://api.github.com/repos/' + s.repo + '/git/trees/' + encodeURIComponent(s.branch) + '?recursive=1';
-        const resp = await fetch(url, { headers: ghHeaders(s.pat) });
+        const resp = await fetch(url, { headers: ghHeaders(s.pat), cache: 'no-store' });
         if (!resp.ok) throw new Error('HTTP ' + resp.status + (resp.status === 404 ? T(' (repo/branch ikke funnet)') : ''));
         const data = await resp.json();
         lastTree = (data.tree || []).filter((n) => n.type === 'blob').map((n) => n.path);
@@ -648,13 +648,13 @@
         const s = ghSettings();
         const err = $('ghPickerError'); if (err) err.textContent = '';
         try {
-          const resp = await fetch(ghContentsUrlFor(s.repo, path) + '?ref=' + encodeURIComponent(s.branch), { headers: ghHeaders(s.pat) });
+          const resp = await fetch(ghContentsUrlFor(s.repo, path) + '?ref=' + encodeURIComponent(s.branch), { headers: ghHeaders(s.pat), cache: 'no-store' });
           if (!resp.ok) throw new Error('HTTP ' + resp.status);
           const data = await resp.json();
           setEditor(b64ToUtf8(data.content), langFromPath(path));
           const nameEl = $('scriptName');
           if (nameEl) nameEl.value = (path.split('/').pop() || '').replace(/\.(txt|py|r)$/i, '');
-          setCurrent({ repo: s.repo, branch: s.branch, path: path });
+          setCurrent({ repo: s.repo, branch: s.branch, path: path, sha: data.sha });
           markSaved();
           pushRecentFile({ kind: 'github', repo: s.repo, branch: s.branch, path: path });
           $('ghPickerBackdrop').style.display = 'none';
@@ -668,13 +668,24 @@
       // Skrubber alltid key(<literal>)-hemmeligheter av editorteksten før den
       // forlater nettleseren (samme regel som shareLink) og returnerer om noe
       // ble fjernet, slik at kallerne kan varsle brukeren om det.
-      async function putFile(s, path, content) {
+      // opts.expectSha: sha-en filen hadde da den ble åpnet/sist lagret. Sendes
+      // som den er, så GitHub svarer 409 hvis filen er endret siden — ellers
+      // ville «siste lagring vinner» stille overskrevet andres endringer.
+      // Uten expectSha (ny sti / Lagre som) slås filen opp, og en eksisterende
+      // fil overskrives bare etter bekreftelse. Returnerer { changed, sha } —
+      // null hvis brukeren avbrøt.
+      async function putFile(s, path, content, opts) {
+        opts = opts || {};
         const scrub = scrubSecrets(content);
         content = scrub.text;
-        // Hent eksisterende sha (kreves for å overskrive en fil som finnes)
-        let sha = null;
-        const head = await fetch(ghContentsUrlFor(s.repo, path) + '?ref=' + encodeURIComponent(s.branch), { headers: ghHeaders(s.pat) });
-        if (head.ok) sha = (await head.json()).sha;
+        let sha = opts.expectSha || null;
+        if (!sha) {
+          const head = await fetch(ghContentsUrlFor(s.repo, path) + '?ref=' + encodeURIComponent(s.branch), { headers: ghHeaders(s.pat), cache: 'no-store' });
+          if (head.ok) {
+            sha = (await head.json()).sha;
+            if (!confirm(T('«{path}» finnes allerede på GitHub. Overskrive den?', { path: path }))) return null;
+          }
+        }
         const body = { message: 'Update ' + path + ' via Microdata Script Runner', content: utf8ToB64(content), branch: s.branch };
         if (sha) body.sha = sha;
         const resp = await fetch(ghContentsUrlFor(s.repo, path), { method: 'PUT', headers: ghHeaders(s.pat), body: JSON.stringify(body) });
@@ -684,7 +695,9 @@
           if (resp.status === 409) msg += T(' (filen er endret på GitHub — bruk «Oppdater» og prøv igjen)');
           throw new Error(msg);
         }
-        return scrub.changed;
+        let newSha = null;
+        try { newSha = ((await resp.json()).content || {}).sha || null; } catch (_) {}
+        return { changed: scrub.changed, sha: newSha };
       }
       async function doSave() {
         closeMenu();
@@ -700,8 +713,10 @@
         if (langFromPath(cur.path) !== currentLang()) { openSaveAs(); return; }
         const si = $('scriptInput');
         try {
-          const changed = await putFile(s, cur.path, si ? si.value : '');
-          setCurrent({ repo: s.repo, branch: s.branch, path: cur.path });
+          const res = await putFile(s, cur.path, si ? si.value : '', { expectSha: cur.sha });
+          if (!res) return;
+          const changed = res.changed;
+          setCurrent({ repo: s.repo, branch: s.branch, path: cur.path, sha: res.sha });
           markSaved();
           toast(changed
             ? T('Lagret til GitHub: {path} — nøkler fjernet fra delt script (bruk key(ask))', { path: cur.path })
@@ -746,8 +761,14 @@
         const s = ghSettings();
         const si = $('scriptInput');
         try {
-          const changed = await putFile(s, path, si ? si.value : '');
-          setCurrent({ repo: s.repo, branch: s.branch, path: path });
+          // Samme fil som er åpen → vanlig konfliktsjekk mot åpnet sha; en
+          // annen sti → bekreft før en eksisterende fil overskrives.
+          const cur = getCurrent();
+          const same = cur && cur.sha && cur.repo === s.repo && cur.branch === s.branch && cur.path === path;
+          const res = await putFile(s, path, si ? si.value : '', { expectSha: same ? cur.sha : null });
+          if (!res) return;
+          const changed = res.changed;
+          setCurrent({ repo: s.repo, branch: s.branch, path: path, sha: res.sha });
           markSaved();
           pushRecentFile({ kind: 'github', repo: s.repo, branch: s.branch, path: path });
           const nameEl = $('scriptName');
@@ -765,10 +786,11 @@
         if (!confirm(T('Hente «{path}» på nytt fra GitHub? Ulagrede lokale endringer går tapt.', { path: cur.path }))) return;
         const s = ghSettings();
         try {
-          const resp = await fetch(ghContentsUrlFor(cur.repo, cur.path) + '?ref=' + encodeURIComponent(cur.branch), { headers: ghHeaders(s.pat) });
+          const resp = await fetch(ghContentsUrlFor(cur.repo, cur.path) + '?ref=' + encodeURIComponent(cur.branch), { headers: ghHeaders(s.pat), cache: 'no-store' });
           if (!resp.ok) throw new Error('HTTP ' + resp.status);
           const data = await resp.json();
           setEditor(b64ToUtf8(data.content), langFromPath(cur.path));
+          setCurrent(Object.assign({}, cur, { sha: data.sha }));
           markSaved();
           toast(T('Hentet på nytt fra GitHub: {path}', { path: cur.path }));
         } catch (e) { alert(T('Kunne ikke oppdatere: {msg}', { msg: e.message || e })); }

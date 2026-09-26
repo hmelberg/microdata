@@ -958,9 +958,61 @@
         }
       }
 
+      // Replace the editor content with the generated script (mirrors the
+      // existing "Sett inn" response-action button in attachResponseInsertBar).
+      // Brukerens eget script tas vare på før AI-en erstatter det (første
+      // innsetting per løp — påfølgende reparasjonsrunder erstatter bare
+      // AI-ens egne script). Backupen ligger også i localStorage, siden
+      // draft-autosaven overskriver utkastet ~800 ms etter innsettingen.
+      var AI_BACKUP_KEY = 'md_ai_script_backup';
+      var _aiLastInserted = null;
+      function backupUserScript(mode) {
+        var cur = dom.scriptInput.value;
+        if (!cur.trim() || cur === _aiLastInserted) return;
+        try { localStorage.setItem(AI_BACKUP_KEY, JSON.stringify({ mode: mode, text: cur, at: Date.now() })); } catch (_) {}
+        showRestoreBar(mode, cur);
+      }
+      function showRestoreBar(mode, text) {
+        var old = document.getElementById('aiRestoreBar');
+        if (old) old.remove();
+        var bar = document.createElement('div');
+        bar.id = 'aiRestoreBar';
+        bar.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent,#2563eb);color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.2);display:flex;gap:10px;align-items:center;';
+        var msg = document.createElement('span');
+        msg.textContent = T('AI-scriptet erstattet scriptet ditt.');
+        var undo = document.createElement('button');
+        undo.type = 'button';
+        undo.textContent = T('Gjenopprett mitt script');
+        undo.style.cssText = 'background:#fff;color:#111;border:0;border-radius:4px;padding:3px 8px;cursor:pointer;';
+        undo.addEventListener('click', function () {
+          if (typeof activeEditorMode !== 'undefined' && activeEditorMode !== mode && typeof switchEditorMode === 'function') {
+            switchEditorMode(mode);
+          }
+          dom.scriptInput.value = text;
+          _aiLastInserted = null;
+          dom.scriptInput.dispatchEvent(new Event('input', { bubbles: true }));
+          if (window.updateLineNumbers) window.updateLineNumbers();
+          bar.remove();
+        });
+        var close = document.createElement('button');
+        close.type = 'button';
+        close.textContent = '×';
+        close.setAttribute('aria-label', T('Lukk'));
+        close.style.cssText = 'background:transparent;color:#fff;border:0;font-size:16px;cursor:pointer;';
+        close.addEventListener('click', function () { bar.remove(); });
+        bar.appendChild(msg); bar.appendChild(undo); bar.appendChild(close);
+        document.body.appendChild(bar);
+      }
+
       function insertScriptIntoEditor(script) {
         if (!dom.scriptInput) return;
+        const mode = (typeof activeEditorMode !== 'undefined' && activeEditorMode) ? activeEditorMode : 'python';
+        backupUserScript(mode);
+        // Editoren holder ikke lenger GitHub-fila — ellers ville Lagre skrevet
+        // AI-scriptet over brukerens fil.
+        if (window.mdGithubClearCurrent) window.mdGithubClearCurrent();
         dom.scriptInput.value = script;
+        _aiLastInserted = dom.scriptInput.value;
         dom.scriptInput.dispatchEvent(new Event('input', { bubbles: true }));
       }
 
