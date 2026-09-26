@@ -12,10 +12,13 @@ _START = "__micro_transform_start_markdown__"
 _END = "__micro_transform_end__"
 
 
-def _emit_line(text):
+def _emit_line(text, newlines=0):
     safe = str(text).replace(_END, "")           # neutralize an injected end marker
     payload = "\n" + _START + "\n" + safe + "\n" + _END + "\n"
-    return "print(%r)" % (payload,)               # repr escapes everything, reproduces exactly
+    # The original literal may span several lines; pad inside the parens with
+    # the same number of newlines so every later line keeps its line number
+    # (tracebacks stay correct) and a trailing `; sibling` stays on its line.
+    return "print(%s%r)" % ("\n" * newlines, payload)  # repr escapes everything, reproduces exactly
 
 
 def _line_start_byte_offsets(data):
@@ -56,5 +59,6 @@ def prep_python_prose(src):
 
     out = data
     for start, end, text in sorted(spans, key=lambda s: s[0], reverse=True):
-        out = out[:start] + _emit_line(text).encode("utf-8") + out[end:]
+        newlines = out[start:end].count(b"\n")
+        out = out[:start] + _emit_line(text, newlines).encode("utf-8") + out[end:]
     return out.decode("utf-8")

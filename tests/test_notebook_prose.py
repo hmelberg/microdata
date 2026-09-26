@@ -99,3 +99,29 @@ def test_crlf_multiline_prose_roundtrips():
     out = _run(src)   # exec the transformed source, capture stdout
     assert "# Head" in out and "body line" in out and "after" in out
     assert out.index("body line") < out.index("after")
+
+def test_multiline_prose_preserves_line_numbers():
+    # a multi-line prose string must not shift later lines: the error below
+    # has to be reported on source line 5, not line 2
+    import traceback
+    src = '"""\na\nb\n"""\nx = 1/0\n'
+    prepped = NP.prep_python_prose(src)
+    assert START in prepped
+    assert prepped.count("\n") == src.count("\n")
+    try:
+        exec(compile(prepped, "<t>", "exec"), {})
+    except ZeroDivisionError as e:
+        tb = traceback.extract_tb(e.__traceback__)
+        assert tb[-1].filename == "<t>" and tb[-1].lineno == 5
+    else:
+        raise AssertionError("expected ZeroDivisionError")
+
+def test_multiline_prose_trailing_sibling_keeps_line():
+    import traceback
+    src = '"""p1\np2"""; y = 1/0\n'
+    try:
+        exec(compile(NP.prep_python_prose(src), "<t>", "exec"), {})
+    except ZeroDivisionError as e:
+        assert traceback.extract_tb(e.__traceback__)[-1].lineno == 2
+    else:
+        raise AssertionError("expected ZeroDivisionError")

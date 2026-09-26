@@ -296,7 +296,11 @@
       });
     }
 
-    // Ensure active dataset is loaded into webR as `data`
+    // Ensure active dataset is loaded into webR as `.jmv_data`. webR-økten deles med
+    // R-modus (M.getWebR/ensureWebRShelter), så et globalt `data` ville stille
+    // overskrive brukerens egen R-variabel med samme navn. runJmvAnalysis binder
+    // `data <- .jmv_data` lokalt i sin local({...}), så de genererte kallene
+    // (`data = data`) virker uendret.
     async function ensureJamoviDataInWebR() {
       var shelter = await M.ensureWebRShelter();
       var py = await M.loadPyodideAndM2py();
@@ -332,7 +336,7 @@
         '_b.b64encode(_df.to_csv(index=False).encode("utf-8")).decode("ascii")'
       ));
       await M.getWebR().evalRVoid(
-        'data <- read.csv(textConnection(rawToChar(base64enc::base64decode("' + b64 + '"))), stringsAsFactors=FALSE, check.names=FALSE)'
+        '.jmv_data <- read.csv(textConnection(rawToChar(base64enc::base64decode("' + b64 + '"))), stringsAsFactors=FALSE, check.names=FALSE)'
       );
     }
 
@@ -406,14 +410,19 @@
     }
 
     // A result card with only a title (for plot-only analyses); plots append into it.
-    function jamoviTitleCard(title) {
+    // dialogGen = jmvDialogGen-verdien (myGen) til dialogen som live-oppdaterer kortet.
+    function jamoviTitleCard(title, dialogGen) {
       var card = document.createElement('div'); card.className = 'jmv-result-card';
       var rm = document.createElement('button'); rm.className = 'jmv-card-remove'; rm.title = T('Fjern'); rm.textContent = '✕';
       rm.addEventListener('click', function() {
         card.remove();
         // Fix 3: this card's analysis dialog (if still open) must stop live-updating a
-        // now-detached card. All jamovi-mode cards are analysis cards, so always invalidate
-        // here (jamoviSingletonCard — Data/Variabler — must NOT get this behavior).
+        // now-detached card. Only invalidate when the removed card is the one the CURRENT
+        // dialog is bound to — removing an older card must not kill live updates (and hide
+        // the options panel) for an unrelated dialog that is open. A newer dialog or a
+        // dataset switch has already bumped jmvDialogGen, so a stale gen never matches.
+        // (jamoviSingletonCard — Data/Variabler — must NOT get this behavior.)
+        if (dialogGen === undefined || dialogGen !== jmvDialogGen) return;
         jmvDialogGen++;
         var _op = document.getElementById('jamoviOptions');
         if (_op) { _op.hidden = true; _op.innerHTML = ''; }
@@ -779,7 +788,9 @@
         .map(function (v) { return 'data[[' + rQuote(v.name) + ']] <- factor(data[[' + rQuote(v.name) + ']])'; })
         .join('\n');
       var call = buildJmvCall(spec, values);
-      var rCode = 'local({\n' + factorLines + '\n.r <- ' + call +
+      // `data` bindes KUN lokalt (se ensureJamoviDataInWebR) — brukerens globale
+      // R-`data` i den delte webR-økten røres ikke.
+      var rCode = 'local({\ndata <- .jmv_data\n' + factorLines + '\n.r <- ' + call +
         '\nprint(.r)\ncat("\\n##JMV##")\ncat(jsonlite::toJSON(.jmv_serialize(.r), auto_unbox = TRUE, na = "null"))\n})';
       var shelter = await M.ensureWebRShelter();
       var cap = await shelter.captureR(rCode, { captureGraphics: { width: 560, height: 400 } });
@@ -1454,7 +1465,7 @@
       Object.assign(values, presets || {});
 
       // Resultatkort som live-oppdateres
-      var card = jamoviTitleCard(spec.title);
+      var card = jamoviTitleCard(spec.title, myGen);
       var cardWrap = card.querySelector('div');
 
       var runTimer = null, running = false, rerunWanted = false;

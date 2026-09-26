@@ -2,6 +2,7 @@
 // Adapters exist for pxweb (SSB & friends) and ckan (Felles datakatalog).
 // Other tilgang values are reached via web_search + probe (prompt rule).
 import { findSource, type DataSource } from "../registry.ts";
+import { guardedFetchImpl } from "../ssrf.ts";
 
 export interface CatalogHit {
   source: string;
@@ -26,7 +27,8 @@ export async function searchCatalog(
   const src = findSource(deps.registry, sourceId);
   if (!src) throw new Error(`ukjent kilde '${sourceId}' — bruk en id fra kilderegisteret`);
   if (!src.sok_endepunkt) throw new Error(`kilden '${sourceId}' er ikke søkbar — bruk web_search + probe i stedet`);
-  const f = deps.fetchImpl ?? fetch;
+  // Timeout + byte-tak + SSRF-sjekk per hop (se guardedFetchImpl i ssrf.ts).
+  const f = guardedFetchImpl(deps.fetchImpl ?? fetch);
   switch (src.tilgang) {
     case "pxweb": return pxwebSearch(src, query, f);
     case "ckan": return fdkSearch(src, query, f);

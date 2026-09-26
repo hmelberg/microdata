@@ -147,3 +147,42 @@ def test_filtrer_paa_stedet_er_selvrefererende():
     stmts = split_sql_statements("CREATE OR REPLACE TABLE df AS SELECT * FROM df WHERE x > 0")
     assert d.extract_self_referencing_created(stmts) == ["df"]
     assert d.extract_self_referencing_created(split_sql_statements("CREATE TABLE res AS SELECT * FROM df")) == []
+
+
+def test_split_ignores_semicolon_in_dollar_quoted_string():
+    assert split_sql_statements("SELECT $$a;b$$; SELECT 2") == ["SELECT $$a;b$$", "SELECT 2"]
+
+
+def test_split_ignores_semicolon_in_tagged_dollar_quote():
+    sql = "SELECT $fn$ x; $$ y $fn$ AS t; SELECT 2"
+    assert split_sql_statements(sql) == ["SELECT $fn$ x; $$ y $fn$ AS t", "SELECT 2"]
+
+
+def test_split_positional_params_are_not_dollar_quotes():
+    assert split_sql_statements("SELECT $1; SELECT a$b$c; SELECT 3") == [
+        "SELECT $1", "SELECT a$b$c", "SELECT 3"]
+
+
+def test_split_ignores_semicolon_in_estring_with_backslash_escape():
+    sql = "SELECT E'it\\'s; here' AS x; SELECT 2"
+    assert split_sql_statements(sql) == ["SELECT E'it\\'s; here' AS x", "SELECT 2"]
+
+
+def test_split_plain_string_has_no_backslash_escape():
+    # only E'…' strings treat \ as an escape; in '…' the backslash is literal
+    assert split_sql_statements("SELECT 'a\\'; SELECT 2") == ["SELECT 'a\\'", "SELECT 2"]
+
+
+def test_scrub_blanks_dollar_and_estring_contents():
+    from duckdb_bridge import _scrub
+    assert _scrub("SELECT E'x\\'y', $$ foo $$, $t$bar$t$ FROM t") == "SELECT  ,  ,   FROM t"
+
+
+def test_split_drops_dollar_quoted_only_piece_like_plain_string():
+    # contents are blanked in scrub exactly like '…' strings
+    assert split_sql_statements("SELECT 1; -- $$ ; $$") == ["SELECT 1"]
+
+
+def test_referenced_tables_ignore_dollar_quoted_text():
+    sql = "SELECT $$person$$ AS s FROM jobb"
+    assert extract_referenced_tables([sql], ["person", "jobb"]) == ["jobb"]

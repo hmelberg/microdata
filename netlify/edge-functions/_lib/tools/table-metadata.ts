@@ -1,6 +1,7 @@
 // table_metadata tool: variable-level lookup for a catalog hit, so the model
 // can build a MINIMAL query URL (spec: build datasets from variables).
 import { findSource, type DataSource } from "../registry.ts";
+import { guardedFetchImpl } from "../ssrf.ts";
 
 export interface TableVariable {
   code: string;
@@ -46,7 +47,8 @@ export async function tableMetadata(
       `table_metadata støtter bare pxweb-kilder ennå — for '${sourceId}': bruk probe på data-URL-en for å se kolonner`,
     );
   }
-  const f = deps.fetchImpl ?? fetch;
+  // Timeout + byte-tak + SSRF-sjekk per hop (se guardedFetchImpl i ssrf.ts).
+  const f = guardedFetchImpl(deps.fetchImpl ?? fetch);
   const url = new URL(`tables/${tableId}/metadata?lang=no`, src.base_url).toString();
   const res = await f(url);
   if (!res.ok) throw new Error(`metadata for ${sourceId}/${tableId} feilet: HTTP ${res.status}`);

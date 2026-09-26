@@ -21,19 +21,61 @@ __all__ = [
 ]
 
 
+_DOLLAR_TAG_RE = re.compile(r"\$(?:[^\W\d]\w*)?\$")
+
+
+def _ident_char(ch):
+    """True if ch can be part of an identifier (so a quote/tag can't start here)."""
+    return ch == "$" or ch == "_" or ch.isalnum()
+
+
+def _dollar_tag_at(sql, i):
+    """The dollar-quote tag ($$ or $tag$) opening at sql[i], else None. A tag
+    can't start mid-identifier, and $1-style positional parameters are not tags
+    (the tag identifier can't begin with a digit)."""
+    if sql[i] != "$" or (i > 0 and _ident_char(sql[i - 1])):
+        return None
+    m = _DOLLAR_TAG_RE.match(sql, i)
+    return m.group(0) if m else None
+
+
+def _estring_at(sql, i):
+    """True if an E'…' escape string (backslash escapes) opens at sql[i]."""
+    return (sql[i] in "eE" and i + 1 < len(sql) and sql[i + 1] == "'"
+            and not (i > 0 and _ident_char(sql[i - 1])))
+
+
 def split_sql_statements(sql):
     """Split a SQL script on top-level semicolons, ignoring those inside string
-    literals ('…'/"…"), -- line comments and /* … */ block comments. Returns a
+    literals ('…'/"…", E'…' with backslash escapes, $$…$$/$tag$…$tag$),
+    -- line comments and /* … */ block comments. Returns a
     list of non-empty, stripped statements (their own comments preserved).
     Pieces that are only comments (e.g. "-- done" after the last ;) are not
     statements and are dropped — otherwise they hid the preview."""
     stmts, buf = [], []
     i, n = 0, len(sql)
-    in_single = in_double = in_line = in_block = False
+    in_single = in_double = in_line = in_block = in_estr = False
+    dollar_tag = None
     while i < n:
         c = sql[i]
         nxt = sql[i + 1] if i + 1 < n else ""
-        if in_line:
+        if dollar_tag:
+            j = sql.find(dollar_tag, i)
+            end = n if j == -1 else j + len(dollar_tag)
+            buf.append(sql[i:end])
+            i = end
+            dollar_tag = None
+        elif in_estr:
+            if c == "\\" or (c == "'" and nxt == "'"):
+                buf.append(c)
+                buf.append(nxt)
+                i += 2
+            else:
+                buf.append(c)
+                if c == "'":
+                    in_estr = False
+                i += 1
+        elif in_line:
             buf.append(c)
             if c == "\n":
                 in_line = False
@@ -69,6 +111,15 @@ def split_sql_statements(sql):
             in_block = True
             buf.append(c)
             i += 1
+        elif _estring_at(sql, i):
+            in_estr = True
+            buf.append(c)
+            buf.append(nxt)
+            i += 2
+        elif c == "$" and _dollar_tag_at(sql, i):
+            dollar_tag = _dollar_tag_at(sql, i)
+            buf.append(dollar_tag)
+            i += len(dollar_tag)
         elif c == "'":
             in_single = True
             buf.append(c)
@@ -93,17 +144,36 @@ def split_sql_statements(sql):
 
 
 def _scrub(sql, keep_dquotes=False):
-    """Return sql with -- and /* */ comments removed, single-quoted string
-    contents replaced by a space, and double-quote characters dropped (so quoted
+    """Return sql with -- and /* */ comments removed, single-quoted, E'…' and
+    $$…$$/$tag$…$tag$ string contents replaced by a space, and double-quote
+    characters dropped (so quoted
     identifiers survive as bare tokens). Used for identifier scanning.
     keep_dquotes=True keeps the quotes, so a quoted identifier stays one token."""
     out = []
     i, n = 0, len(sql)
-    in_single = in_line = in_block = False
+    in_single = in_line = in_block = in_estr = False
+    dollar_tag = None
     while i < n:
         c = sql[i]
         nxt = sql[i + 1] if i + 1 < n else ""
-        if in_line:
+        if dollar_tag:
+            j = sql.find(dollar_tag, i)
+            if j == -1:
+                i = n
+            else:
+                i = j + len(dollar_tag)
+                out.append(" ")
+            dollar_tag = None
+        elif in_estr:
+            if c == "\\" or (c == "'" and nxt == "'"):
+                i += 2
+            elif c == "'":
+                in_estr = False
+                out.append(" ")
+                i += 1
+            else:
+                i += 1
+        elif in_line:
             if c == "\n":
                 in_line = False
                 out.append(c)
@@ -130,6 +200,12 @@ def _scrub(sql, keep_dquotes=False):
         elif c == "/" and nxt == "*":
             in_block = True
             i += 2
+        elif _estring_at(sql, i):
+            in_estr = True
+            i += 2  # drop the E prefix too, so it doesn't survive as a token
+        elif c == "$" and _dollar_tag_at(sql, i):
+            dollar_tag = _dollar_tag_at(sql, i)
+            i += len(dollar_tag)
         elif c == "'":
             in_single = True
             i += 1

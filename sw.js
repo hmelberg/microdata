@@ -4,7 +4,7 @@
 // py2m/py2m_runner.html and export_data*.html — update all together when
 // upgrading Pyodide.
 const PYODIDE_VERSION = 'v314.0.2';
-const CACHE = 'm2py-v16';
+const CACHE = 'm2py-v17';
 const CDN_HOSTS = new Set([
   'cdn.jsdelivr.net',
   'cdn.plot.ly',
@@ -13,6 +13,34 @@ const CDN_HOSTS = new Set([
   'webr.r-wasm.org',    // webR-runtime (jamovi-modus)
   'repo.r-wasm.org'     // wasm-R-pakker: jmv, scatr m.fl. (~170 MB, cache-first)
 ]);
+
+// Cache-first KUN for uforanderlige (versjonspinnede) URL-er. Alt annet på
+// CDN_HOSTS er muterbart — f.eks. brukerdata fra en gren
+// (cdn.jsdelivr.net/gh/eier/repo@main/data.csv), micropips
+// pypi.org/pypi/<pkg>/json-oppslag og webR-repoets PACKAGES-indeks — og går
+// network-first (cachet kopi kun som fallback ved nettverksfeil/!ok).
+// (Portet fra openstat, review 2026-09-26.)
+const EXACT_SEMVER = String.raw`v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?`;
+const JSDELIVR_IMMUTABLE = [
+  /^\/pyodide\/v\d+(?:\.\d+)+\//,
+  // /npm/pkg@1.2.3/… og /npm/@scope/pkg@1.2.3/… (ikke @1, @^1, @latest)
+  new RegExp('^/npm/(?:@[^/@]+/)?[^/@]+@' + EXACT_SEMVER + '(?:/|$)'),
+  // /gh/eier/repo@<commit-sha|semver-tag>/… (ikke @main, @master, …)
+  new RegExp('^/gh/[^/@]+/[^/@]+@(?:[0-9a-f]{7,40}|' + EXACT_SEMVER + ')(?:/|$)', 'i')
+];
+function isImmutableUrl(url) {
+  const p = url.pathname;
+  switch (url.hostname) {
+    case 'files.pythonhosted.org': return true;  // filnavn inneholder versjon + hash-sti
+    case 'cdn.plot.ly':            return /^\/plotly-(?:[a-z]+-)?\d+\.\d+\.\d+/.test(p);
+    case 'webr.r-wasm.org':        return /^\/v\d+\.\d+\.\d+\//.test(p);
+    // Pakkefiler bærer versjon i navnet (jmv_2.5.6.tgz/.data/.js.metadata);
+    // PACKAGES/PACKAGES.rds-indeksen er muterbar.
+    case 'repo.r-wasm.org':        return /\/[A-Za-z0-9.]+_\d[^/]*$/.test(p);
+    case 'cdn.jsdelivr.net':       return JSDELIVR_IMMUTABLE.some(re => re.test(p));
+    default:                       return false;  // bl.a. pypi.org (JSON-API-et er muterbart)
+  }
+}
 // Cache-skew-fiksen (portet fra openstat 2026-07-23): den gamle ENUMERERTE
 // listen driftet — den manglet bl.a. m2py_runtime/*.py og m2py_translate.py,
 // som dermed falt til ren HTTP-cache med heuristisk TTL (observert
@@ -59,7 +87,7 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
   if (CDN_HOSTS.has(url.hostname)) {
-    e.respondWith(cacheFirst(e.request));
+    e.respondWith(isImmutableUrl(url) ? cacheFirst(e.request) : networkFirst(e.request));
     return;
   }
 
@@ -90,10 +118,32 @@ async function cacheFirst(req) {
     }
     // Transient 4xx/5xx (CDN-blipp): prøv cachet kopi før vi gir feilen videre —
     // en resolved !ok-respons nådde aldri catch-fallbacken under.
-    const stale = await cache.match(req, { ignoreSearch: true });
+    // Eksakt nøkkel (ikke ignoreSearch): en annen query-variant av samme sti
+    // kan være et helt annet innhold (f.eks. jsdelivr ?-parametre, API-kall).
+    const stale = await cache.match(req);
     return stale || res;
   } catch (err) {
-    const fallback = await cache.match(req, { ignoreSearch: true });
+    const fallback = await cache.match(req);
+    if (fallback) return fallback;
+    throw err;
+  }
+}
+
+// Muterbart CDN-innhold: nettverk først, cachet kopi (eksakt nøkkel) kun når
+// nettverket feiler eller svarer !ok — gir offline-støtte uten å fryse
+// f.eks. @main-data eller pypi-JSON for alltid.
+async function networkFirst(req) {
+  const cache = await caches.open(CACHE);
+  try {
+    const res = await fetch(req);
+    if (res && res.ok) {
+      cache.put(req, res.clone()).catch(() => {});
+      return res;
+    }
+    const stale = await cache.match(req);
+    return stale || res;
+  } catch (err) {
+    const fallback = await cache.match(req);
     if (fallback) return fallback;
     throw err;
   }

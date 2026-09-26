@@ -108,3 +108,34 @@ test('extractCreatedTables: kvalifisert og kvotert navn', () => {
   assert.deepEqual(DN.extractCreatedTables(['CREATE TABLE main.res AS SELECT 1']), ['res']);
   assert.deepEqual(DN.extractCreatedTables(['CREATE TABLE "my-t" AS SELECT 1']), ['my-t']);
 });
+
+test('split: ignores semicolon in dollar-quoted string', () => {
+  assert.deepEqual(DN.splitSqlStatements('SELECT $$a;b$$; SELECT 2'), ['SELECT $$a;b$$', 'SELECT 2']);
+});
+
+test('split: ignores semicolon in tagged dollar quote', () => {
+  assert.deepEqual(DN.splitSqlStatements('SELECT $fn$ x; $$ y $fn$ AS t; SELECT 2'),
+    ['SELECT $fn$ x; $$ y $fn$ AS t', 'SELECT 2']);
+});
+
+test('split: positional params are not dollar quotes', () => {
+  assert.deepEqual(DN.splitSqlStatements('SELECT $1; SELECT a$b$c; SELECT 3'),
+    ['SELECT $1', 'SELECT a$b$c', 'SELECT 3']);
+});
+
+test('split: ignores semicolon in E-string with backslash escape', () => {
+  assert.deepEqual(DN.splitSqlStatements("SELECT E'it\\'s; here' AS x; SELECT 2"),
+    ["SELECT E'it\\'s; here' AS x", 'SELECT 2']);
+});
+
+test('split: plain string is not an E-string (no backslash escaping)', () => {
+  assert.deepEqual(DN.splitSqlStatements("SELECT 'a\\'; SELECT 2"), ["SELECT 'a\\'", 'SELECT 2']);
+});
+
+test('scrub: blanks dollar-quoted and E-string contents', () => {
+  assert.strictEqual(DN.scrub("SELECT E'x\\'y', $$ foo $$, $t$bar$t$ FROM t"), 'SELECT  ,  ,   FROM t');
+});
+
+test('split: dollar-quote inside comment-only tail is dropped', () => {
+  assert.deepEqual(DN.splitSqlStatements('SELECT 1; -- $$ ; $$'), ['SELECT 1']);
+});
