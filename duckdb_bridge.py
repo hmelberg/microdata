@@ -182,7 +182,26 @@ def build_preview_select(statements):
 
 
 def df_to_parquet_bytes(df):
-    """Serialize a DataFrame to Parquet bytes (pyarrow engine)."""
+    """Serialize a DataFrame to Parquet bytes (pyarrow engine).
+
+    A *named* index (e.g. the keys of ``df.groupby('g').mean()``) is data, so
+    it becomes ordinary columns; an unnamed index (0..n or a filtered subset
+    of it) is dropped as before. Object columns that mix types (``[1, 'x']``)
+    can't be written by pyarrow — those are written as text instead of
+    failing every cell that references the dataset.
+    """
+    names = [n for n in df.index.names if n is not None]
+    if names and not any(n in df.columns for n in names):
+        df = df.reset_index()
     buf = io.BytesIO()
-    df.to_parquet(buf, engine="pyarrow", index=False)
+    try:
+        df.to_parquet(buf, engine="pyarrow", index=False)
+    except Exception:
+        import pandas as pd
+        fixed = df.copy()
+        for c in fixed.columns:
+            if fixed[c].dtype == object:
+                fixed[c] = fixed[c].map(lambda v: None if pd.isna(v) else str(v))
+        buf = io.BytesIO()
+        fixed.to_parquet(buf, engine="pyarrow", index=False)
     return buf.getvalue()

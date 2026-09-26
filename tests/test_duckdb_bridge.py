@@ -111,3 +111,22 @@ def test_split_handles_escaped_single_quote():
 def test_referenced_tables_ignores_table_name_inside_escaped_quote_string():
     sql = "SELECT 'O''Brien jobb' AS lbl FROM person"
     assert extract_referenced_tables([sql], ["person", "jobb"]) == ["person"]
+
+
+def test_df_to_parquet_beholder_navngitt_indeks_groupby():
+    import io
+    import pandas as pd
+    df = pd.DataFrame({"g": ["a", "a", "b"], "v": [1, 2, 3]})
+    back = pd.read_parquet(io.BytesIO(df_to_parquet_bytes(df.groupby("g").mean())))
+    assert back.columns.tolist() == ["g", "v"]
+    # unavngitt (filtrert) indeks droppes fortsatt
+    back2 = pd.read_parquet(io.BytesIO(df_to_parquet_bytes(df[df.v > 1])))
+    assert back2.columns.tolist() == ["g", "v"]
+
+
+def test_df_to_parquet_blandet_objektkolonne_blir_tekst():
+    import io
+    import pandas as pd
+    df = pd.DataFrame({"x": [1, "x", None]})
+    back = pd.read_parquet(io.BytesIO(df_to_parquet_bytes(df)))
+    assert back.x.tolist() == ["1", "x", None]

@@ -48,7 +48,14 @@
       if (!window.activeDatasetName) return;
       var py = await M.loadPyodideAndM2py();
       // append an all-missing row at the end with a fresh index, return its id
-      var newId = await py.runPythonAsync('import pandas as _pd\n_df = e.datasets[e.active_name]\n_ni = (int(_df.index.max())+1) if len(_df) else 0\n_df.loc[_ni] = _pd.NA\n_ni');
+      // int/bool-kolonner gjøres nullable først: en NA-rad ville ellers gjort
+      // dem om til object, og jamoviVariables() ville da vist dem som nominal.
+      var newId = await py.runPythonAsync('import pandas as _pd\n_df = e.datasets[e.active_name]\n' +
+        'for _c in _df.columns:\n' +
+        '    if not _pd.api.types.is_extension_array_dtype(_df[_c]):\n' +
+        '        if _pd.api.types.is_integer_dtype(_df[_c]): _df[_c] = _df[_c].astype("Int64")\n' +
+        '        elif _pd.api.types.is_bool_dtype(_df[_c]): _df[_c] = _df[_c].astype("boolean")\n' +
+        '_ni = (int(_df.index.max())+1) if len(_df) else 0\n_df.loc[_ni] = _pd.NA\n_ni');
       // re-render and bring the new (empty) row into view + highlight it
       renderDataView(typeof newId === 'number' ? newId : Number(newId));
     }
@@ -212,6 +219,15 @@
             : (window.activeDatasetName && d.names.indexOf(window.activeDatasetName) !== -1) ? window.activeDatasetName
             : d.names[0];
           d.names.forEach(function(n){ var op = document.createElement('option'); op.value = n; op.textContent = n; if (n === active) op.selected = true; sel.appendChild(op); });
+          if (window.activeDatasetName && active !== window.activeDatasetName) {
+            // Samme per-datasett-nullstilling som jamoviSwitchDataset: ellers
+            // ble forrige datasetts filter (og typeoverstyringer) brukt på dette.
+            jamoviTypeOverrides = {}; jamoviFilter = '';
+            jmvDialogGen++;
+            jmvLevelCache = {};
+            var _op = document.getElementById('jamoviOptions');
+            if (_op) { _op.hidden = true; _op.innerHTML = ''; }
+          }
           window.activeDatasetName = active;
           if (active !== d.active) {
             // Keep the engine's active_name in sync with the picker so python/other modes
@@ -260,6 +276,11 @@
       else if (at === 'variables') renderVariablesView();
     }
 
+    // pandas-dtypes som er tall: int64/int32/uint8/float32 og de nullable
+    // Int64/UInt8/Float64 (openstat.py lager Int64). Eksakt match — «interval»
+    // starter også med «int».
+    function isNumericDtype(d) { return /^(u?int|float)(8|16|32|64)?$/i.test(d || ''); }
+
     function jamoviVariables() {
       var name = window.activeDatasetName;
       if (!name || !window.lastDatasetInfo || !window.lastDatasetInfo[name]) return [];
@@ -270,7 +291,7 @@
         var ov = jamoviTypeOverrides[name + '::' + c];
         if (ov) return { name: c, type: ov };
         var d = dtypes[c] || '';
-        var type = (d === 'int64' || d === 'float64') ? 'numeric' : 'nominal';
+        var type = isNumericDtype(d) ? 'numeric' : 'nominal';
         return { name: c, type: type };
       });
     }
@@ -288,10 +309,13 @@
       var b64 = String(await py.runPythonAsync(
         'import base64 as _b, pandas as _pd\n' +
         '_df = e.datasets[e.active_name].copy()\n' +
-        'try:\n' +
-        '    if _jmv_filter: _df = _df.query(_jmv_filter)\n' +
-        'except Exception:\n' +
-        '    pass\n' +
+        // Et filter som ikke lar seg bruke skal feile synlig — å stille
+        // analysere alle rader mens Data-kortet sier «Filter aktivt» er verre.
+        'if _jmv_filter:\n' +
+        '    try:\n' +
+        '        _df = _df.query(_jmv_filter)\n' +
+        '    except Exception as _fe:\n' +
+        '        raise ValueError("Filteret " + repr(_jmv_filter) + " kan ikke brukes på dette datasettet: " + str(_fe))\n' +
         'def _lk(_x, _m):\n' +
         '    if _pd.isna(_x): return _x\n' +
         '    _k = str(_x).strip()\n' +
@@ -501,7 +525,7 @@
         var columns = [{ title: '#', field: '__rowid__', width: 56, headerSort: false, editor: false, cssClass: 'jmv-rowid-col' }];
         d.cols.forEach(function(c) {
           var dt = d.dtypes[c] || '';
-          var isNum = /^(int|float|uint)/i.test(dt);
+          var isNum = isNumericDtype(dt);
           var isLabeled = d.labeled.indexOf(c) !== -1;
           columns.push({
             title: c, field: c, headerSort: true, headerFilter: 'input',
