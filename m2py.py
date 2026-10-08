@@ -4985,6 +4985,77 @@ class StatsEngine:
                     limit_pct=int(_DC_TABULATE_LOW_RATIO*100))
                 )
 
+    @staticmethod
+    def _t5_suppression_mask(counts):
+        """T5 per celle: hvilke celler skal undertrykkes (vises som NaN).
+
+        counts: rå tellinger UTEN marginer — Series (1-veis) eller DataFrame
+        (2-veis). For summarize() er tellingen antall enheter med verdi.
+        Returnerer bool-maske MED 'Total'-marginer (Series: + 'Total';
+        DataFrame: + 'Total'-rad og -kolonne), eller None når DC er av.
+
+        Primær: celler med 0 < n < dc_tabulate_low_cell (0-celler vises —
+        de avslører ingen enkeltperson). Sekundær: en «linje» (rad eller
+        kolonne inkl. dens margin) med nøyaktig én undertrykt celle lar
+        cellen regnes tilbake fra Total (eller fra 100 % i pct-tabeller), så
+        da undertrykkes også linjens minste synlige celle (ikke-null først,
+        grand total sist). Gjentas til ingen linje har nøyaktig én. Dette er
+        standard «minst to per linje»-heuristikken, ikke en full LP-revisjon
+        mot kombinasjoner av flere linjer."""
+        if not _is_disclosure_control():
+            return None
+        low = _dc_threshold('dc_tabulate_low_cell')
+        if isinstance(counts, pd.Series):
+            v = counts.to_numpy(dtype=float)
+            E = np.append(v, v.sum())[None, :]
+            n_c = E.shape[1]
+            lines = [[(0, j) for j in range(n_c)]]
+            grand = (0, n_c - 1)
+        else:
+            C = counts.to_numpy(dtype=float)
+            r, c = C.shape
+            E = np.zeros((r + 1, c + 1))
+            E[:r, :c] = C
+            E[:r, c] = C.sum(axis=1)
+            E[r, :c] = C.sum(axis=0)
+            E[r, c] = C.sum()
+            lines = ([[(i, j) for j in range(c + 1)] for i in range(r + 1)]
+                     + [[(i, j) for i in range(r + 1)] for j in range(c + 1)])
+            grand = (r, c)
+        M = (E > 0) & (E < low)
+        changed = M.any()
+        while changed:
+            changed = False
+            for line in lines:
+                if sum(1 for p in line if M[p]) != 1:
+                    continue
+                cands = [p for p in line if not M[p] and p != grand] or \
+                        [p for p in line if not M[p]]
+                if not cands:
+                    continue
+                cands = [p for p in cands if E[p] > 0] or cands
+                M[min(cands, key=lambda p: E[p])] = True
+                changed = True
+        if isinstance(counts, pd.Series):
+            return pd.Series(M[0], index=list(counts.index) + ['Total'])
+        return pd.DataFrame(M, index=list(counts.index) + ['Total'],
+                            columns=list(counts.columns) + ['Total'])
+
+    @staticmethod
+    def _t5_apply_suppression(tb, mask):
+        """Sett celler der maska er True til NaN (labels matches, så
+        normaliserte tabeller og tabeller uten marginer håndteres)."""
+        if mask is None or tb is None:
+            return tb
+        if isinstance(tb, pd.Series):
+            m = mask.reindex(tb.index, fill_value=False).to_numpy(dtype=bool)
+        else:
+            m = mask.reindex(index=tb.index, columns=tb.columns,
+                             fill_value=False).to_numpy(dtype=bool)
+        if not m.any():
+            return tb
+        return tb.mask(m)
+
     def execute(self, cmd, df, args, options):
         if cmd == 'generate':
             expr = args['expression']
@@ -5504,6 +5575,22 @@ class StatsEngine:
                         else:
                             total_val = getattr(df[val_var], agg_func)()
                         tb = pd.concat([tb, pd.Series([total_val], index=['Total'])])
+                # T5 per celle: undertrykk celler med få enheter som bidrar
+                # med verdi (notna), med sekundærundertrykkelse mot Total.
+                if _dc_on:
+                    if var2:
+                        _sub = df[df[val_var].notna()]
+                        _cnt = _crosstab_na(_sub[var1], _sub[var2], dropna=dropna)
+                        tb = self._t5_apply_suppression(tb, self._t5_suppression_mask(_cnt))
+                    elif isinstance(tb, pd.DataFrame):
+                        for _v in val_vars:
+                            if _v in df.columns and _v in tb.columns:
+                                _cnt = df[_v].notna().groupby(df[var1], dropna=dropna).sum()
+                                tb[_v] = self._t5_apply_suppression(
+                                    tb[_v], self._t5_suppression_mask(_cnt))
+                    else:
+                        _cnt = df[val_var].notna().groupby(df[var1], dropna=dropna).sum()
+                        tb = self._t5_apply_suppression(tb, self._t5_suppression_mask(_cnt))
                 # rowsort() / colsort() — bevar Total
                 if isinstance(tb, pd.DataFrame):
                     tb = _sort_tab_frame(tb, options)
@@ -5563,6 +5650,10 @@ class StatsEngine:
             if var2:
                 ct = _crosstab_na(df[var1], df[var2], normalize=normalize, dropna=dropna,
                                   margins=True, margins_name='Total')
+                # T5 per celle: små celler (og sekundærceller) → NaN
+                if _is_disclosure_control():
+                    ct = self._t5_apply_suppression(ct, self._t5_suppression_mask(
+                        _crosstab_na(df[var1], df[var2], dropna=dropna)))
                 # rowsort() / colsort() — kjøres FØR chi2 (chi2 caster til string)
                 ct = _sort_tab_frame(ct, options)
                 if 'chi2' in options:
@@ -5605,6 +5696,12 @@ class StatsEngine:
             else:
                 vc = df[var1].value_counts(normalize=normalize, dropna=dropna)
                 total = vc.sum()
+                # T5 per celle: små celler (og sekundærceller) → NaN
+                if _is_disclosure_control():
+                    _mk = self._t5_suppression_mask(df[var1].value_counts(dropna=dropna))
+                    vc = self._t5_apply_suppression(vc, _mk)
+                    if bool(_mk.get('Total', False)):
+                        total = np.nan
                 # rowsort() / colsort() FØR top/bottom og før Total legges til
                 vc = _sort_tab_series(vc, options)
                 if 'top' in options:
@@ -5644,6 +5741,14 @@ class StatsEngine:
                 agg_func = agg_map.get('p50' if 'p50' in options else 'std' if 'std' in options else 'mean', 'mean')
                 ct = df.pivot_table(index=row_vals if hasattr(row_vals, 'name') else pd.Series(row_vals, index=df.index),
                                    columns='tid', values=val_var, aggfunc=agg_func)
+            # T5 per celle: som tabulate (summarize: enheter med verdi)
+            if _is_disclosure_control():
+                if 'summarize' in options and options['summarize'] in df.columns:
+                    _nn = df[options['summarize']].notna()
+                    _cnt = pd.crosstab(row_vals[_nn], df.loc[_nn, 'tid'], dropna=dropna)
+                else:
+                    _cnt = pd.crosstab(row_vals, df['tid'], dropna=dropna)
+                ct = self._t5_apply_suppression(ct, self._t5_suppression_mask(_cnt))
             lm = options.get('_label_manager')
             if lm and not vars_rest:
                 ct = lm.apply_labels_to_frame(ct, var1, None)
@@ -5671,6 +5776,9 @@ class StatsEngine:
                 # kontroller de underliggende tellingene før tabellen bygges.
                 self._t5_small_cell_check(pairs[var], pairs['_next'], dropna=True)
                 ct = pd.crosstab(pairs[var], pairs['_next'], normalize='index')
+                if _is_disclosure_control():
+                    ct = self._t5_apply_suppression(ct, self._t5_suppression_mask(
+                        pd.crosstab(pairs[var], pairs['_next'])))
                 lm = options.get('_label_manager')
                 if lm:
                     ct = lm.apply_labels_to_frame(ct, var, None)
