@@ -326,6 +326,20 @@ _M2PY_MESSAGES_EN = {
     '{colname} er en pseudonymvariabel og kan ikke brukes i {context}. Pseudonymer kan kun brukes som nøkkel i collapse(by) eller merge(on).': '{colname} is a pseudonym variable and cannot be used in {context}. Pseudonyms can only be used as a key in collapse(by) or merge(on).',
     "{colname} er en strengvariabel (alfanumerisk) i microdata.no — operasjonen '{op}' krever en numerisk variabel. Bruk frekvens/count i stedet (f.eks. tabulate).": "{colname} is a string variable (alphanumeric) in microdata.no — the operation '{op}' requires a numeric variable. Use frequency/count instead (e.g. tabulate).",
     '{ident} er en pseudonymvariabel og kan ikke brukes i {cmd}-uttrykk. Pseudonymer kan kun brukes som nøkkel i collapse(by) eller merge(on).': '{ident} is a pseudonym variable and cannot be used in {cmd} expressions. Pseudonyms can only be used as a key in collapse(by) or merge(on).',
+    # merge … into (_merge_into_frames)
+    "Variabelen {clash} finnes allerede i måldatasettet. merge overskriver "
+    "ikke eksisterende variabler — gi den nytt navn med rename (eller fjern "
+    "den med drop) før merge.":
+        "The variable {clash} already exists in the target dataset. merge does not "
+        "overwrite existing variables — rename it (or remove it with drop) before merge.",
+    "Koblingsvariabelen '{key}' er ikke unik i kildedatasettet: {n} "
+    "nøkkelverdi(er) har flere rader med ulike verdier (f.eks. {ex}). "
+    "merge … into kobler mange-til-én, så hver nøkkelverdi må forekomme én "
+    "gang i kilden. Bruk f.eks. collapse …, by({key}) først.":
+        "The key variable '{key}' is not unique in the source dataset: {n} key "
+        "value(s) have several rows with different values (e.g. {ex}). merge … into "
+        "links many-to-one, so each key value must occur once in the source. "
+        "Use e.g. collapse …, by({key}) first.",
     # --- END lines 6000-end additions ---
     # --- END engelsk meldingskatalog ---
 }
@@ -3929,6 +3943,8 @@ AGG_STAT_ALIAS = {
     'percent': lambda x: 100 * x.notna().sum() / len(x) if len(x) > 0 else np.nan,
     'iqr': calculate_iqr,
     'gini': calculate_gini,
+    'p25': lambda x: x.quantile(0.25),
+    'p75': lambda x: x.quantile(0.75),
 }
 
 # Statistikker som ikke er støttet i microdata.no — avvises i streng modus.
@@ -4217,6 +4233,79 @@ def _get_df_key_col(df):
             return c
     return None
 
+
+def _align_merge_keys(left, right):
+    """Normaliser nøkkel-dtype når den ene siden er tall og den andre streng
+    (f.eks. kommune '0301' mot 301). Er alle strengverdiene tall, kobles det
+    numerisk ('0301' == 301); ellers gjøres tallsiden om til heltallsstreng."""
+    def _is_num(s):
+        return pd.api.types.is_numeric_dtype(s) and not pd.api.types.is_bool_dtype(s)
+    l_num, r_num = _is_num(left), _is_num(right)
+    if l_num == r_num:
+        return left, right
+    num, txt = (left, right) if l_num else (right, left)
+    txt_num = pd.to_numeric(txt, errors='coerce')
+    if int(txt_num.notna().sum()) == int(txt.notna().sum()):
+        num_out, txt_out = pd.to_numeric(num, errors='coerce'), txt_num
+    else:
+        num_out = num.map(lambda v: (str(int(v)) if float(v).is_integer() else str(v))
+                          if pd.notna(v) else np.nan)
+        txt_out = txt.astype(object)
+    return (num_out, txt_out) if l_num else (txt_out, num_out)
+
+
+def _merge_into_frames(target_df, source_df, cols_from_source, left_on, right_on):
+    """Kjernen i `merge vars into MÅL on nøkkel` (venstre-kobling, mange-til-én).
+
+    Kaster ValueError (norsk melding) når
+      - en variabel som flettes inn allerede finnes i målet (ingen x_x/x_y),
+      - kildens nøkkel ikke er unik (ulike verdier for samme nøkkel).
+    Nøkler med ulik dtype (streng/tall) normaliseres; rader i kilden med
+    manglende nøkkel kobles aldri. Resultatet har målets kolonner + de nye
+    variablene (kildens nøkkelkolonne(r) tas ikke med)."""
+    lon = list(left_on) if isinstance(left_on, (list, tuple)) else [left_on]
+    ron = list(right_on) if isinstance(right_on, (list, tuple)) else [right_on]
+    cols = [c for c in dict.fromkeys(cols_from_source) if c not in ron and c not in lon]
+    clash = [c for c in cols if c in target_df.columns]
+    if clash:
+        raise ValueError(_t(
+            "Variabelen {clash} finnes allerede i måldatasettet. merge overskriver "
+            "ikke eksisterende variabler — gi den nytt navn med rename (eller fjern "
+            "den med drop) før merge.",
+            clash=', '.join(f"'{c}'" for c in clash)))
+    right = source_df[list(dict.fromkeys(ron + cols))].dropna(subset=ron).drop_duplicates()
+    dup_mask = right.duplicated(subset=ron, keep=False)
+    if dup_mask.any():
+        dup_vals = right.loc[dup_mask, ron[0]].drop_duplicates()
+        raise ValueError(_t(
+            "Koblingsvariabelen '{key}' er ikke unik i kildedatasettet: {n} "
+            "nøkkelverdi(er) har flere rader med ulike verdier (f.eks. {ex}). "
+            "merge … into kobler mange-til-én, så hver nøkkelverdi må forekomme én "
+            "gang i kilden. Bruk f.eks. collapse …, by({key}) først.",
+            key=ron[0], n=len(dup_vals), ex=', '.join(map(str, dup_vals.head(3).tolist()))))
+    tmp = {}
+    right = right.copy()
+    for i, (lk, rk) in enumerate(zip(lon, ron)):
+        name = f'__m2py_mkey{i}__'
+        tmp[name], right[name] = _align_merge_keys(target_df[lk], right[rk])
+    right = right.drop(columns=ron)
+    left = target_df.assign(**tmp)
+    merged = pd.merge(left, right, on=list(tmp), how='left')
+    return merged.drop(columns=list(tmp))
+
+def _reshape_from_panel_df(df):
+    """Long → wide for reshape-from-panel: hver variabel (unntatt enhets-id,
+    `tid` og hjelpevariabelen `panel@date`) blir `<var><tid>`. Tidsinvariante
+    variabler får også tidssuffiks — som i microdata.no (manualens eksempel
+    2.13 gjør `drop kjonn20` / `rename kjonn19 kjonn` etterpå). Enheter og
+    tidspunkter med bare manglende verdier beholdes (pivot_table droppet dem)."""
+    id_col = _get_df_key_col(df) or df.columns[0]
+    val_cols = [c for c in df.columns if c not in (id_col, 'tid', 'panel@date')]
+    grouped = df.groupby([id_col, 'tid'], sort=True)[val_cols].first()
+    wide = grouped.unstack('tid')
+    wide.columns = [f'{a}{b}' if b != '' else str(a) for a, b in wide.columns]
+    return wide.reset_index()
+
 # ICD-10: (kode, norsk_label, min_alder, max_alder, kjønn_bias, base_vekt)
 # kjønn_bias: >0 = mer vanlig hos kvinner, <0 = mer vanlig hos menn
 _ICD10_CODES = [
@@ -4452,10 +4541,7 @@ class DataTransformHandler:
         if cmd == 'reshape-from-panel':
             if 'tid' not in df.columns:
                 return None
-            id_col = _get_df_key_col(df) or df.columns[0]
-            wide = df.pivot_table(index=id_col, columns='tid', aggfunc='first')
-            wide.columns = [f'{a}{b}' if b else str(a) for a, b in wide.columns]
-            return wide.reset_index()
+            return _reshape_from_panel_df(df)
 
         if cmd == 'recode':
             # Samle opp nye labels per variabel når regler har tekstetiketter
@@ -9594,27 +9680,12 @@ class MicroInterpreter:
                         self._log(_t("FEIL: {missing} finnes ikke i {active_name}.", missing=missing, active_name=self.active_name))
                         return
 
-                    right_cols = list(dict.fromkeys([right_on] + cols_from_source))
-                    right_df   = source_df[right_cols].drop_duplicates(subset=[right_on])
-
-                    if left_on == right_on:
-                        merged = pd.merge(target_df, right_df, on=left_on, how='left')
-                    else:
-                        # Sjekk om target allerede har right_on som egen kolonne
-                        # (da får vi name-kollisjon og pandas auto-suffikser)
-                        target_has_right_on = right_on in target_df.columns
-                        merged = pd.merge(
-                            target_df, right_df,
-                            left_on=left_on, right_on=right_on,
-                            how='left', suffixes=('', '_src_dup'),
-                        )
-                        # Drop duplikat-kolonner som ble suffikset fra kilde-siden
-                        merged = merged.drop(columns=[c for c in merged.columns if c.endswith('_src_dup')])
-                        # Drop right_on-kolonnen fra kilden KUN hvis target ikke hadde right_on.
-                        # Hvis target hadde right_on, er den nåværende kolonnen target sin (ønsket)
-                        # og source sin ble allerede droppet via _src_dup suffikset.
-                        if not target_has_right_on and right_on != left_on and right_on in merged.columns:
-                            merged = merged.drop(columns=[right_on])
+                    try:
+                        merged = _merge_into_frames(target_df, source_df, cols_from_source,
+                                                    left_on, right_on)
+                    except ValueError as e:
+                        self._log(_t("FEIL: {err}", err=str(e)))
+                        return
 
                     self.datasets[into_name] = merged
                     n_str = f"{len(merged):,}".replace(",", " ")

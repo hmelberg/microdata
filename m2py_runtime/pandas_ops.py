@@ -266,22 +266,14 @@ def merge(df, other, on, how="left"):
 
 def merge_into(target, source, vars, left_on, right_on):
     """Into-form merge ``merge vars into TARGET``: bring ``vars`` from ``source``
-    onto ``target`` (left=target, right=source deduped on its key), always a
-    left-join. Mirrors the emulator's column handling exactly, including the
-    asymmetric-key suffix/drop behaviour. Accepts scalar or list keys.
+    onto ``target`` (left-join, many-to-one). Shares the emulator's core
+    (``m2py._merge_into_frames``): raises ValueError if a var already exists in
+    the target or the source key is not unique; string/int keys are aligned.
+    Accepts scalar or list keys.
     """
-    lon = left_on if isinstance(left_on, list) else [left_on]
-    ron = right_on if isinstance(right_on, list) else [right_on]
+    from m2py import _merge_into_frames
     cols_from_source = [c for c in (vars or []) if c in source.columns]
-    right_cols = list(dict.fromkeys(list(ron) + cols_from_source))
-    right = source[right_cols].drop_duplicates(subset=ron)
-    if lon == ron:
-        return pd.merge(target, right, on=lon, how="left")
-    merged = pd.merge(target, right, left_on=lon, right_on=ron,
-                      how="left", suffixes=("", "_src_dup"))
-    merged = merged.drop(columns=[c for c in merged.columns if c.endswith("_src_dup")])
-    drop = [c for c in ron if c not in lon and c not in target.columns and c in merged.columns]
-    return merged.drop(columns=drop) if drop else merged
+    return _merge_into_frames(target, source, cols_from_source, left_on, right_on)
 
 
 def reshape_to_panel(df, prefixes):
@@ -329,14 +321,11 @@ def reshape_to_panel(df, prefixes):
 
 def reshape_from_panel(df):
     """Long -> wide. Pivot each non-id column over ``tid`` into ``<var><tid>``
-    columns (one row per entity). Mirrors the emulator."""
-    from m2py import _get_df_key_col
+    columns (one row per entity). Shares the emulator's implementation."""
+    from m2py import _reshape_from_panel_df
     if "tid" not in df.columns:
         raise ValueError("reshape-from-panel requires a 'tid' column")
-    id_col = _get_df_key_col(df) or df.columns[0]
-    wide = df.pivot_table(index=id_col, columns="tid", aggfunc="first")
-    wide.columns = [f"{a}{b}" if b != "" else str(a) for a, b in wide.columns]
-    return wide.reset_index()
+    return _reshape_from_panel_df(df)
 
 
 def rename(df, old, new):
