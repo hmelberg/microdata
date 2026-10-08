@@ -27,8 +27,18 @@ def _pl():
     return pl
 
 
+# microdata (p25)/(p75) -> polars quantile (lineær interpolasjon = pandas)
+_AGG_QUANTILE = {"p25": 0.25, "p75": 0.75}
+
+
+def _agg_supported(stat):
+    return stat in _AGG_METHOD or stat in _AGG_QUANTILE
+
+
 def _agg_expr(stat, src, alias):
     pl = _pl()
+    if stat in _AGG_QUANTILE:
+        return pl.col(src).quantile(_AGG_QUANTILE[stat], interpolation="linear").alias(alias)
     method = _AGG_METHOD.get(stat)
     if method is None:
         raise UnsupportedExpr(f"collapse/summarize stat ({stat}) unsupported in polars")
@@ -76,21 +86,25 @@ def recode(lf, vars, rules, prefix=None):
 # ── row/column shaping ───────────────────────────────────────────────────────
 
 def keep(lf, vars=None, cond=None):
+    # Betingelsen FØR kolonnefilteret (som pandas_ops/emulatoren): `keep x if
+    # y == 1` skal virke selv om y ikke er blant beholdte kolonner.
     try:
-        out = lf.select(vars) if vars else lf
+        out = lf
         if cond:
-            out = out.filter(compile_expr(cond, condition=True))
-        return out
+            out = out.filter(compile_expr(cond, condition=True).fill_null(False))
+        return out.select(vars) if vars else out
     except UnsupportedExpr:
         return _eval_fallback(lf, "keep", vars, cond)
 
 
 def drop(lf, vars=None, cond=None):
+    # Samme rekkefølge som keep. fill_null(False): rader der betingelsen er
+    # null (f.eks. `drop if y > 0` med manglende y) beholdes, som i pandas.
     try:
-        out = lf.drop(vars) if vars else lf
+        out = lf
         if cond:
-            out = out.filter(~compile_expr(cond, condition=True))
-        return out
+            out = out.filter(~compile_expr(cond, condition=True).fill_null(False))
+        return out.drop(vars) if vars else out
     except UnsupportedExpr:
         return _eval_fallback(lf, "drop", vars, cond)
 
@@ -100,6 +114,10 @@ def drop(lf, vars=None, cond=None):
 def collapse(lf, targets, by=None):
     if isinstance(by, str) and by.strip():
         by = by.strip().split()[0]
+    if not all(_agg_supported(t["stat"]) for t in targets):
+        # gini/iqr/percent/semean/sebinomial: ingen polars-ekvivalent -> den
+        # testede pandas-operasjonen (materialiser, beregn, re-lazy)
+        return _eval_fallback(lf, "collapse", targets, by)
     aggs = [_agg_expr(t["stat"], t["src"], t["target"] or t["src"]) for t in targets]
     if not by:
         return lf.select(aggs)
@@ -107,14 +125,12 @@ def collapse(lf, targets, by=None):
 
 
 def aggregate(lf, targets, by=None):
-    pl = _pl()
+    if not all(_agg_supported(t["stat"]) for t in targets):
+        return _eval_fallback(lf, "aggregate", targets, by)
     cols = []
     for t in targets:
-        method = _AGG_METHOD.get(t["stat"])
-        if method is None:
-            raise UnsupportedExpr(f"aggregate stat ({t['stat']}) unsupported in polars")
         new_var = t["target"] or t["src"]
-        cols.append(getattr(pl.col(t["src"]), method)().over(by).alias(new_var))
+        cols.append(_agg_expr(t["stat"], t["src"], new_var).over(by))
     return lf.with_columns(cols)
 
 
