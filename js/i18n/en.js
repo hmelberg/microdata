@@ -743,4 +743,6 @@ window.M2PY_I18N.en = {
   "Balansert \u2014 anbefalt": "Balanced \u2014 recommended",
   "Best \u2014 dyrest, grundigst": "Best \u2014 most expensive, most thorough",
   "Gjenopprettet ulagret utkast.": "Restored unsaved draft.",
+  "Obs: API-basen peker ikke til leverand\u00f8ren du valgte. N\u00f8kkelen sendes til adressen i feltet \u2014 sjekk at den er riktig.": "Note: the API base does not point to the provider you selected. The key is sent to the address in the field \u2014 check that it is correct.",
+  "Hva som sendes hvor, og hva som lagres midlertidig: se personvernerkl\u00e6ringen.": "What is sent where, and what is stored temporarily: see the <a href=\"personvern.en.html\" target=\"_blank\" rel=\"noopener\">privacy statement</a>.",
 };

@@ -4,13 +4,17 @@
 // by provider choice; the provider call is a runTurn callback so this module
 // knows no wire formats. State stays in Anthropic message format — adapters
 // translate at their boundary.
-import type { AgenticResumeState, RetryDeps } from "../anthropic.ts";
+import {
+  type AgenticResumeState, AVKORTET_MIDT_I_SVARET, AVKORTET_UNDER_TENKING, type RetryDeps,
+} from "../anthropic.ts";
 
 export interface ProviderTurnResult {
   text: string;
   toolUses: { id: string; name: string; input: Record<string, unknown> }[];
   searchNotes: string[];
-  stop: "tool_use" | "end";
+  /** "max_tokens": avkortet tur (finish_reason length / status incomplete,
+   *  eller uparsbare verktøyargumenter) — aldri et svar, aldri et kall. */
+  stop: "tool_use" | "end" | "max_tokens";
   usage: { inputTokens: number; outputTokens: number };
   responseId?: string;
 }
@@ -28,6 +32,9 @@ export interface ProviderAgenticOptions {
   runTurn: RunTurn;
   system: string;
   userContent: string;
+  /** Tidligere turer i samme samtale, seedet foran dagens spørsmål — som
+   *  anthropic.ts sin AgenticOptions.forhistorikk. Ignoreres ved resume. */
+  forhistorikk?: { role: "user" | "assistant"; content: string }[];
   tools: unknown[];
   executeTool: (name: string, input: Record<string, unknown>) => Promise<string>;
   progressLabel?: (name: string, input: Record<string, unknown>) => string;
@@ -76,7 +83,10 @@ export function runProviderAgenticStream(opts: ProviderAgenticOptions): Readable
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
 
       const state: AgenticResumeState = opts.resume ?? {
-        messages: [{ role: "user", content: opts.userContent }],
+        messages: [
+          ...(opts.forhistorikk ?? []),
+          { role: "user", content: opts.userContent },
+        ],
         turn: 0,
         clientCalls: 0,
         usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 },
@@ -154,6 +164,12 @@ export function runProviderAgenticStream(opts: ProviderAgenticOptions): Readable
           if (turn.responseId) state.prevResponseId = turn.responseId;
           for (const note of turn.searchNotes) emit({ type: "progress", text: note });
 
+          // Speiler anthropic.ts sin max_tokens-gren: en avkortet tur er
+          // verken et ferdig svar eller et gyldig verktøykall.
+          if (turn.stop === "max_tokens") {
+            throw new Error(turn.text ? AVKORTET_MIDT_I_SVARET : AVKORTET_UNDER_TENKING);
+          }
+
           if (turn.stop === "tool_use" && turn.toolUses.length) {
             const content: Record<string, unknown>[] = [];
             if (turn.text) content.push({ type: "text", text: turn.text });
@@ -177,6 +193,11 @@ export function runProviderAgenticStream(opts: ProviderAgenticOptions): Readable
                   } else {
                     clientCall = { id: tu.id, name: tu.name, input: tu.input };
                   }
+                } else if (typeof tu.input.script !== "string" || !tu.input.script.trim()) {
+                  // Aldri en run_code med tomt script til klienten — be
+                  // modellen sende kallet på nytt (teller ikke mot budsjettet).
+                  results.push({ tool_use_id: tu.id, content:
+                    "Feil: run_code-kallet manglet et gyldig script-argument. Send kallet på nytt med hele scriptet i «script»." });
                 } else {
                   state.runCalls = (state.runCalls ?? 0) + 1;
                   if (state.runCalls > maxRunCode) {

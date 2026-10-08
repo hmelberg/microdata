@@ -36,33 +36,45 @@
   [headers.values]
     Cache-Control = "public, max-age=86400"
 
-# Content-Security-Policy-Report-Only (docs/REVIEW_2026-07-07.md §3, CSP item):
-# OBSERVE-ONLY — this is the "-Report-Only" header, not "Content-Security-Policy",
-# so nothing here can break production; browsers evaluate it and log console
-# violations but never block a request because of it. Allowlist derived from
-# what the app actually loads: sw.js CDN_HOSTS + PRECACHE_URLS (jsdelivr,
-# cdn.plot.ly), index.html's external <script>/<link> tags and dynamic
-# import()s (jsdelivr for pyodide/markdown-it/duckdb-wasm, webr.r-wasm.org for
-# WebR), and the same-origin /api/* edge functions (this build is BYOK-only —
-# no Anvil backend — so AI calls go through same-origin edge functions, which
-# in turn call the user's own provider key; no external AI API host needs an
-# explicit connect-src entry). The fact that Open-from-URL / connect / load
-# directives let a script fetch any user-supplied https: data source is why
-# connect-src https: is broad rather than a fixed host list.
-# Pyodide needs 'unsafe-eval'+'wasm-unsafe-eval' in script-src; the DuckDB-WASM
-# worker is spun up from a blob: URL (worker-src/script-src blob:); the app has
-# no build step and ships hand-written inline <script>/style attributes
-# throughout index.html, so 'unsafe-inline' is included to match current
-# reality rather than flood the console with expected-noise violations.
+# Content-Security-Policy — ENFORCED (docs/REVIEW_2026-07-07.md §3, CSP item).
+# Promoted from Report-Only on 2026-10-08 after a Playwright run with this exact
+# header enforced showed zero violations and output identical to a no-CSP
+# baseline: boot + microdata run (incl. plot), static data source (DuckDB-WASM
+# + static_data/*.parquet), python, python+#duckdb, duckdb SQL, CSV from
+# raw.githubusercontent, statx, brython (pandas + plotly), jamovi, R (webR),
+# AI settings dialog, hjelp/personvern (no+en), export_data.html, py2m runner.
 #
-# To promote to enforcing later: watch the browser console (and/or wire up a
-# report-to endpoint) for a while, tighten anything unexpectedly broad, then
-# either add nonces/hashes to drop 'unsafe-inline' or accept it as a known
-# tradeoff, and rename this header to "Content-Security-Policy".
+# Why each source is there:
+# - script-src: cdn.jsdelivr.net (pyodide, markdown-it, tabulator, brython,
+#   duckdb-wasm +esm and its worker scripts), cdn.plot.ly (plotly),
+#   webr.r-wasm.org (webr.mjs + its worker). 'wasm-unsafe-eval' for every
+#   WASM engine (Pyodide, DuckDB, webR). 'unsafe-eval' is needed ONLY by
+#   Brython (brython.min.js calls eval) — verified: dropping it breaks only
+#   brython mode. blob: because the DuckDB and webR workers are blob: URLs
+#   that importScripts() from the CDNs.
+# - 'unsafe-inline' (script + style): index.html is one ~10k-line page with a
+#   large inline <script> block, inline on*= handlers and style= attributes and
+#   no build step. Hashes would have to be regenerated on every edit and do
+#   not cover on*= handlers; nonces need server-side templating. Accepted
+#   tradeoff — the policy still stops loading script from arbitrary origins.
+# - style-src cdn.jsdelivr.net: tabulator_simple.min.css (the old Report-Only
+#   policy omitted it and would have broken table styling if enforced).
+# - connect-src https: (deliberately broad): Pyodide/micropip pull packages
+#   from cdn.jsdelivr.net, pypi.org and files.pythonhosted.org; DuckDB from
+#   extensions.duckdb.org; webR from repo.r-wasm.org; GitHub storage uses
+#   api.github.com; and the load/connect/Open-from-URL directives and
+#   pd.read_csv() let a user script fetch ANY https: URL by design. AI calls
+#   go to the same-origin /api/* edge functions. http: stays blocked.
+# - img-src https: data: blob: — plot export and markdown images.
+# - object-src 'none', base-uri 'self', form-action 'self', frame-src 'self'.
+#
+# If a new CDN or mode is added, add its origin here and re-run the
+# Playwright check (serve the repo with this header and watch the console for
+# "Content Security Policy" messages) before deploying.
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: https://cdn.jsdelivr.net https://cdn.plot.ly https://webr.r-wasm.org; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: data: blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: https://cdn.jsdelivr.net https://cdn.plot.ly https://webr.r-wasm.org; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: data: blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
 
 [[edge_functions]]
   function = "svar"

@@ -50,7 +50,9 @@ export function parseProviderConfig(
   };
 }
 
-/** Scrub a key out of upstream error text before it may be logged. */
+/** Scrub a key out of upstream error text before it may be logged or shown.
+ * Keys under 8 chars are not real keys (extractLlmKey requires ≥ 8) and are
+ * ignored, so a test/empty key can't mask ordinary letters in messages. */
 export function scrubKey(text: string, key: string): string {
-  return key ? text.split(key).join("***") : text;
+  return key && key.length >= 8 ? text.split(key).join("***") : text;
 }

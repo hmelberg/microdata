@@ -45,6 +45,27 @@
     return String(script || '').replace(/\b(key\()\s*(?!ask\s*\))[^)]*\)/gi, '$1***)');
   }
 
+  // Motsatt vei: et AI-revidert script kommer tilbake med key(***). Før det
+  // erstatter editoren settes brukerens egne nøkler inn igjen — én unik
+  // nøkkel overalt, ellers posisjonsvis når antallet stemmer. Ellers urørt:
+  // heller key(***) synlig enn feil nøkkel på feil kilde.
+  function restoreKeys(revised, original) {
+    var lits = [], m, re = /\bkey\(\s*(?!ask\s*\))([^)]*)\)/gi;
+    while ((m = re.exec(String(original || ''))) !== null) {
+      var v = m[1].trim();
+      if (v && v !== '***') lits.push(v);
+    }
+    var out = String(revised || '');
+    if (!lits.length) return out;
+    var uniq = lits.filter(function (v, i) { return lits.indexOf(v) === i; });
+    var masked = /\b(key\()\s*\*\*\*\s*\)/gi;
+    if (uniq.length === 1) return out.replace(masked, function (_, k) { return k + uniq[0] + ')'; });
+    var n = (out.match(masked) || []).length;
+    if (n !== lits.length) return out;
+    var i = 0;
+    return out.replace(masked, function (_, k) { return k + lits[i++] + ')'; });
+  }
+
   function parse(script) {
     var connects = [], loads = [], errors = [], m;
     CONNECT_RE.lastIndex = 0;
@@ -244,5 +265,5 @@
     return { segments: out, errors: errors };
   }
 
-  global.DataDirectives = { parse: parse, resolve: resolve, scrubKeys: scrubKeys, parseAssembly: parseAssembly, parseOptions: parseOptions, parseUse: parseUse, parseSegmentUses: parseSegmentUses, runtimeFamily: runtimeFamily };
+  global.DataDirectives = { parse: parse, resolve: resolve, scrubKeys: scrubKeys, restoreKeys: restoreKeys, parseAssembly: parseAssembly, parseOptions: parseOptions, parseUse: parseUse, parseSegmentUses: parseSegmentUses, runtimeFamily: runtimeFamily };
 })(typeof window !== 'undefined' ? window : globalThis);

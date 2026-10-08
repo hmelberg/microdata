@@ -106,3 +106,46 @@ test('describeError: bevisste (oversatte) meldinger passerer urørt', () => {
     { endpoint: 'kode-svar', phase: 'request' });
   assert.equal(msg, 'Ugyldig API-nøkkel. Sjekk nøkkelen i AI-innstillingene.');
 });
+
+// key(<literal>) er en dekrypteringsnøkkel og skal aldri forlate nettleseren
+// mot /api/* — uansett kallsted (dm-vurder, tolk-resultat, svar …).
+const { scrubAiBody } = require('../../js/ai-transport.js');
+
+test('scrubAiBody: script, output, spørsmål og historikk maskeres; key(ask) beholdes', () => {
+  const body = {
+    script: 'require no.ssb.fdb:9 as db key(hemmelig123)\nrequire x key(ask)',
+    output: 'echo key(abc)',
+    question: 'hvorfor feiler key( s3cr3t )?',
+    historikk: [{ role: 'user', content: 'bruk key(zzz)' }],
+    run_result: 'OK.\nkey(qqq)',
+  };
+  const out = scrubAiBody(body);
+  assert.equal(out.script, 'require no.ssb.fdb:9 as db key(***)\nrequire x key(ask)');
+  assert.equal(out.output, 'echo key(***)');
+  assert.equal(out.question, 'hvorfor feiler key(***)?');
+  assert.equal(out.historikk[0].content, 'bruk key(***)');
+  assert.equal(out.run_result, 'OK.\nkey(***)');
+  assert.match(body.script, /hemmelig123/, 'input mutated');
+});
+
+test('scrubAiBody: resume-tilstand og ikke-strenger røres ikke', () => {
+  const body = { resume: { state: 'key(x)' }, quality: 'best', n: 3, flag: true, nil: null };
+  assert.deepEqual(scrubAiBody(body), body);
+});
+
+test('postWithRetry: JSON-body mot /api/ scrubbes før sending', async () => {
+  let sent = null;
+  await postWithRetry('/api/dm-vurder', { method: 'POST', body: JSON.stringify({ script: 'x key(topp) y' }) }, {
+    fetchImpl: async (_u, init) => { sent = init.body; return resp(200); },
+    sleep: async () => {},
+  });
+  assert.equal(JSON.parse(sent).script, 'x key(***) y');
+});
+
+test('postWithRetry: ikke-JSON-body og andre URL-er sendes urørt', async () => {
+  const seen = [];
+  const fetchImpl = async (u, init) => { seen.push(init.body); return resp(200); };
+  await postWithRetry('/api/x', { method: 'POST', body: 'key(raw) ikke json' }, { fetchImpl, sleep: async () => {} });
+  await postWithRetry('https://example.org/', { method: 'POST', body: '{"script":"key(a)"}' }, { fetchImpl, sleep: async () => {} });
+  assert.deepEqual(seen, ['key(raw) ikke json', '{"script":"key(a)"}']);
+});

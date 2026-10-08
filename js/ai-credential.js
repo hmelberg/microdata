@@ -22,8 +22,36 @@
     return v.indexOf('sk-ant-') === 0 ? 'anthropic' : 'access';
   }
 
-  global.AiCredential = { classify: classify };
+  function norm(v) {
+    return String(v == null ? '' : v).trim().replace(/\/+$/, '');
+  }
+
+  // Leverandørbytte i innstillingene: et felt som er tomt eller fortsatt
+  // bærer FORRIGE presets standardverdi byttes til den nye presetens verdi.
+  // Ellers ville f.eks. OpenAI → Mistral beholdt api.openai.com, og den nye
+  // Mistral-nøkkelen blitt sendt dit. Det brukeren selv har skrevet beholdes.
+  function swapPresetField(current, prevDefault, newDefault) {
+    var cur = norm(current);
+    var prev = norm(prevDefault);
+    if (!cur || (prev && cur === prev)) return newDefault || '';
+    return String(current);
+  }
+
+  // Sant når en (beholdt) egen URL peker til en annen vert enn presetet
+  // brukeren valgte — da sendes nøkkelen et annet sted enn navnet tilsier,
+  // og innstillingene viser en advarsel.
+  function baseUrlMismatch(url, presetUrl) {
+    var u = norm(url), p = norm(presetUrl);
+    if (!u || !p) return false;
+    try {
+      return new URL(u).host.toLowerCase() !== new URL(p).host.toLowerCase();
+    } catch (e) {
+      return true;
+    }
+  }
+
+  global.AiCredential = { classify: classify, swapPresetField: swapPresetField, baseUrlMismatch: baseUrlMismatch };
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { classifyCredential: classify };
+    module.exports = { classifyCredential: classify, swapPresetField: swapPresetField, baseUrlMismatch: baseUrlMismatch };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);

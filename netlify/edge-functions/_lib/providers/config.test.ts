@@ -52,3 +52,12 @@ Deno.test("scrubKey replaces every occurrence", () => {
   assertEquals(scrubKey("ren tekst", KEY), "ren tekst");
   assertEquals(scrubKey("x", ""), "x");
 });
+
+// scrubKey kjøres nå på ALLE oppstrøms-feiltekster, også klientrettede.
+// En urealistisk kort «nøkkel» (tester, tomme felt) ville ellers maskert
+// vanlige bokstaver midt i norske feilmeldinger («to***en-budsjettet»).
+// Ingen ekte nøkkel er under 8 tegn (extractLlmKey krever minst 8).
+Deno.test("scrubKey ignores implausibly short keys instead of mangling text", () => {
+  assertEquals(scrubKey("token-budsjettet", "k"), "token-budsjettet");
+  assertEquals(scrubKey("abc1234567 x", "abc1234567"), "*** x");
+});

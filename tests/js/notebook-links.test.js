@@ -93,6 +93,39 @@ test('autorunNeedsGate: openstat gates only when a secret is present', () => {
   assert.equal(NL.autorunNeedsGate('openstat', true), true);
 });
 
+// hasStoredSecret: delt lenke (#output=/#url=) skal ikke auto-kjøre et script
+// når nettleseren har lagret noe et fremmed script kunne lest ut.
+function fakeStorage(obj) {
+  const keys = Object.keys(obj);
+  return {
+    get length() { return keys.length; },
+    key(i) { return keys[i] == null ? null : keys[i]; },
+    getItem(k) { return Object.prototype.hasOwnProperty.call(obj, k) ? obj[k] : null; },
+  };
+}
+test('hasStoredSecret: empty / harmless storage → false', () => {
+  assert.equal(NL.hasStoredSecret(fakeStorage({})), false);
+  assert.equal(NL.hasStoredSecret(fakeStorage({ microdata_theme: 'dark', md_llm_provider: '{"type":"openai-compat"}' })), false);
+});
+test('hasStoredSecret: every credential key gates', () => {
+  for (const k of ['md_anthropic_key', 'md_llm_key', 'md_access_token', 'm2py_github_pat']) {
+    assert.equal(NL.hasStoredSecret(fakeStorage({ [k]: 'x' })), true, k);
+  }
+});
+test('hasStoredSecret: GitHub profiles with a PAT gate, without do not', () => {
+  assert.equal(NL.hasStoredSecret(fakeStorage({ m2py_github_profiles: '[{"name":"a","pat":"ghp_x"}]' })), true);
+  assert.equal(NL.hasStoredSecret(fakeStorage({ m2py_github_profiles: '[{"name":"a","pat":""}]' })), false);
+});
+test('hasStoredSecret: a stored script with a key(<literal>) gates, key(ask) does not', () => {
+  assert.equal(NL.hasStoredSecret(fakeStorage({ some_draft: 'require x key(abc123) as y' })), true);
+  assert.equal(NL.hasStoredSecret(fakeStorage({ some_draft: 'require x key(ask) as y' })), false);
+});
+test('hasStoredSecret: a throwing or missing storage is treated as no secret', () => {
+  const bad = { get length() { throw new Error('denied'); }, key() { throw new Error('denied'); }, getItem() { throw new Error('denied'); } };
+  assert.equal(NL.hasStoredSecret(bad), false);
+  assert.equal(NL.hasStoredSecret(null), false);
+});
+
 test('urlHasMicro: always on in this build (persona locked)', () => {
   assert.equal(NL.urlHasMicro('https://micro.safestat.app/'), true);
   assert.equal(NL.urlHasMicro('http://localhost:8080/'), true);

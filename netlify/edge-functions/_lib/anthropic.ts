@@ -1,4 +1,6 @@
 import { flushSseBuffer, parseSseFrames } from "./sse-frames.ts";
+import { isPublicHttpUrl } from "./ssrf.ts";
+import { scrubKey } from "./providers/config.ts";
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -35,9 +37,24 @@ export interface StreamEvent {
   message?: string;
 }
 
-/** Endepunktet for dette kallet: brukerens gateway, ellers Anthropic selv. */
+/** Avkortingsmeldingene — delt av den native løkka, leverandørløkka
+ *  (providers/agentic.ts) og single-shot-strømmene, så brukeren får SAMME
+ *  forklaring uansett leverandør. */
+export const AVKORTET_MIDT_I_SVARET =
+  "Svaret ble avkortet: modellen nådde token-taket midt i svaret. Still spørsmålet enklere, eller be om et kortere svar.";
+export const AVKORTET_UNDER_TENKING =
+  "Modellen brukte hele token-budsjettet på å tenke uten å begynne på svaret. Still spørsmålet enklere, eller velg et raskere kvalitetsnivå.";
+
+/** Endepunktet for dette kallet: brukerens gateway, ellers Anthropic selv.
+ * apiBase er brukerstyrt (provider.base_url). parseProviderConfig har alt
+ * SSRF-sjekket den, men den sjekkes igjen HER, rett før bruk, slik at ingen
+ * fremtidig kallevei kan sende nøkkel + prompt til en intern vert. */
 function apiTarget(apiBase?: string): string {
-  return apiBase ? `${apiBase.replace(/\/+$/, "")}/messages` : ANTHROPIC_API;
+  if (!apiBase) return ANTHROPIC_API;
+  if (!isPublicHttpUrl(apiBase)) {
+    throw new Error("blokkert base-URL for leverandøren (ikke offentlig http/https)");
+  }
+  return `${apiBase.replace(/\/+$/, "")}/messages`;
 }
 
 const ANTHROPIC_TIMEOUT_MS = 30_000;
@@ -136,21 +153,24 @@ export async function streamAnthropic(
     ];
   }
 
+  // redirect: "error" — en (ondsinnet) gateway skal ikke kunne sende POST-en
+  // med nøkkelen videre til en vert SSRF-vakten aldri så.
   const upstream = await fetchWithRetry(apiTarget(opts.apiBase), {
     method: "POST",
     headers,
     body: JSON.stringify(requestBody),
+    redirect: "error",
   }, deps);
 
   if (!upstream.ok || !upstream.body) {
     // Log the upstream detail server-side, but do NOT echo it to the client
     // (it can contain account/key diagnostics). Callers surface a generic 502.
     const detail = await upstream.text().catch(() => "");
-    console.error(`Anthropic API error ${upstream.status}: ${detail}`);
+    console.error(`Anthropic API error ${upstream.status}: ${scrubKey(detail, opts.apiKey)}`);
     throw new Error(`Anthropic API error ${upstream.status}`);
   }
 
-  return transformAnthropicStream(upstream.body);
+  return transformAnthropicStream(upstream.body, opts.apiKey);
 }
 
 export interface AnthropicMessageResult {
@@ -201,12 +221,12 @@ export async function messageAnthropic(
 
   const resp = await fetchWithRetry(
     apiTarget(opts.apiBase),
-    { method: "POST", headers, body: JSON.stringify(requestBody) },
+    { method: "POST", headers, body: JSON.stringify(requestBody), redirect: "error" },
     deps,
   );
   if (!resp.ok) {
     const detail = await resp.text().catch(() => "");
-    console.error(`Anthropic API error ${resp.status}: ${detail}`);
+    console.error(`Anthropic API error ${resp.status}: ${scrubKey(detail, opts.apiKey)}`);
     throw new Error(`Anthropic API error ${resp.status}`);
   }
   const json = await resp.json();
@@ -228,6 +248,7 @@ export async function messageAnthropic(
 
 function transformAnthropicStream(
   upstream: ReadableStream<Uint8Array>,
+  apiKey: string,
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
@@ -245,6 +266,9 @@ function transformAnthropicStream(
       // copy-paste of each other (framing AND event handling duplicated),
       // so a fix to one silently missed the other; framing now lives in
       // sse-frames.ts and the event vocabulary lives here, once.
+      // Avkorting/strømfeil: meldes som `error` i stedet for `done`, så
+      // klienten ikke viser et avkortet svar som ferdig.
+      const utfall: { feil: string | null } = { feil: null };
       const handlePayload = (payload: string) => {
         try {
           const obj = JSON.parse(payload);
@@ -255,15 +279,20 @@ function transformAnthropicStream(
             inputTokens = obj.message.usage.input_tokens ?? 0;
             cacheReadTokens = obj.message.usage.cache_read_input_tokens ?? 0;
             cacheCreationTokens = obj.message.usage.cache_creation_input_tokens ?? 0;
-          } else if (obj.type === "message_delta" && obj.usage) {
-            outputTokens = obj.usage.output_tokens ?? outputTokens;
+          } else if (obj.type === "message_delta") {
+            if (obj.usage) outputTokens = obj.usage.output_tokens ?? outputTokens;
+            if (obj.delta?.stop_reason === "max_tokens") utfall.feil = AVKORTET_MIDT_I_SVARET;
+          } else if (obj.type === "error") {
+            // Midt-strøm-feil (overloaded_error o.l.) kommer som et SSE-event
+            // ETTER 200 — de ble før svelget og meldt som `done`.
+            utfall.feil = `Anthropic-strømmen feilet: ${String(obj.error?.type ?? "error").slice(0, 80)}`;
           }
         } catch (_e) {
           // ignore non-JSON event data
         }
       };
       try {
-        while (true) {
+        while (utfall.feil === null) {
           const { value, done } = await reader.read();
           if (done) break;
           const parsed = parseSseFrames(decoder.decode(value, { stream: true }), buffer);
@@ -271,7 +300,13 @@ function transformAnthropicStream(
           parsed.payloads.forEach(handlePayload);
         }
         // Drain any residual buffer content not yet terminated by \n\n
-        flushSseBuffer(buffer).forEach(handlePayload);
+        if (utfall.feil === null) flushSseBuffer(buffer).forEach(handlePayload);
+        if (utfall.feil !== null) {
+          const err: StreamEvent = { type: "error", message: utfall.feil };
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(err)}\n\n`));
+          await reader.cancel().catch(() => {});
+          return;
+        }
         const done: StreamEvent = {
           type: "done",
           inputTokens,
@@ -281,7 +316,7 @@ function transformAnthropicStream(
         };
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(done)}\n\n`));
       } catch (e) {
-        const err: StreamEvent = { type: "error", message: String(e) };
+        const err: StreamEvent = { type: "error", message: scrubKey(String(e), apiKey) };
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(err)}\n\n`));
       } finally {
         reader.releaseLock();
@@ -422,16 +457,17 @@ async function streamOneTurn(
     method: "POST",
     headers,
     body: JSON.stringify({ ...requestBody, stream: true }),
+    redirect: "error",
   }, deps);
   if (!resp.ok || !resp.body) {
     const detail = await resp.text().catch(() => "");
-    console.error(`Anthropic API error ${resp.status}: ${detail}`);
+    const key = headers["x-api-key"] ?? "";
+    console.error(`Anthropic API error ${resp.status}: ${scrubKey(detail, key)}`);
     // verboseUpstream (microdata-tillegg 2026-08-28): personlig-autentiserte
     // kall får detaljen med i feilmeldingen — API-nøkkelen skrubbes til ***
     // først (tom/udefinert nøkkel = no-op), og detaljen kuttes til 300 tegn.
     if (deps.verboseUpstream) {
-      const key = headers["x-api-key"];
-      const scrubbed = key ? detail.split(key).join("***") : detail;
+      const scrubbed = scrubKey(detail, key);
       throw new Error(`Anthropic API error ${resp.status}: ${scrubbed.slice(0, 300)}`);
     }
     throw new Error(`Anthropic API error ${resp.status}`);
@@ -741,9 +777,7 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
           // svar — ingenting skilte det fra en heng. Nå sier vi hva som skjedde.
           if (turn.stopReason === "max_tokens") {
             throw new Error(
-              turnHadText || carryHadText
-                ? "Svaret ble avkortet: modellen nådde token-taket midt i svaret. Still spørsmålet enklere, eller be om et kortere svar."
-                : "Modellen brukte hele token-budsjettet på å tenke uten å begynne på svaret. Still spørsmålet enklere, eller velg et raskere kvalitetsnivå.",
+              turnHadText || carryHadText ? AVKORTET_MIDT_I_SVARET : AVKORTET_UNDER_TENKING,
             );
           }
           // Final answer — its deltas were already forwarded live above.
@@ -758,7 +792,7 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
         controller.close();
         return;
       } catch (e) {
-        emit({ type: "error", message: String(e) });
+        emit({ type: "error", message: scrubKey(String(e), opts.apiKey) });
         controller.close();
       }
     },

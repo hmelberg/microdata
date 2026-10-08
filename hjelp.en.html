@@ -190,6 +190,7 @@
   <a href="#widgets">Widgets</a>
   <div class="nav-section">AI assistant</div>
   <a href="#ai">AI assistant</a>
+  <a href="personvern.en.html">Privacy</a>
   <div class="nav-section">Other modes</div>
   <a href="#modes">Modes</a>
   <a href="#python">Python (Pyodide)</a>
@@ -353,9 +354,12 @@ summarize kjonn</code></pre>
 
     <h3>How it works</h3>
     <p>
-      Click the hamburger menu → "Assess data minimisation". The first time you use the
-      feature, a confirmation is shown that the script is sent to Anthropic. Actual
-      microdata values are never sent.
+      Click the "Assess privacy" button in the toolbar. Each assessment sends the
+      script (with any <code>key(...)</code> values masked) and the context you
+      write, via the app's server, to the AI provider you selected in the AI settings.
+      No separate confirmation is shown before sending. Actual microdata values are
+      never sent — the script only runs against synthetic practice data here. See
+      the <a href="personvern.en.html">privacy statement</a> for details.
     </p>
     <p>
       In the options modal you can:
@@ -367,12 +371,12 @@ summarize kjonn</code></pre>
       <li><strong>Specify purpose and context</strong> — optional; gives a more precise assessment</li>
     </ul>
 
-    <h3>Login</h3>
+    <h3>API key</h3>
     <p>
-      The AI assessment requires that you are logged in to m2py. Use the Log in button
-      at the top and follow the link in the email. Once you are logged in (via an FHI
-      or other approved email address), you have access to the data minimisation
-      feature automatically — no separate access key is needed.
+      There is no login and no account in this version. The assessment requires that
+      you have entered your own Anthropic API key in the AI settings (the gear icon in
+      the AI panel). If you have also selected a different AI provider there, the
+      assessment goes to that provider with the key you entered for it.
     </p>
 
     <h3>Sensitive variables</h3>
@@ -626,7 +630,7 @@ summarize kjonn
     <p>An experimental side panel with an AI assistant that can answer questions about microdata syntax, suggest variables, and generate or revise scripts. Opened with the star icon at the top right or <kbd>Ctrl</kbd>+<kbd>I</kbd>.</p>
 
     <div class="callout">
-      <strong>Requires your own API key.</strong> Click the gear icon in the AI panel and paste in a key. Anthropic is the default (create a key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>), but you can instead pick OpenAI, Mistral or any other service with an OpenAI-compatible API from the provider dropdown. The key is stored only locally in the browser (localStorage) and sent as an <code>X-Anthropic-Key</code> or <code>X-Llm-Key</code> header straight through to the provider you selected, for each request. The Quality selector (Fast/Balanced/Best) controls the model and how hard it thinks.
+      <strong>Requires your own API key.</strong> Click the gear icon in the AI panel and paste in a key. Anthropic is the default (create a key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>), but you can instead pick OpenAI, Mistral or any other service with an OpenAI-compatible API from the provider dropdown. The key is stored only locally in the browser (localStorage) and sent as an <code>X-Anthropic-Key</code> or <code>X-Llm-Key</code> header straight through to the provider you selected, for each request. The Quality selector (Fast/Balanced/Best) controls the model and how hard it thinks. What is sent where, and what is stored temporarily on the server, is described in the <a href="personvern.en.html">privacy statement</a>.
     </div>
 
     <h3>What the assistant can do</h3>

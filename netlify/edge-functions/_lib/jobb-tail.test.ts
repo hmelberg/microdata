@@ -1,8 +1,8 @@
 import { assertEquals, assertStringIncludes } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
-  chunkNokkel, headNokkel, lagSkriver, type BlobbStore,
+  chunkNokkel, headNokkel, HJERTESLAG_MS, lagSkriver, type BlobbStore,
 } from "./jobb-blobb.ts";
-import { MAKS_JOBB_MS, tailStream } from "./jobb-tail.ts";
+import { MAKS_JOBB_UTEN_STEMPEL_MS, MAKS_STILLHET_MS, tailStream } from "./jobb-tail.ts";
 
 function fakeStore() {
   const data = new Map<string, string>();
@@ -145,27 +145,30 @@ Deno.test("start() uten noen skriv() gjør at taileren venter, ikke rapporterer 
 
 // ── Dødjobb-vakten (Task 6, ruling 5) ──────────────────────────────────────
 
-Deno.test("jobb «kjorer» over 16 minutter dør med feil, ikke overlevering", async () => {
+Deno.test("jobb «kjorer» uten livstegn over MAKS_STILLHET_MS dør med feil, ikke overlevering", async () => {
   const { store, data } = fakeStore();
   // head skrives DIREKTE (ikke via lagSkriver) — vi trenger full kontroll
-  // over `start`, som lagSkriver alltid setter til konstruksjonstidspunktet.
+  // over `start`/`oppdatert`, som lagSkriver setter fra sin egen klokke.
   await store.set(chunkNokkel("j1", 1), 'data: {"type":"delta","text":"gammelt"}\n\n');
-  await store.setJSON(headNokkel("j1"), { seq: 1, state: "kjorer", start: 0 });
-  // Tailerens klokke starter godt forbi MAKS_JOBB_MS etter jobbens start —
+  await store.setJSON(headNokkel("j1"), { seq: 1, state: "kjorer", start: 0, oppdatert: 0 });
+  // Tailerens klokke starter godt forbi MAKS_STILLHET_MS etter siste livstegn —
   // vakten skal slå til på ALLEREDE FØRSTE løkke-runde, før fristMs (45 s,
   // som "now() - start(taileren)" fortsatt er 0 for) i det hele tatt ville
   // vurdert overlevering. Dette beviser vakten avgjør UAVHENGIG av
   // overleveringsfristen, ikke som en bivirkning av den.
-  const k = klokke(1_000, MAKS_JOBB_MS + 60_000);
+  const k = klokke(1_000, MAKS_STILLHET_MS + 60_000);
   const ut = await lesAlt(tailStream({
     store, jobId: "j1", fra: 0, now: k.now, sleep: k.sleep, fristMs: 45_000,
   }));
   // Drenering skjedde FØRST — det gamle innholdet må ikke svelges av feilen.
   assertStringIncludes(ut, 'data: {"type":"delta","text":"gammelt"}\n\n');
   assertStringIncludes(ut, '"type":"error"');
-  assertStringIncludes(ut, "16 minutter");
+  // Meldingen leser den FAKTISKE grensen (den sto før på «16 minutter»
+  // mens vakten slo til etter 7).
+  assertStringIncludes(ut, `${Math.round(MAKS_STILLHET_MS / 60_000)} minutter`);
+  assertEquals(ut.includes("16 minutter"), false);
   // Diskriminerer mot: (a) vakten fjernet — ville gitt "tail" her, siden
-  // fristMs (45s < 16 min) alltid nås før MAKS_JOBB_MS i noen senere runde;
+  // fristMs (45s < MAKS_STILLHET_MS) alltid nås før vakten i noen senere runde;
   // (b) sammenligningen snudd (< i stedet for >) — for denne svært gamle
   // jobben er `now() - head.start` stort, så en snudd sjekk ville aldri
   // slått til, og løkken ville falt gjennom til nøyaktig samme "tail".
@@ -183,7 +186,7 @@ Deno.test("fersk «kjorer»-jobb forbi 45s-fristen overleverer likevel normalt",
   const s = lagSkriver(store, "j1", () => (na += 200));
   await s.skriv('data: {"type":"delta","text":"en"}\n\n');
   // 20s per sleep: etter tre runder er tailerens "now() - start" 60s, forbi
-  // fristMs (45s) — men SVÆRT langt unna MAKS_JOBB_MS (16 min). Vakten må
+  // fristMs (45s) — men SVÆRT langt unna MAKS_STILLHET_MS. Vakten må
   // altså IKKE slå til her, selv om jobben fortsatt står "kjorer".
   const k = klokke(20_000);
   const ut = await lesAlt(tailStream({
@@ -192,7 +195,7 @@ Deno.test("fersk «kjorer»-jobb forbi 45s-fristen overleverer likevel normalt",
   assertStringIncludes(ut, 'data: {"type":"delta","text":"en"}\n\n');
   assertStringIncludes(ut, '"type":"tail"');
   // Diskriminerer mot: (a) sammenligningen snudd (< i stedet for >) — da
-  // ville `now() - head.start` (0 ved første runde) vært "< MAKS_JOBB_MS",
+  // ville `now() - head.oppdatert` (≈0 ved første runde) vært "< MAKS_STILLHET_MS",
   // altså SANN, og vakten ville feilaktig slått til på aller første runde,
   // FØR fristMs-sjekken engang kjørte; (b) vakten som slår til uansett tid
   // (kun sjekker state==="kjorer") — samme utfall, feil i stedet for tail.
@@ -244,4 +247,45 @@ Deno.test("cancel() stanser en forlatt tailer i stedet for å polle videre mot f
   await new Promise((r) => setTimeout(r, 0));
   assertEquals(sleepKall, kallVedCancel,
     "løkken kalte sleep() på nytt etter cancel() — den forlatte tailerens polling stanset ikke");
+});
+
+// ── Vakten måler stillhet, ikke alder (sikkerhetsrunde 2026-10-08) ─────────
+// En levende jobb kan legitimt bruke mer enn 7 min fra start: prefiks-
+// bygging, forord-retry (30 s × 3), 429/529-backoff og en 5-minutters
+// turfrist som først starter når headers er mottatt. Vakten slo før til på
+// `now - head.start` og drepte slike jobber midt i svaret.
+
+Deno.test("gammel jobb med ferskt livstegn overleverer — vakten måler ikke alder", async () => {
+  const { store, data } = fakeStore();
+  const tiMin = 10 * 60_000;
+  await store.setJSON(headNokkel("j1"), { seq: 0, state: "kjorer", start: 0, oppdatert: tiMin - 5_000 });
+  const k = klokke(20_000, tiMin);
+  const ut = await lesAlt(tailStream({
+    store, jobId: "j1", fra: 0, now: k.now, sleep: k.sleep, fristMs: 45_000,
+  }));
+  assertStringIncludes(ut, '"type":"tail"');
+  assertEquals(ut.includes('"type":"error"'), false);
+  assertEquals(data.has("j1/head"), true);
+});
+
+Deno.test("head fra eldre kode (uten oppdatert) faller tilbake til start + plattformtaket", async () => {
+  // Under en deploy kan en bakgrunnsjobb på GAMMEL kode skrive heads uten
+  // `oppdatert`. Den skal ikke drepes etter MAKS_STILLHET_MS fra start —
+  // bare etter at den umulig kan leve lenger (plattformtaket).
+  const { store } = fakeStore();
+  await store.setJSON(headNokkel("j1"), { seq: 0, state: "kjorer", start: 0 });
+  const levende = await lesAlt(tailStream({
+    store, jobId: "j1", fra: 0, ...klokke(20_000, 10 * 60_000), fristMs: 45_000,
+  }));
+  assertStringIncludes(levende, '"type":"tail"');
+  const dod = await lesAlt(tailStream({
+    store, jobId: "j1", fra: 0, ...klokke(20_000, MAKS_JOBB_UTEN_STEMPEL_MS + 60_000), fristMs: 45_000,
+  }));
+  assertStringIncludes(dod, '"type":"error"');
+});
+
+Deno.test("MAKS_STILLHET_MS tåler flere tapte hjerteslag og en hel forord-retry-runde", () => {
+  if (MAKS_STILLHET_MS < 4 * HJERTESLAG_MS) throw new Error("for kort mot HJERTESLAG_MS");
+  if (MAKS_STILLHET_MS <= 90_000) throw new Error("for kort mot forord-retry (30 s × 3)");
+  if (MAKS_JOBB_UTEN_STEMPEL_MS < 15 * 60_000) throw new Error("under plattformtaket på 15 min");
 });

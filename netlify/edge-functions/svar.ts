@@ -72,6 +72,29 @@ export function validHistorikk(h: unknown): boolean {
   });
 }
 
+/** svar-jobb.mts sitt kroppstak (runGate maxBodyBytes) — må holdes likt. */
+export const JOBB_MAX_BODY_BYTES = 2_000_000;
+
+/**
+ * Kroppen som videresendes til bakgrunnsjobben. De RÅ klientfeltene som
+ * jobben ikke bruker kastes: `resume` (resumeState er den validerte utgaven),
+ * `run_result` (runResultTilLopet er den kappede/klassifiserte) og
+ * `historikk` (forhistorikk er den oversatte). Med dem på lasset kunne en
+ * klientkropp nær 2 MB sprenge jobbens 2 MB-tak — og siden en
+ * bakgrunnsfunksjon ALLTID svarer 202, døde avvisningen usynlig og brukeren
+ * så bare «Svarjobben startet aldri». Størrelsen sjekkes derfor HER, før
+ * spawn, så kalleren kan svare med en forklart feil.
+ */
+export function byggJobbKropp(
+  body: Record<string, unknown>,
+  ekstra: Record<string, unknown>,
+): { ok: true; body: string } | { ok: false; bytes: number } {
+  const { resume: _r, run_result: _rr, historikk: _h, ...offentlig } = body;
+  const json = JSON.stringify({ ...offentlig, ...ekstra });
+  const bytes = new TextEncoder().encode(json).length;
+  return bytes > JOBB_MAX_BODY_BYTES ? { ok: false, bytes } : { ok: true, body: json };
+}
+
 // `pending` kopieres som ETT objekt, ALDRI felt-for-felt (i motsetning til
 // `usage`, som bevisst whitelister tallfelt) — en felt-for-felt-omskriving
 // ville stille droppet felter og latt runden dø.
@@ -205,16 +228,24 @@ export default async (request: Request, context: IpContext): Promise<Response> =
   // «Svarjobben startet aldri» ti sekunder senere, umulig å skille fra et
   // reelt krasj (Task 6 review-funn 2). Den uvaliderte kopien skal heller
   // ikke reise videre: resumeState er den validerte/rekonstruerte utgaven.
-  const { resume: _uvalidert, ...offentlig } = body;
+  // (Se byggJobbKropp: run_result og historikk kastes av samme grunn.)
+  const jobbKropp = byggJobbKropp(body as Record<string, unknown>, {
+    jobId, runOkCalls, runResultTilLopet,
+    resumeState, quality: kvalitet, forhistorikk,
+    // erPersonlig sendes IKKE — jobb-funksjonen regner den ut fra tokenet
+    // selv. Et klientsatt flagg ville vært en innsyns-bypass.
+  });
+  if (!jobbKropp.ok) {
+    console.error(`svar: jobbkroppen er for stor (${jobbKropp.bytes} B)`);
+    return new Response(
+      "Samtalen er blitt for stor til å fortsette. Start en ny samtale, eller kort ned scriptet.",
+      { status: 413 },
+    );
+  }
   const spawn = await fetch(new URL("/api/svar-jobb", origin), {
     method: "POST",
     headers: videre,
-    body: JSON.stringify({
-      ...offentlig, jobId, runOkCalls, runResultTilLopet,
-      resumeState, quality: kvalitet, forhistorikk,
-      // erPersonlig sendes IKKE — jobb-funksjonen regner den ut fra tokenet
-      // selv. Et klientsatt flagg ville vært en innsyns-bypass.
-    }),
+    body: jobbKropp.body,
   });
   if (spawn.status !== 202) {
     console.error(`svar: jobbstart feilet med ${spawn.status}`);

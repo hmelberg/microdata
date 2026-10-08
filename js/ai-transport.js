@@ -29,7 +29,43 @@
   var DEFAULT_BACKOFF_MS = [500, 1500];
   var MAX_RETRY_AFTER_MS = 5000;
 
+  // key(<literal>) er en dekrypteringsnøkkel og skal aldri sendes til
+  // serveren (spec 2026-07-05 §5). Samme regel som DataDirectives.scrubKeys;
+  // kopien her er en reserve for når den fila ikke er lastet (node-tester).
+  function scrubKeysFallback(s) {
+    return String(s || '').replace(/\b(key\()\s*(?!ask\s*\))[^)]*\)/gi, '$1***)');
+  }
+  function scrubString(s) {
+    var dd = global.DataDirectives;
+    return (dd && typeof dd.scrubKeys === 'function') ? dd.scrubKeys(s) : scrubKeysFallback(s);
+  }
+  // Ikke-mutérende dyp maskering av ALLE strenger i en /api/*-body: script,
+  // output (tolk-resultat), run_result, spørsmål og historikk. Unntak:
+  // `resume` er serverens egen løkketilstand og sendes tilbake urørt.
+  var SCRUB_SKIP = { resume: true };
+  function scrubAiBody(v, key) {
+    if (key && SCRUB_SKIP[key]) return v;
+    if (typeof v === 'string') return /key\(/i.test(v) ? scrubString(v) : v;
+    if (Array.isArray(v)) return v.map(function (x) { return scrubAiBody(x); });
+    if (v && typeof v === 'object') {
+      var out = {};
+      for (var k in v) if (Object.prototype.hasOwnProperty.call(v, k)) out[k] = scrubAiBody(v[k], k);
+      return out;
+    }
+    return v;
+  }
+  // Sentral sperre: hvert kall gjennom postWithRetry mot /api/* får body-en
+  // maskert, så et nytt kallsted ikke kan glemme det.
+  function scrubInit(url, init) {
+    if (!init || typeof init.body !== 'string' || String(url).indexOf('/api/') !== 0) return init;
+    if (!/key\(/i.test(init.body)) return init;
+    var parsed;
+    try { parsed = JSON.parse(init.body); } catch (e) { return init; }
+    return Object.assign({}, init, { body: JSON.stringify(scrubAiBody(parsed)) });
+  }
+
   async function postWithRetry(url, init, deps) {
+    init = scrubInit(url, init);
     deps = deps || {};
     var fetchImpl = deps.fetchImpl || global.fetch.bind(global);
     var sleep = deps.sleep || function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
@@ -144,8 +180,8 @@
     return ut.slice(-(HIST_UTVEKSLINGER * 2));
   }
 
-  global.AiTransport = { postWithRetry: postWithRetry, describeError: describeError, byggHistorikk: byggHistorikk, nesteTailSteg: nesteTailSteg };
+  global.AiTransport = { postWithRetry: postWithRetry, describeError: describeError, byggHistorikk: byggHistorikk, nesteTailSteg: nesteTailSteg, scrubAiBody: scrubAiBody };
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { postWithRetry: postWithRetry, describeError: describeError, byggHistorikk: byggHistorikk, nesteTailSteg: nesteTailSteg };
+    module.exports = { postWithRetry: postWithRetry, describeError: describeError, byggHistorikk: byggHistorikk, nesteTailSteg: nesteTailSteg, scrubAiBody: scrubAiBody };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
