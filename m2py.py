@@ -5417,14 +5417,47 @@ class StatsEngine:
                     data = pd.concat([data, pd.Series([total_val], index=['Total'])])
                 return data
 
+            def _na_to_sentinel(s):
+                """missing: pd.crosstab bygger marginer feil når nøklene har NaN
+                (NaN-radens Total blir NaN). Bytt NaN med en sentinel som
+                sorteres sist, og gjør om til NaN etter krysstabellen."""
+                if dropna or not s.isna().any():
+                    return s, None
+                if isinstance(s.dtype, pd.CategoricalDtype):
+                    sent = '￿_missing'
+                    return s.cat.add_categories([sent]).fillna(sent), sent
+                if pd.api.types.is_numeric_dtype(s):
+                    mx = s.max()
+                    sent = float(mx) + 1.0 if pd.notna(mx) else 0.0
+                    return s.fillna(sent), sent
+                sent = '￿_missing'
+                return s.astype(object).fillna(sent), sent
+
+            def _crosstab_na(r, c, **kw):
+                r2, rs = _na_to_sentinel(r)
+                c2, cs = _na_to_sentinel(c)
+                out = pd.crosstab(r2, c2, **kw)
+                if rs is not None:
+                    out.index = pd.Index([np.nan if v == rs else v for v in out.index],
+                                         name=out.index.name)
+                if cs is not None:
+                    out.columns = pd.Index([np.nan if v == cs else v for v in out.columns],
+                                           name=out.columns.name)
+                return out
+
             if 'summarize' in options:
                 # Volumtabell: summarize(var [, var2 ...]) [mean|std|sum|p50|p25|p75|gini|iqr]
                 # En gjennomsnitts-/sum-tabell over små celler avslører nær-individuelle
                 # verdier akkurat som en frekvenstabell, så T5 gjelder også her.
-                self._t5_small_cell_check(df[var1], df[var2] if var2 else None, dropna)
                 # summarize kan inneholde én eller flere komma-separerte variabler
                 val_var_spec = options['summarize']
                 val_vars = [v.strip() for v in str(val_var_spec).split(',') if v.strip()]
+                # Cellene telles som enheter som BIDRAR med en verdi (notna),
+                # ikke rader: 20 rader med 1 ikke-missing verdi er én person.
+                for _v in val_vars:
+                    _m = df[_v].notna() if _v in df.columns else slice(None)
+                    self._t5_small_cell_check(df.loc[_m, var1],
+                                              df.loc[_m, var2] if var2 else None, dropna)
                 # T2 + T8 (D3): volumtabellen skal bruke samme beskyttelse som
                 # vanlig summarize — winsoriser verdikolonnen globalt før
                 # gruppestatistikk, og vis persentiler med 3 signifikante
@@ -5434,6 +5467,13 @@ class StatsEngine:
                 if _dc_on:
                     df = df.assign(**{v: _winsorize_series(df[v]) for v in val_vars
                                       if v in df.columns})
+                # Uten missing vises ikke NaN-grupper — Total skal da beregnes
+                # over de samme radene som vises (som vanlig tabulate).
+                if dropna:
+                    _keep = df[var1].notna()
+                    if var2:
+                        _keep &= df[var2].notna()
+                    df = df.loc[_keep]
                 def _q_agg(p):
                     if _dc_on:
                         return lambda x: _round_to_sig_digits(x.quantile(p))
@@ -5448,17 +5488,17 @@ class StatsEngine:
                         break
                 val_var = val_vars[0]  # første variabel for backward-compat
                 if var2:
-                    tb = pd.crosstab(df[var1], df[var2], values=df[val_var], aggfunc=agg_func, dropna=dropna,
-                                     margins=True, margins_name='Total')
+                    tb = _crosstab_na(df[var1], df[var2], values=df[val_var], aggfunc=agg_func,
+                                      dropna=dropna, margins=True, margins_name='Total')
                 else:
                     if len(val_vars) > 1:
                         # Flere variabler: lag kolonne per variabel
-                        tb = df.groupby(var1, dropna=not dropna)[val_vars].agg(agg_func)
+                        tb = df.groupby(var1, dropna=dropna)[val_vars].agg(agg_func)
                         total_row = df[val_vars].agg(agg_func)
                         total_row.name = 'Total'
                         tb = pd.concat([tb, total_row.to_frame().T])
                     else:
-                        tb = df.groupby(var1, dropna=not dropna)[val_var].agg(agg_func)
+                        tb = df.groupby(var1, dropna=dropna)[val_var].agg(agg_func)
                         if callable(agg_func):
                             total_val = agg_func(df[val_var].dropna())
                         else:
@@ -5521,13 +5561,13 @@ class StatsEngine:
             self._t5_small_cell_check(df[var1], df[var2] if var2 else None, dropna)
 
             if var2:
-                ct = pd.crosstab(df[var1], df[var2], normalize=normalize, dropna=dropna,
-                                 margins=True, margins_name='Total')
+                ct = _crosstab_na(df[var1], df[var2], normalize=normalize, dropna=dropna,
+                                  margins=True, margins_name='Total')
                 # rowsort() / colsort() — kjøres FØR chi2 (chi2 caster til string)
                 ct = _sort_tab_frame(ct, options)
                 if 'chi2' in options:
                     from scipy.stats import chi2_contingency
-                    ct_raw = pd.crosstab(df[var1], df[var2], dropna=dropna)
+                    ct_raw = _crosstab_na(df[var1], df[var2], dropna=dropna)
                     chi2, p, dof, exp = chi2_contingency(ct_raw)
                     ct = ct.astype(str)
                     ct.loc['_chi2'] = f'chi2={chi2:.4f}, p={p:.4f}, dof={dof}'
@@ -9672,20 +9712,37 @@ class MicroInterpreter:
                     )
                 )
                 _n_before = len(df_target) if _row_filter else None
-                # T6: snapshot målkolonner for replace/recode FØR transform
+                # T6: snapshot målkolonner for replace/recode FØR transform.
+                # _t6_snapshots: sammenligningsgrunnlag per målkolonne.
+                # _t6_restore: opprinnelig kolonne (None = fantes ikke → droppes
+                # ved revert). Uten dette kunne T6 omgås ved å skrive til en NY
+                # kolonne (recode ..., prefix() eller replace på ny variabel).
                 _t6_targets = []
                 _t6_snapshots = {}
+                _t6_restore = {}
                 if _is_disclosure_control():
                     if cmd == 'replace' and isinstance(args, dict):
                         _tn = args.get('target')
-                        if _tn and _tn in df_target.columns:
+                        if _tn:
                             _t6_targets.append(_tn)
-                            _t6_snapshots[_tn] = df_target[_tn].copy()
-                    elif cmd == 'recode' and isinstance(args, dict):
-                        for _tn in (args.get('vars') or []):
-                            if _tn and _tn in df_target.columns:
-                                _t6_targets.append(_tn)
+                            if _tn in df_target.columns:
                                 _t6_snapshots[_tn] = df_target[_tn].copy()
+                                _t6_restore[_tn] = _t6_snapshots[_tn]
+                            else:
+                                # Ny kolonne: før-tilstanden er «alt missing»
+                                _t6_snapshots[_tn] = None
+                                _t6_restore[_tn] = None
+                    elif cmd == 'recode' and isinstance(args, dict):
+                        _pfx = args.get('prefix') or ''
+                        for _src in (args.get('vars') or []):
+                            if not _src or _src not in df_target.columns:
+                                continue
+                            _tn = f"{_pfx}{_src}"
+                            _t6_targets.append(_tn)
+                            # prefix(): ny kolonne sammenlignes mot kildekolonnen
+                            _t6_snapshots[_tn] = df_target[_src].copy()
+                            _t6_restore[_tn] = (df_target[_tn].copy()
+                                                if _tn in df_target.columns else None)
                 result = self.transform_handler.execute(cmd, df_target, args, opts_copy)
                 # destring konverterer streng → tall: merk utdata-kolonnene som
                 # numeriske, så regress/summarize ikke avviser dem som alfanumeriske.
@@ -9725,9 +9782,13 @@ class MicroInterpreter:
                             break
                     if _t6_err is not None:
                         _err, _tn = _t6_err
-                        # Revert: gjenopprett snapshot-verdier
-                        for _tcol, _snap in _t6_snapshots.items():
-                            if _tcol in _df_check.columns:
+                        # Revert: gjenopprett snapshot-verdier (dropp nye kolonner)
+                        for _tcol, _snap in _t6_restore.items():
+                            if _tcol not in _df_check.columns:
+                                continue
+                            if _snap is None:
+                                _df_check.drop(columns=[_tcol], inplace=True)
+                            else:
                                 _df_check[_tcol] = _snap.values
                         self._log(_t("FEIL: {err}", err=_err))
                         return
