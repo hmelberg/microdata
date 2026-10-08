@@ -35,6 +35,14 @@ export interface StreamEvent {
   message?: string;
 }
 
+/** Avkortingsmeldingene — delt av den native løkka, leverandørløkka
+ *  (providers/agentic.ts) og single-shot-strømmene, så brukeren får SAMME
+ *  forklaring uansett leverandør. */
+export const AVKORTET_MIDT_I_SVARET =
+  "Svaret ble avkortet: modellen nådde token-taket midt i svaret. Still spørsmålet enklere, eller be om et kortere svar.";
+export const AVKORTET_UNDER_TENKING =
+  "Modellen brukte hele token-budsjettet på å tenke uten å begynne på svaret. Still spørsmålet enklere, eller velg et raskere kvalitetsnivå.";
+
 /** Endepunktet for dette kallet: brukerens gateway, ellers Anthropic selv. */
 function apiTarget(apiBase?: string): string {
   return apiBase ? `${apiBase.replace(/\/+$/, "")}/messages` : ANTHROPIC_API;
@@ -245,6 +253,9 @@ function transformAnthropicStream(
       // copy-paste of each other (framing AND event handling duplicated),
       // so a fix to one silently missed the other; framing now lives in
       // sse-frames.ts and the event vocabulary lives here, once.
+      // Avkorting/strømfeil: meldes som `error` i stedet for `done`, så
+      // klienten ikke viser et avkortet svar som ferdig.
+      const utfall: { feil: string | null } = { feil: null };
       const handlePayload = (payload: string) => {
         try {
           const obj = JSON.parse(payload);
@@ -255,15 +266,20 @@ function transformAnthropicStream(
             inputTokens = obj.message.usage.input_tokens ?? 0;
             cacheReadTokens = obj.message.usage.cache_read_input_tokens ?? 0;
             cacheCreationTokens = obj.message.usage.cache_creation_input_tokens ?? 0;
-          } else if (obj.type === "message_delta" && obj.usage) {
-            outputTokens = obj.usage.output_tokens ?? outputTokens;
+          } else if (obj.type === "message_delta") {
+            if (obj.usage) outputTokens = obj.usage.output_tokens ?? outputTokens;
+            if (obj.delta?.stop_reason === "max_tokens") utfall.feil = AVKORTET_MIDT_I_SVARET;
+          } else if (obj.type === "error") {
+            // Midt-strøm-feil (overloaded_error o.l.) kommer som et SSE-event
+            // ETTER 200 — de ble før svelget og meldt som `done`.
+            utfall.feil = `Anthropic-strømmen feilet: ${String(obj.error?.type ?? "error").slice(0, 80)}`;
           }
         } catch (_e) {
           // ignore non-JSON event data
         }
       };
       try {
-        while (true) {
+        while (utfall.feil === null) {
           const { value, done } = await reader.read();
           if (done) break;
           const parsed = parseSseFrames(decoder.decode(value, { stream: true }), buffer);
@@ -271,7 +287,13 @@ function transformAnthropicStream(
           parsed.payloads.forEach(handlePayload);
         }
         // Drain any residual buffer content not yet terminated by \n\n
-        flushSseBuffer(buffer).forEach(handlePayload);
+        if (utfall.feil === null) flushSseBuffer(buffer).forEach(handlePayload);
+        if (utfall.feil !== null) {
+          const err: StreamEvent = { type: "error", message: utfall.feil };
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(err)}\n\n`));
+          await reader.cancel().catch(() => {});
+          return;
+        }
         const done: StreamEvent = {
           type: "done",
           inputTokens,
@@ -741,9 +763,7 @@ export function runAgenticStream(opts: AgenticOptions): ReadableStream<Uint8Arra
           // svar — ingenting skilte det fra en heng. Nå sier vi hva som skjedde.
           if (turn.stopReason === "max_tokens") {
             throw new Error(
-              turnHadText || carryHadText
-                ? "Svaret ble avkortet: modellen nådde token-taket midt i svaret. Still spørsmålet enklere, eller be om et kortere svar."
-                : "Modellen brukte hele token-budsjettet på å tenke uten å begynne på svaret. Still spørsmålet enklere, eller velg et raskere kvalitetsnivå.",
+              turnHadText || carryHadText ? AVKORTET_MIDT_I_SVARET : AVKORTET_UNDER_TENKING,
             );
           }
           // Final answer — its deltas were already forwarded live above.

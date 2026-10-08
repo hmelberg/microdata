@@ -5,6 +5,7 @@
 import { type AgenticResumeState, fetchWithRetry, type RetryDeps } from "../anthropic.ts";
 import { type ProviderConfig, scrubKey } from "./config.ts";
 import type { ProviderTurnResult, RunTurn, TurnOpts } from "./agentic.ts";
+import { erTokenTakFeil, senketTak } from "./fallback.ts";
 
 export function toOpenAiTools(anthropicTools: unknown[]): unknown[] {
   return (anthropicTools as Record<string, unknown>[]).map((t) => ({
@@ -52,13 +53,15 @@ export function toOpenAiMessages(
   return out;
 }
 
-function safeParseJson(raw: unknown): Record<string, unknown> {
-  if (typeof raw !== "string") return {};
+/** null = uparsbare argumenter (typisk et avkortet verktøykall). */
+function safeParseJson(raw: unknown): Record<string, unknown> | null {
+  if (raw === undefined || raw === null || raw === "") return {};
+  if (typeof raw !== "string") return null;
   try {
     const v = JSON.parse(raw);
-    return v && typeof v === "object" ? v as Record<string, unknown> : {};
+    return v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : null;
   } catch (_) {
-    return {};
+    return null;
   }
 }
 
@@ -74,10 +77,11 @@ function throwClassified(status: number, detail: string, cfg: ProviderConfig, ha
  * POST to /chat/completions. Newer OpenAI chat models reject `max_tokens`
  * (they want `max_completion_tokens`); most third-party compat providers
  * still expect `max_tokens`. So send `max_tokens` first, and if that's
- * rejected with a 400 whose detail mentions max_tokens, retry ONCE with
- * `max_completion_tokens` in its place. Any other failure (including a
- * failure of the retry) is classified/thrown as before. Reads each
- * response body exactly once.
+ * rejected as an unsupported parameter, retry with `max_completion_tokens`
+ * in its place. Separately, a 400 saying the cap is too HIGH (DeepSeek:
+ * 8192, gpt-4o: 16384) gets ONE retry with the cap the message names, or
+ * with the parameter omitted. Any other failure is classified/thrown as
+ * before. Reads each response body exactly once.
  */
 // deno-lint-ignore no-explicit-any
 async function postChatCompletion(
@@ -94,18 +98,34 @@ async function postChatCompletion(
       body: JSON.stringify(b),
     }, deps);
 
-  let resp = await post(body);
-  if (resp.ok) return await resp.json();
-  let detail = await resp.text().catch(() => "");
-  if (resp.status === 400 && "max_tokens" in body && /max_tokens/i.test(detail)) {
-    const retryBody: Record<string, unknown> = { ...body };
-    delete retryBody.max_tokens;
-    retryBody.max_completion_tokens = body.max_tokens;
-    resp = await post(retryBody);
+  let b = body;
+  let byttet = false;
+  let senket = false;
+  while (true) {
+    const resp = await post(b);
     if (resp.ok) return await resp.json();
-    detail = await resp.text().catch(() => "");
+    const detail = await resp.text().catch(() => "");
+    if (resp.status === 400) {
+      if (!byttet && "max_tokens" in b && /max_tokens/i.test(detail) &&
+        /unsupported|not supported|max_completion_tokens/i.test(detail)) {
+        const retryBody: Record<string, unknown> = { ...b };
+        delete retryBody.max_tokens;
+        retryBody.max_completion_tokens = b.max_tokens;
+        b = retryBody;
+        byttet = true;
+        continue;
+      }
+      if (!senket && erTokenTakFeil(detail)) {
+        const ny = senketTak(b, "max_tokens" in b ? "max_tokens" : "max_completion_tokens", detail);
+        if (ny) {
+          b = ny;
+          senket = true;
+          continue;
+        }
+      }
+    }
+    throwClassified(resp.status, detail, cfg, hadTools);
   }
-  throwClassified(resp.status, detail, cfg, hadTools);
 }
 
 export function makeOpenAiCompatTurn(cfg: ProviderConfig): RunTurn {
@@ -118,18 +138,27 @@ export function makeOpenAiCompatTurn(cfg: ProviderConfig): RunTurn {
     };
     if (opts.tools.length) body.tools = toOpenAiTools(opts.tools);
     const json = await postChatCompletion(cfg, body, opts.tools.length > 0, opts.deps);
-    const msg = (json?.choices?.[0]?.message ?? {}) as Record<string, unknown>;
-    const toolUses = (Array.isArray(msg.tool_calls) ? msg.tool_calls : [])
+    const choice = (json?.choices?.[0] ?? {}) as Record<string, unknown>;
+    const msg = (choice.message ?? {}) as Record<string, unknown>;
+    if (choice.finish_reason === "content_filter") {
+      throw new Error("Leverandøren avbrøt svaret (content_filter)");
+    }
+    const parsed = (Array.isArray(msg.tool_calls) ? msg.tool_calls : [])
       .map((tc: Record<string, Record<string, unknown>>) => ({
         id: String(tc.id ?? ""),
         name: String(tc.function?.name ?? ""),
         input: safeParseJson(tc.function?.arguments),
       }));
+    // finish_reason "length" — eller et verktøykall med uparsbare argumenter —
+    // er en AVKORTET tur, ikke et svar og ikke et kall. Før ble det meldt som
+    // `done` midt i svaret, eller som run_code med tomt script (args → {}).
+    const avkortet = choice.finish_reason === "length" || parsed.some((t) => t.input === null);
+    const toolUses = parsed.map((t) => ({ ...t, input: t.input ?? {} }));
     return {
       text: typeof msg.content === "string" ? msg.content : "",
       toolUses,
       searchNotes: [],
-      stop: toolUses.length ? "tool_use" : "end",
+      stop: avkortet ? "max_tokens" : toolUses.length ? "tool_use" : "end",
       usage: {
         inputTokens: json?.usage?.prompt_tokens ?? 0,
         outputTokens: json?.usage?.completion_tokens ?? 0,

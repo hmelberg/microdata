@@ -17,6 +17,7 @@
 // kvalitetsnivåets anthropic-modell.
 import {
   type AnthropicMessageResult,
+  AVKORTET_MIDT_I_SVARET,
   type AnthropicStreamOptions,
   fetchWithRetry,
   messageAnthropic,
@@ -26,6 +27,7 @@ import {
 } from "../anthropic.ts";
 import { flushSseBuffer, parseSseFrames } from "../sse-frames.ts";
 import { type ProviderConfig, scrubKey } from "./config.ts";
+import { erEffortFeil } from "./fallback.ts";
 
 export interface SingleChoice {
   effort?: string;
@@ -33,6 +35,33 @@ export interface SingleChoice {
 
 function authHeaders(cfg: ProviderConfig): Record<string, string> {
   return { "Content-Type": "application/json", "Authorization": `Bearer ${cfg.key}` };
+}
+
+/**
+ * Effort kommer fra kvalitetsnivået, men brukerens modell er vilkårlig —
+ * ikke-resonnerende modeller (gpt-4o o.l.) avviser reasoning_effort /
+ * reasoning.effort med 400. Spec §4: effort «droppes der leverandøren ikke
+ * støtter den», stille. Derfor ÉTT nytt forsøk uten effort når 400-detaljen
+ * nevner reasoning/effort. Ellers returneres svaret uendret (detaljen
+ * bevares i en ny Response, så fail() fortsatt kan logge den).
+ */
+async function utenEffortVed400(
+  resp: Response,
+  cfg: ProviderConfig,
+  opts: AnthropicStreamOptions,
+  choice: SingleChoice,
+  stream: boolean,
+  deps: RetryDeps,
+): Promise<Response> {
+  if (resp.status !== 400 || !choice.effort) return resp;
+  const detail = await resp.text().catch(() => "");
+  if (!erEffortFeil(detail)) return new Response(detail, { status: 400 });
+  return await fetchWithRetry(endpointFor(cfg), {
+    method: "POST",
+    redirect: "error",
+    headers: authHeaders(cfg),
+    body: JSON.stringify(bodyFor(cfg, opts, {}, stream)),
+  }, deps);
 }
 
 /** Feil fra leverandøren: logg detaljen nøkkel-skrubbet, kast noe generisk. */
@@ -92,6 +121,10 @@ function transformProviderStream(
       const reader = upstream.getReader();
       const emit = (e: StreamEvent) =>
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`));
+      // Avkorting/avbrudd meldes som `error`, ikke `done` (review-runden
+      // 2026-10-08: response.incomplete/failed og finish_reason length ble
+      // før meldt som et ferdig svar).
+      const utfall: { feil: string | null } = { feil: null };
 
       const handlePayload = (payload: string) => {
         try {
@@ -102,11 +135,26 @@ function transformProviderStream(
             } else if (obj.type === "response.completed" && obj.response?.usage) {
               inputTokens = obj.response.usage.input_tokens ?? 0;
               outputTokens = obj.response.usage.output_tokens ?? 0;
+            } else if (obj.type === "response.incomplete") {
+              const grunn = String(obj.response?.incomplete_details?.reason ?? "");
+              utfall.feil = !grunn || grunn === "max_output_tokens"
+                ? AVKORTET_MIDT_I_SVARET
+                : `Leverandøren avbrøt svaret (${grunn.slice(0, 100)})`;
+            } else if (obj.type === "response.failed" || obj.type === "error") {
+              const e = obj.response?.error ?? obj.error ?? obj;
+              utfall.feil = `Leverandøren avbrøt svaret (${String(e?.code ?? e?.message ?? "failed").slice(0, 100)})`;
             }
+            return;
+          }
+          if (obj.error) {
+            utfall.feil = `Leverandøren avbrøt svaret (${String(obj.error.code ?? obj.error.message ?? "error").slice(0, 100)})`;
             return;
           }
           const delta = obj.choices?.[0]?.delta?.content;
           if (typeof delta === "string" && delta) emit({ type: "text", text: delta });
+          const slutt = obj.choices?.[0]?.finish_reason;
+          if (slutt === "length") utfall.feil = AVKORTET_MIDT_I_SVARET;
+          else if (slutt === "content_filter") utfall.feil = "Leverandøren avbrøt svaret (content_filter)";
           // Usage-chunken kommer til slutt og har tom choices-liste.
           if (obj.usage) {
             inputTokens = obj.usage.prompt_tokens ?? inputTokens;
@@ -126,6 +174,10 @@ function transformProviderStream(
           parsed.payloads.forEach(handlePayload);
         }
         flushSseBuffer(buffer).forEach(handlePayload);
+        if (utfall.feil !== null) {
+          emit({ type: "error", message: scrubKey(utfall.feil, cfg.key) });
+          return;
+        }
         emit({
           type: "done",
           inputTokens,
@@ -159,8 +211,9 @@ export async function streamProvider(
     headers: authHeaders(cfg),
     body: JSON.stringify(bodyFor(cfg, opts, choice, true)),
   }, deps);
-  if (!resp.ok || !resp.body) return fail(resp, cfg);
-  return transformProviderStream(resp.body, cfg);
+  const svar = await utenEffortVed400(resp, cfg, opts, choice, true, deps);
+  if (!svar.ok || !svar.body) return fail(svar, cfg);
+  return transformProviderStream(svar.body, cfg);
 }
 
 /** Ikke-strømmende single-shot (v2-plukkepasset). Speiler messageAnthropic. */
@@ -178,8 +231,9 @@ export async function messageProvider(
     headers: authHeaders(cfg),
     body: JSON.stringify(bodyFor(cfg, opts, choice, false)),
   }, deps);
-  if (!resp.ok) return fail(resp, cfg);
-  const json = await resp.json();
+  const svar = await utenEffortVed400(resp, cfg, opts, choice, false, deps);
+  if (!svar.ok) return fail(svar, cfg);
+  const json = await svar.json();
 
   let text = "";
   let u: Record<string, number> = {};

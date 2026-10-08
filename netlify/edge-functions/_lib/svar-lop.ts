@@ -11,6 +11,7 @@ import { type AgenticResumeState, runAgenticStream } from "./anthropic.ts";
 import { upstreamErrorResponse } from "./auth.ts";
 import { type LlmChoice } from "./llm-choice.ts";
 import { runProviderAgenticStream } from "./providers/agentic.ts";
+import { EGEN_LEVERANDOR_MAX_TOKENS } from "./providers/fallback.ts";
 import { makeOpenAiCompatTurn } from "./providers/openai-compat.ts";
 import { makeOpenAiResponsesTurn } from "./providers/openai-responses.ts";
 import { filtrerRunCode } from "./run-disiplin.ts";
@@ -178,18 +179,20 @@ export async function byggLop(inp: LopInput): Promise<ReadableStream<Uint8Array>
     },
   };
   const providerDeps = { timeoutMs: 180_000, retries: 1 };
+  // Egne leverandører får IKKE Anthropic-taket over: 32000 avvises av
+  // DeepSeek (8192) og gpt-4o/4o-mini (16384). Adapterne senker taket
+  // ytterligere ved en token-tak-400 (providers/fallback.ts).
+  const providerOpts = { ...commonOpts, maxTokens: EGEN_LEVERANDOR_MAX_TOKENS, deps: providerDeps };
   let inner: ReadableStream<Uint8Array>;
   try {
     if (choice.provider?.type === "openai-compat") {
       inner = runProviderAgenticStream({
-        ...commonOpts,
-        deps: providerDeps,
+        ...providerOpts,
         runTurn: makeOpenAiCompatTurn(choice.provider),
       });
     } else if (choice.provider?.type === "openai-responses") {
       inner = runProviderAgenticStream({
-        ...commonOpts,
-        deps: providerDeps,
+        ...providerOpts,
         runTurn: makeOpenAiResponsesTurn(choice.provider),
       });
     } else {
