@@ -36,12 +36,27 @@ def floor(x): return np.floor(x)
 def int_(x):
     """Elementvis heltallstrunkering. Bevarer int-dtype for pandas Series."""
     if isinstance(x, pd.Series):
-        # Nullable Int64 bevarer NaN → pd.NA
-        return np.trunc(x).astype('Int64')
+        # int64 bare uten missing; ellers float64 (NaN). Nullable Int64 gir
+        # pd.NA i sammenligninger og velter if-betingelser.
+        t = np.trunc(pd.to_numeric(x, errors='coerce').astype(float))
+        return t if t.isna().any() else t.astype(np.int64)
     if hasattr(x, '__iter__') and not isinstance(x, str):
         return np.trunc(x).astype(np.int64)
     return int(np.trunc(x))
-def round_(x, y=1): return np.round(x / y) * y if y != 1 else np.round(x)
+def round_(x, y=1):
+    """Avrunding til nærmeste multiplum av y, halvparten bort fra null
+    (round(0.5)=1, round(2.5)=3), ikke numpys banker's rounding. Kvotienten
+    pre-avrundes for å fjerne flyttallsstøy (0.15/0.1 = 1.4999999999999998)."""
+    xf = x.astype(float) if isinstance(x, pd.Series) else x
+    q = np.round(np.asarray(xf / y, dtype=float), 9) if y != 1 else np.asarray(xf, dtype=float)
+    r = np.sign(q) * np.floor(np.abs(q) + 0.5)
+    if y != 1:
+        r = r * y
+    if isinstance(x, pd.Series):
+        return pd.Series(r, index=x.index)
+    if np.ndim(r) == 0:
+        return float(r)
+    return r
 def pi(): return np.pi
 
 @_safe
@@ -162,9 +177,27 @@ def Ftail(x, v1, v2, lam=0):
 def invF(x, v1, v2): return scipy_stats.f.ppf(x, v1, v2)
 def invFtail(x, v1, v2): return scipy_stats.f.isf(x, v1, v2)
 
-def binomial(x, n, p): return scipy_stats.binom.cdf(int(x), int(n), p)
-def binomialp(x, n, p): return scipy_stats.binom.pmf(int(x), int(n), p)
-def binomialtail(x, n, p): return scipy_stats.binom.sf(int(x), int(n), p)
+def _binom_args(x, n):
+    """Elementvis heltallstrunkering av x og n (int() krasjet på Series)."""
+    return np.trunc(np.asarray(x, dtype=float)), np.trunc(np.asarray(n, dtype=float))
+
+
+def _binom_wrap(r, *args):
+    for a in args:
+        if isinstance(a, pd.Series):
+            return pd.Series(r, index=a.index)
+    return r if np.ndim(r) else float(r)
+
+
+def binomial(x, n, p):
+    xi, ni = _binom_args(x, n)
+    return _binom_wrap(scipy_stats.binom.cdf(xi, ni, p), x, n, p)
+def binomialp(x, n, p):
+    xi, ni = _binom_args(x, n)
+    return _binom_wrap(scipy_stats.binom.pmf(xi, ni, p), x, n, p)
+def binomialtail(x, n, p):
+    xi, ni = _binom_args(x, n)
+    return _binom_wrap(scipy_stats.binom.sf(xi, ni, p), x, n, p)
 
 def betaden(x, a, b): return scipy_stats.beta.pdf(x, a, b)
 def ibeta(x, a, b): return scipy_stats.beta.cdf(x, a, b)
@@ -173,10 +206,26 @@ def invibeta(x, a, b): return scipy_stats.beta.ppf(x, a, b)
 def invibetatail(x, a, b): return scipy_stats.beta.isf(x, a, b)
 
 # ============ STRENG ============
+def _scalar_na(x):
+    return x is None or (isinstance(x, (float, np.floating)) and np.isnan(x))
+
+
+def _str_keep_na(x, fn):
+    """Bruk fn på strengversjonen av x, men la missing forbli missing (som
+    string()); astype(str) ga ellers 'nan'/'None'."""
+    out = fn(x.astype(str))
+    na = x.isna()
+    if na.any():
+        out = out.astype(object).mask(na)
+    return out
+
+
 def length(x):
     if isinstance(x, pd.Series):
-        return x.astype(str).str.len()
-    return len(str(x))
+        out = x.astype(str).str.len()
+        na = x.isna()
+        return out.astype(float).mask(na) if na.any() else out
+    return np.nan if _scalar_na(x) else len(str(x))
 
 def string(x):
     if isinstance(x, pd.Series):
@@ -194,13 +243,13 @@ def string(x):
 
 def lower(x):
     if isinstance(x, pd.Series):
-        return x.astype(str).str.lower()
-    return str(x).lower()
+        return _str_keep_na(x, lambda s: s.str.lower())
+    return np.nan if _scalar_na(x) else str(x).lower()
 
 def upper(x):
     if isinstance(x, pd.Series):
-        return x.astype(str).str.upper()
-    return str(x).upper()
+        return _str_keep_na(x, lambda s: s.str.upper())
+    return np.nan if _scalar_na(x) else str(x).upper()
 
 def _substr_prepare_scalar(v):
     """Heltalls-IDer som kommunenummer (0–9999) skal ha 4 tegn før substr, ellers mister man ledende null (301→«0301»)."""
@@ -240,28 +289,28 @@ def substr(x, pos, length):
 
 def trim(x):
     if isinstance(x, pd.Series):
-        return x.astype(str).str.strip()
-    return str(x).strip()
+        return _str_keep_na(x, lambda s: s.str.strip())
+    return np.nan if _scalar_na(x) else str(x).strip()
 
 def ltrim(x):
     if isinstance(x, pd.Series):
-        return x.astype(str).str.lstrip()
-    return str(x).lstrip()
+        return _str_keep_na(x, lambda s: s.str.lstrip())
+    return np.nan if _scalar_na(x) else str(x).lstrip()
 
 def rtrim(x):
     if isinstance(x, pd.Series):
-        return x.astype(str).str.rstrip()
-    return str(x).rstrip()
+        return _str_keep_na(x, lambda s: s.str.rstrip())
+    return np.nan if _scalar_na(x) else str(x).rstrip()
 
 def startswith(x, s):
     if isinstance(x, pd.Series):
-        return x.astype(str).str.startswith(str(s))
-    return str(x).startswith(str(s))
+        return _str_keep_na(x, lambda v: v.str.startswith(str(s)))
+    return np.nan if _scalar_na(x) else str(x).startswith(str(s))
 
 def endswith(x, s):
     if isinstance(x, pd.Series):
-        return x.astype(str).str.endswith(str(s))
-    return str(x).endswith(str(s))
+        return _str_keep_na(x, lambda v: v.str.endswith(str(s)))
+    return np.nan if _scalar_na(x) else str(x).endswith(str(s))
 
 # ============ LOGIKK ============
 def inlist(x, *vals):
