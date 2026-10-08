@@ -1632,6 +1632,23 @@ def _py_eval_expr(df, expr):
     return pd.Series(result, index=df.index)
 
 
+def _na_safe_mask(m):
+    """Gjør en betingelsesmaske fri for pd.NA. Nullable dtyper (boolean,
+    Int64 …) gir pd.NA i sammenligninger; som maske ga det «boolean value of
+    NA is ambiguous» eller at missing-rader ble droppet. boolean-NA → False
+    (som NaN-sammenligning for float); nullable tall går via float slik at
+    `if x` oppfører seg som for en float-kolonne."""
+    if isinstance(m, pd.Series) and pd.api.types.is_extension_array_dtype(m.dtype):
+        if pd.api.types.is_bool_dtype(m.dtype):
+            return m.fillna(False).astype(bool)
+        if pd.api.types.is_numeric_dtype(m.dtype):
+            return m.astype(float).astype(bool)
+    if isinstance(m, pd.Series) and m.dtype == object and m.isna().any():
+        # F.eks. startswith(s, …) på missing s gir missing — ikke sann
+        return m.where(m.notna(), False).astype(bool)
+    return m
+
+
 def _py_eval_cond(df, expr):
     """
     Evaluer en betingelse (if-uttrykk) til en boolsk mask (Series[bool]) med samme index som df.
@@ -1640,7 +1657,7 @@ def _py_eval_cond(df, expr):
     """
     if isinstance(expr, str):
         expr = _stata_like_bool_fixup(expr)
-    res = _py_eval_expr(df, expr)
+    res = _na_safe_mask(_py_eval_expr(df, expr))
     if not isinstance(res, pd.Series):
         return pd.Series(bool(res), index=df.index)
     if res.dtype != bool:
@@ -1656,7 +1673,7 @@ def _line_condition_mask(df, expr, options):
     if options:
         m = options.get('_condition_mask')
         if m is not None:
-            return m
+            return _na_safe_mask(m)
     if not expr:
         return None
     return _py_eval_cond(df, expr)
@@ -4485,7 +4502,10 @@ class DataTransformHandler:
                         r'^([+-]?\d+(?:\.\d+)?)(?:\s+(?:"([^"]*)"|\'([^\']*)\'))?$',
                         rhs,
                     )
-                    if m_val:
+                    if rhs == '.' or re.fullmatch(r'(?:sys)?miss(?:ing)?', rhs, re.IGNORECASE):
+                        # `recode x (9 = .)`: omkod til missing, ikke literal '.'
+                        new_val = np.nan
+                    elif m_val:
                         code_str = m_val.group(1)
                         label_text = m_val.group(2) if m_val.group(2) is not None else m_val.group(3)
                         try:
@@ -4523,7 +4543,9 @@ class DataTransformHandler:
                         if row_mask is not None:
                             mask = mask & row_mask
                         write_val = new_val
-                        if was_string and isinstance(new_val, (int, float)) and not isinstance(new_val, bool):
+                        if was_string and isinstance(new_val, float) and np.isnan(new_val):
+                            write_val = None
+                        elif was_string and isinstance(new_val, (int, float)) and not isinstance(new_val, bool):
                             # Strengkolonner: omkodede verdier lagres som streng
                             # (parstatus == '1' skal virke etter recode)
                             write_val = str(int(new_val)) if float(new_val) == int(new_val) else str(new_val)
@@ -4590,15 +4612,18 @@ class DataTransformHandler:
                     for lo_val, hi_val in ranges:
                         mask = mask | ((col >= lo_val) & (col <= hi_val))
                     _apply_rule(mask)
-                # Hele tall etter recode → nullable int (bedre tabulate/etiketter; unngår 8.0 vs 8).
+                # Hele tall etter recode → int64 (bedre tabulate/etiketter; unngår 8.0 vs 8).
+                # Bare uten missing: nullable Int64 gir pd.NA i sammenligninger
+                # (drop if x > 1 droppet missing, generate … if krasjet), så med
+                # missing beholdes float64.
                 # Strengkolonner er alt håndtert i _apply_rule (omkodede verdier
                 # skrives som streng, umatchede passerer byte-identisk gjennom).
                 if not was_string and pd.api.types.is_numeric_dtype(out_col):
-                    sub = out_col.dropna()
-                    if len(sub):
-                        arr = sub.to_numpy(dtype=float, copy=False)
+                    out_col = pd.to_numeric(out_col, errors='coerce').astype(float)
+                    if len(out_col) and not out_col.isna().any():
+                        arr = out_col.to_numpy(dtype=float, copy=False)
                         if np.all(np.isfinite(arr)) and np.all(arr == np.round(arr)):
-                            out_col = out_col.round().astype('Int64')
+                            out_col = out_col.round().astype(np.int64)
                 # prefix()/generate(): nye variabler med omkodete verdier,
                 # originalen beholdes urørt (manualen). Uten prefix: overskriv.
                 if prefix:
@@ -8269,10 +8294,18 @@ class MicroInterpreter:
                 if not var or not rest:
                     return None
                 # Parse verdi: anførselstegn eller tall
-                if (rest.startswith('"') and rest.endswith('"')) or (rest.startswith("'") and rest.endswith("'")):
+                if len(rest) >= 2 and ((rest.startswith('"') and rest.endswith('"')) or (rest.startswith("'") and rest.endswith("'"))):
                     value = rest[1:-1]
                 else:
                     value = rest.strip()
+                    # Hurtigstien tar bare tall, '.', kolonnenavn og bare
+                    # label-aktige identifikatorer. Uttrykk (y + 1, round(y),
+                    # (y+1) …) må via eval — ellers sammenlignes mot en
+                    # streng-literal og masken blir stille feil.
+                    if value != '.' and not re.fullmatch(
+                            r'[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?'
+                            r'|[A-Za-z_À-ɏ][\wÀ-ɏ]*', value):
+                        return None
                     try:
                         if '.' in value:
                             value = float(value)
@@ -8404,9 +8437,9 @@ class MicroInterpreter:
         if cond:
             stripped = self._strip_parens_fully(cond)
             if '&' in stripped or '|' in stripped:
-                return self._eval_compound_condition_mask(df, stripped)
+                return _na_safe_mask(self._eval_compound_condition_mask(df, stripped))
             cond = stripped
-        return self._eval_simple_condition_mask(df, cond)
+        return _na_safe_mask(self._eval_simple_condition_mask(df, cond))
 
     def _eval_simple_condition_mask(self, df, cond):
         """Mask for én enkel betingelse (var op verdi) — ingen & / |."""
@@ -8438,6 +8471,10 @@ class MicroInterpreter:
                 return None
         resolved, aux = self._resolve_condition_value(var, value, df, self.label_manager)
         col = df[var]
+        if pd.api.types.is_extension_array_dtype(col.dtype) and pd.api.types.is_numeric_dtype(col.dtype) \
+                and not pd.api.types.is_bool_dtype(col.dtype):
+            # Nullable Int64 o.l.: sammenlign som float (NaN-semantikk, ikke pd.NA)
+            col = col.astype(float)
 
         def _is_stringy(c):
             # object (pandas 2 / Pyodide) eller str-dtype (pandas 3)
