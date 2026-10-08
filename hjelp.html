@@ -190,6 +190,7 @@
   <a href="#widgets">Widgets</a>
   <div class="nav-section">AI assistent</div>
   <a href="#ai">AI assistent</a>
+  <a href="personvern.html">Personvern</a>
   <div class="nav-section">Andre moduser</div>
   <a href="#modes">Moduser</a>
   <a href="#python">Python (Pyodide)</a>
@@ -352,9 +353,12 @@ summarize kjonn</code></pre>
 
     <h3>Slik fungerer det</h3>
     <p>
-      Klikk hamburger-meny → "Vurder dataminimering". Første gang du bruker
-      funksjonen vises en bekreftelse på at scriptet sendes til Anthropic. Faktiske
-      mikrodata-verdier sendes aldri.
+      Klikk «Vurder personvern»-knappen i verktøylinja. Ved hver vurdering sendes
+      scriptet (med eventuelle <code>key(...)</code>-verdier maskert) og konteksten du
+      skriver, via appens server til AI-leverandøren du har valgt i AI-innstillingene.
+      Det vises ingen egen bekreftelse før sending. Faktiske mikrodata-verdier sendes
+      aldri — scriptet kjøres bare mot syntetiske øvingsdata her. Se
+      <a href="personvern.html">personvernerklæringen</a> for detaljer.
     </p>
     <p>
       I valgmodalen kan du:
@@ -366,12 +370,12 @@ summarize kjonn</code></pre>
       <li><strong>Spesifisere formål og kontekst</strong> — valgfritt; gir mer presis vurdering</li>
     </ul>
 
-    <h3>Innlogging</h3>
+    <h3>API-nøkkel</h3>
     <p>
-      AI-vurderingen krever at du er logget inn i m2py. Bruk Logg inn-knappen
-      øverst og følg lenken på epost. Når du er logget inn (via FHI- eller annen
-      godkjent epost-adresse), har du tilgang til dataminimering-funksjonen
-      automatisk — ingen separat tilgangsnøkkel trengs.
+      Det finnes ingen innlogging eller konto i denne versjonen. Vurderingen krever
+      at du har lagt inn din egen Anthropic-API-nøkkel i AI-innstillingene
+      (tannhjulet i AI-panelet). Har du i tillegg valgt en annen AI-leverandør der,
+      går vurderingen til den leverandøren med den nøkkelen du har lagt inn for den.
     </p>
 
     <h3>Sensitive variabler</h3>
@@ -625,7 +629,7 @@ summarize kjonn
     <p>Et eksperimentelt sidepanel med en AI-assistent som kan svare på spørsmål om microdata-syntaks, foreslå variabler og generere eller revidere skript. Åpnes med stjerne-ikonet øverst til høyre eller <kbd>Ctrl</kbd>+<kbd>I</kbd>.</p>
 
     <div class="callout">
-      <strong>Krever egen API-nøkkel.</strong> Klikk tannhjul-ikonet i AI-panelet og lim inn en nøkkel. Standard er Anthropic (lag en nøkkel på <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>), men du kan i stedet velge OpenAI, Mistral eller en annen tjeneste med OpenAI-kompatibelt API i leverandør-nedtrekkslista. Nøkkelen lagres kun lokalt i nettleseren (localStorage) og sendes som <code>X-Anthropic-Key</code>- eller <code>X-Llm-Key</code>-header direkte videre til den leverandøren du har valgt, for hver forespørsel. Kvalitet-velgeren (Rask/Balansert/Best) styrer modell og hvor grundig modellen tenker.
+      <strong>Krever egen API-nøkkel.</strong> Klikk tannhjul-ikonet i AI-panelet og lim inn en nøkkel. Standard er Anthropic (lag en nøkkel på <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>), men du kan i stedet velge OpenAI, Mistral eller en annen tjeneste med OpenAI-kompatibelt API i leverandør-nedtrekkslista. Nøkkelen lagres kun lokalt i nettleseren (localStorage) og sendes som <code>X-Anthropic-Key</code>- eller <code>X-Llm-Key</code>-header direkte videre til den leverandøren du har valgt, for hver forespørsel. Kvalitet-velgeren (Rask/Balansert/Best) styrer modell og hvor grundig modellen tenker. Hva som sendes hvor, og hva som lagres midlertidig på serveren, står i <a href="personvern.html">personvernerklæringen</a>.
     </div>
 
     <h3>Hva assistenten kan gjøre</h3>

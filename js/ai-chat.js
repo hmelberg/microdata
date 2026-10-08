@@ -27,6 +27,13 @@
           ? window.DataDirectives.scrubKeys(s || '') : (s || '');
       }
 
+      // Motsatt vei: AI-scriptet kommer tilbake med key(***) — sett brukerens
+      // egne nøkler fra editoren inn igjen før det erstatter innholdet.
+      function restoreScriptKeys(s, original) {
+        return (window.DataDirectives && window.DataDirectives.restoreKeys)
+          ? window.DataDirectives.restoreKeys(s || '', original || '') : (s || '');
+      }
+
       const state = {
         sending: false,
         history: [],   // {role, html|text, raw}
@@ -97,7 +104,7 @@
          'aiSettingsBackdrop','aiCfgAnthropicKey','aiCfgSave','aiCfgCancel',
          'aiCfgByokStored','aiCfgByokRemove',
          'aiCfgProviderType','aiCfgAnthropicSection','aiCfgProviderFields',
-         'aiCfgProviderUrl','aiCfgProviderModel','aiCfgLlmKey','aiCfgQuality','aiCfgInstructions',
+         'aiCfgProviderUrl','aiCfgProviderUrlWarn','aiCfgProviderModel','aiCfgLlmKey','aiCfgQuality','aiCfgInstructions',
          'sidebarRight','sidebarOpenTab','scriptInput'
         ].forEach(id => { dom[id] = $(id); });
         dom.containers = document.querySelectorAll('.container');
@@ -421,7 +428,7 @@
         btn.addEventListener('click', () => {
           const content = buildInsertContent(rawMd, cb.checked);
           if (!content) return;
-          dom.scriptInput.value = content;
+          dom.scriptInput.value = restoreScriptKeys(content, dom.scriptInput.value);
           dom.scriptInput.dispatchEvent(new Event('input', { bubbles: true }));
           flash(btn, T('✓ Satt inn'));
         });
@@ -516,8 +523,9 @@
           method: 'POST',
           headers,
           body: JSON.stringify(Object.assign({
-            script: payload.script || '',
-            output: payload.output || '',
+            // key(<literal>) maskeres her OG sentralt i postWithRetry.
+            script: scrubScript(payload.script || ''),
+            output: scrubScript(payload.output || ''),
             språk: payload.lang || 'auto',
             // 'emulator' (syntetiske øvingsdata) eller 'ekte' (resultater
             // brukeren har kjørt på microdata.no). Bestemmer innrammingen
@@ -1011,7 +1019,7 @@
         // Editoren holder ikke lenger GitHub-fila — ellers ville Lagre skrevet
         // AI-scriptet over brukerens fil.
         if (window.mdGithubClearCurrent) window.mdGithubClearCurrent();
-        dom.scriptInput.value = script;
+        dom.scriptInput.value = restoreScriptKeys(script, dom.scriptInput.value);
         _aiLastInserted = dom.scriptInput.value;
         dom.scriptInput.dispatchEvent(new Event('input', { bubbles: true }));
       }
@@ -1198,6 +1206,20 @@
         var isAnthropic = !dom.aiCfgProviderType || dom.aiCfgProviderType.value === 'anthropic';
         if (dom.aiCfgAnthropicSection) dom.aiCfgAnthropicSection.style.display = isAnthropic ? '' : 'none';
         if (dom.aiCfgProviderFields) dom.aiCfgProviderFields.style.display = isAnthropic ? 'none' : '';
+        syncProviderUrlWarning();
+      }
+
+      // Forrige valgte preset — leverandørbyttet bytter bare ut verdier som
+      // fortsatt er DENS standard (se AiCredential.swapPresetField).
+      var lastPresetId = 'anthropic';
+
+      /** Advar når en beholdt egen URL peker et annet sted enn valgt preset. */
+      function syncProviderUrlWarning() {
+        if (!dom.aiCfgProviderUrlWarn) return;
+        var pr = presetById(dom.aiCfgProviderType ? dom.aiCfgProviderType.value : 'anthropic');
+        var url = dom.aiCfgProviderUrl ? dom.aiCfgProviderUrl.value : '';
+        var warn = !!pr.type && window.AiCredential.baseUrlMismatch(url, pr.url || '');
+        dom.aiCfgProviderUrlWarn.style.display = warn ? '' : 'none';
       }
 
       function openSettings() {
@@ -1206,6 +1228,7 @@
         var cfg = providerConfig();
         var pr = presetForConfig(cfg);
         if (dom.aiCfgProviderType) dom.aiCfgProviderType.value = pr.id;
+        lastPresetId = pr.id;
         if (dom.aiCfgProviderUrl) dom.aiCfgProviderUrl.value = cfg ? cfg.base_url : (pr.url || '');
         if (dom.aiCfgProviderModel) dom.aiCfgProviderModel.value = cfg ? cfg.model : (pr.model || '');
         if (dom.aiCfgLlmKey) dom.aiCfgLlmKey.value = state.llmKey;
@@ -1293,16 +1316,23 @@
             // Bytt preset → fyll URL/modell, men BARE når feltet er tomt eller
             // bar forrige presets verdi: en bruker som har skrevet sin egen
             // URL skal ikke få den overskrevet av et uhell med nedtrekkslista.
+            // Uten utbyttingen ville OpenAI → Mistral beholdt api.openai.com,
+            // og den nye Mistral-nøkkelen blitt sendt dit. En beholdt egen URL
+            // som peker et annet sted får en synlig advarsel (syncProviderFields).
             var pr = presetById(dom.aiCfgProviderType.value);
-            if (pr.type && dom.aiCfgProviderUrl && !dom.aiCfgProviderUrl.value.trim()) {
-              dom.aiCfgProviderUrl.value = pr.url || '';
+            var prev = presetById(lastPresetId);
+            lastPresetId = pr.id;
+            var AC = window.AiCredential;
+            if (pr.type && dom.aiCfgProviderUrl) {
+              dom.aiCfgProviderUrl.value = AC.swapPresetField(dom.aiCfgProviderUrl.value, prev.url || '', pr.url || '');
             }
-            if (pr.type && dom.aiCfgProviderModel && !dom.aiCfgProviderModel.value.trim()) {
-              dom.aiCfgProviderModel.value = pr.model || '';
+            if (pr.type && dom.aiCfgProviderModel) {
+              dom.aiCfgProviderModel.value = AC.swapPresetField(dom.aiCfgProviderModel.value, prev.model || '', pr.model || '');
             }
             syncProviderFields();
           });
         }
+        if (dom.aiCfgProviderUrl) dom.aiCfgProviderUrl.addEventListener('input', syncProviderUrlWarning);
         dom.aiSettingsBackdrop.addEventListener('click', (e) => {
           if (e.target === dom.aiSettingsBackdrop) closeSettings();
         });

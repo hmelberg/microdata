@@ -107,6 +107,35 @@
     return app === 'safestat' || !!hasSecret;
   };
 
+  // Every localStorage key that holds a credential. A shared #output=/#url=
+  // script runs in this origin and can read all of them, so autorun must be
+  // gated while any is present. Keep in sync with js/ai-chat.js (LS_KEY_*)
+  // and js/github-storage.js (LS_PAT/LS_PROFILES).
+  NL.SECRET_STORAGE_KEYS = ['md_anthropic_key', 'md_llm_key', 'md_access_token', 'm2py_github_pat'];
+
+  // key(<literal>) in a stored script (drafts, AI backup, recent files) is a
+  // decryption key — same pattern as DataDirectives.scrubKeys; key(ask) is not.
+  var STORED_KEY_LITERAL_RE = /\bkey\(\s*(?!ask\s*\))[^)\s][^)]*\)/i;
+
+  // storage: anything with getItem/length/key (window.localStorage). A storage
+  // that throws is unreadable to a shared script too → no secret.
+  NL.hasStoredSecret = function (storage) {
+    if (!storage) return false;
+    try {
+      for (var i = 0; i < NL.SECRET_STORAGE_KEYS.length; i++) {
+        if (storage.getItem(NL.SECRET_STORAGE_KEYS[i])) return true;
+      }
+      var p = storage.getItem('m2py_github_profiles');
+      if (p && /"pat"\s*:\s*"[^"]/.test(p)) return true;
+      var n = storage.length || 0;
+      for (var j = 0; j < n; j++) {
+        var v = storage.getItem(storage.key(j));
+        if (v && STORED_KEY_LITERAL_RE.test(v)) return true;
+      }
+    } catch (_) {}
+    return false;
+  };
+
   if (typeof module !== 'undefined' && module.exports) module.exports = NL;
   else global.NotebookLinks = NL;
 })(typeof window !== 'undefined' ? window : globalThis);
