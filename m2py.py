@@ -5255,16 +5255,34 @@ class StatsEngine:
             if len(args) < 2:
                 return pd.DataFrame()
             dep_var = args[0]
-            factors = [a for a in args[1:] if a in df.columns]
-            if dep_var not in df.columns or not factors:
+            if dep_var not in df.columns:
                 return pd.DataFrame()
             from statsmodels.formula.api import ols
             from statsmodels.stats.anova import anova_lm
-            formula_terms = [f"C({f})" for f in factors]
+            # a → hovedeffekt; a#b → kun interaksjon; a##b → hovedeffekter +
+            # interaksjon (som _expand_factor_design). i.-prefiks tillates.
+            formula_terms = []
+
+            def _add_term(term):
+                if term not in formula_terms:
+                    formula_terms.append(term)
+
             for a in args[1:]:
+                parts = [p.strip() for p in a.replace('##', '#').split('#')]
+                parts = [p[2:] if p.startswith('i.') else p for p in parts]
+                missing = [p for p in parts if p not in df.columns]
+                if missing:
+                    raise ValueError(_t("anova: variabelen '{var}' finnes ikke i datasettet.",
+                                        var=missing[0]))
+                if '##' in a:
+                    for p in parts:
+                        _add_term(f"C({p})")
                 if '#' in a:
-                    parts = a.replace('##', '#').split('#')
-                    formula_terms.append(':'.join(f"C({p.strip()})" for p in parts if p.strip() in df.columns))
+                    _add_term(':'.join(f"C({p})" for p in parts))
+                else:
+                    _add_term(f"C({parts[0]})")
+            if not formula_terms:
+                return pd.DataFrame()
             formula = f"{dep_var} ~ " + " + ".join(formula_terms)
             model = ols(formula, data=df).fit()
             anova_table = anova_lm(model, typ=2)
@@ -5639,6 +5657,16 @@ class StatsEngine:
                 return results[0]
             return results
 
+
+def _factor_dummies(series, prefix):
+    """i.VAR → 0/1-dummyer (referansekategori droppes). Rader der VAR mangler
+    blir NaN i ALLE dummyer — ellers ville de stille bli kodet som
+    referansekategorien (alle dummyer 0) og telle med i N."""
+    d = pd.get_dummies(series, prefix=prefix, drop_first=True).astype(float)
+    d.loc[series.isna(), :] = np.nan
+    return d
+
+
 class RegressionHandler:
     # control(): variablene er MED i modellen, men koeffisientene skjules.
     # Manualen dokumenterer opsjonen for regress og viser til den fra
@@ -5687,6 +5715,23 @@ class RegressionHandler:
         sm, _ = _ensure_statsmodels()
         return sm.add_constant(X) if add else X
 
+    @staticmethod
+    def _robust_refit(model, cov_type, cov_kwds=None):
+        """Robust/cluster-kovarians for en tilpasset statsmodels-modell.
+
+        OLS har get_robustcov_results; logit/probit/poisson/negative-binomial/
+        mlogit (discrete/GLM) har det ikke — de tilpasses på nytt med
+        cov_type, som gir samme punktestimater og sandwich-kovarians."""
+        if hasattr(model, 'get_robustcov_results'):
+            if cov_type == 'cluster':
+                return model.get_robustcov_results(cov_type='cluster',
+                                                   groups=cov_kwds['groups'])
+            return model.get_robustcov_results(cov_type=cov_type)
+        kw = {'cov_type': cov_type}
+        if cov_kwds:
+            kw['cov_kwds'] = cov_kwds
+        return model.model.fit(disp=0, **kw)
+
     def _apply_cov(self, model, options, df_clean=None):
         """Bruk robust eller cluster standardfeil.
 
@@ -5704,7 +5749,11 @@ class RegressionHandler:
                     _t("cluster({cov}): variabelen '{cov}' finnes ikke i datasettet.", cov=cov)
                 )
             try:
-                return model.get_robustcov_results(cov_type='cluster', groups=df_clean[cov].values)
+                groups = df_clean[cov].values
+                if len(groups) != int(model.nobs):
+                    raise ValueError(_t("klyngevariabelen har {n} rader, modellen {m}",
+                                        n=len(groups), m=int(model.nobs)))
+                return self._robust_refit(model, 'cluster', {'groups': groups})
             except Exception as e:
                 raise ValueError(
                     _t("cluster({cov}): kunne ikke beregne cluster-standardfeil "
@@ -5712,7 +5761,7 @@ class RegressionHandler:
                 )
         if options.get('robust'):
             try:
-                return model.get_robustcov_results(cov_type='HC1')
+                return self._robust_refit(model, 'HC1')
             except Exception as e:
                 raise ValueError(
                     _t("robust: kunne ikke beregne robuste standardfeil "
@@ -5738,7 +5787,15 @@ class RegressionHandler:
             if res_name:
                 extra[str(res_name) if res_name is not True else 'residuals'] = pd.Series(residuals.values, index=panel_df.index)
             if eff_name:
-                extra[str(eff_name) if eff_name is not True else 'effects'] = pd.Series(entity_means.values, index=panel_df.index)
+                # u_i = ȳ_i − x̄_i·b (− konstant når modellen har konstantledd),
+                # samme konvensjon som linearmodels estimated_effects / Stata
+                # `predict, u` — ikke entitetssnittet av y.
+                b = model.params
+                Xb_orig = X_orig[list(b.index)].astype(float) @ b.values
+                effects = entity_means - Xb_orig.groupby(g).transform('mean')
+                if 'const' in X_orig.columns:
+                    effects = effects - (Y_orig.mean() - Xb_orig.mean())
+                extra[str(eff_name) if eff_name is not True else 'effects'] = pd.Series(effects.values, index=panel_df.index)
         elif model_type == 're':
             # RE via MixedLM
             predicted = model.fittedvalues
@@ -5798,8 +5855,8 @@ class RegressionHandler:
         def _dummies(base):
             if base not in df.columns:
                 raise ValueError(_t("Faktorvariabel '{base}' finnes ikke i datasettet", base=base))
-            d = pd.get_dummies(df[base], prefix=base, drop_first=True)
-            return [(c, d[c].astype(float)) for c in d.columns]
+            d = _factor_dummies(df[base], base)
+            return [(c, d[c]) for c in d.columns]
 
         def _numeric(base):
             if base not in df.columns:
@@ -6551,7 +6608,14 @@ class RegressionHandler:
             X_w = X_panel.groupby(g).transform(lambda x: x - x.mean())
             if add_const and 'const' in X_w.columns:
                 X_w = X_w.drop(columns=['const'], errors='ignore')
-            model = sm.OLS(Y_w, X_w).fit()
+            # Frihetsgrader: within-OLS ser bare N-K, men G entitetssnitt er
+            # estimert i tillegg → df_resid = N-K-G (som LSDV / Stata xtreg, fe).
+            # Påvirker vanlig SE og t-fordeling; cluster-korreksjonen bruker
+            # exog-formen (N, K) og er uendret.
+            fe_mod = sm.OLS(Y_w, X_w)
+            fe_mod.df_resid = (len(Y_w) - np.linalg.matrix_rank(np.asarray(X_w, dtype=float))
+                               - int(g.nunique()))
+            model = fe_mod.fit()
             if options.get('robust'):
                 try:
                     model = model.get_robustcov_results(cov_type='cluster', groups=g.values)
@@ -6821,7 +6885,7 @@ class RegressionHandler:
             if v.startswith('i.'):
                 base = v[2:]
                 if base in df.columns:
-                    dummies = pd.get_dummies(df[base], prefix=base, drop_first=True).astype(float)
+                    dummies = _factor_dummies(df[base], base)
                     for col in dummies.columns:
                         df[col] = dummies[col]
                     exog_cols.extend(dummies.columns)
@@ -7023,18 +7087,28 @@ class SurvivalHandler:
         # forskerens datasett skal ikke få dummy-kolonner som bivirkning.
         work_parts = [df[[event_var, duration_var]]]
         covars = []
+        missing = [v for v in raw_covars
+                   if (v[2:] if v.startswith('i.') else v) not in df.columns]
+        if missing:
+            raise ValueError(_t("cox: variabelen '{var}' finnes ikke i datasettet.",
+                                var=missing[0]))
         for v in raw_covars:
             if v.startswith('i.'):
                 base = v[2:]
-                if base in df.columns:
-                    dummies = pd.get_dummies(df[base], prefix=base, drop_first=True).astype(float)
-                    work_parts.append(dummies)
-                    covars.extend(dummies.columns)
-            elif v in df.columns:
+                dummies = _factor_dummies(df[base], base)
+                work_parts.append(dummies)
+                covars.extend(dummies.columns)
+            else:
                 work_parts.append(df[[v]])
                 covars.append(v)
         sub = pd.concat(work_parts, axis=1).dropna(how='any')
+        n_nonpos = int((sub[duration_var] <= 0).sum())
         sub = sub[sub[duration_var] > 0]
+        if n_nonpos:
+            # Som Stata stset: varighet <= 0 er utenfor risikoperioden og
+            # utelates — men ikke stille.
+            options.setdefault('_notes', []).append(
+                _t("cox: {n} observasjoner med varighet <= 0 er utelatt.", n=n_nonpos))
         if sub.empty or len(sub) < 3:
             return (_t("cox: for få observasjoner etter dropna (varighet må være > 0)."), None)
         level = float(options.get('level', 95)) / 100
@@ -10213,6 +10287,8 @@ class MicroInterpreter:
                 surv_opts = dict(opts)
                 surv_opts['_label_manager'] = self.label_manager
                 result = self.survival_handler.execute(cmd, df_target, args, surv_opts)
+                for _note in surv_opts.get('_notes', ()):
+                    self._log(_note)
                 if isinstance(result, tuple):
                     summary, fig = result
                     if isinstance(summary, pd.DataFrame):
