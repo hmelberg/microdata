@@ -1,7 +1,7 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
-  chunkNokkel, headNokkel, lagSkriver, lesChunks, lesHead, slettJobb,
-  type BlobbStore,
+  chunkNokkel, headNokkel, HJERTESLAG_MS, lagSkriver, lesChunks, lesHead,
+  merkGjentattJobbFeilet, slettJobb, type BlobbStore,
 } from "./jobb-blobb.ts";
 
 /** Falsk store som HUSKER rekkefølgen skrivingene kom i. */
@@ -66,7 +66,7 @@ Deno.test("avslutt flusher resten og setter slutt-tilstanden", async () => {
   await s.skriv('data: {"type":"delta","text":"hei"}\n\n');
   await s.avslutt("ferdig");
   const head = await lesHead(store, "j1");
-  assertEquals(head, { seq: 1, state: "ferdig", start: 1000 });
+  assertEquals(head, { seq: 1, state: "ferdig", start: 1000, oppdatert: 1000 });
 });
 
 // Fix 2 (sluttfiks-planen 2026-08-28): head må finnes FØR byggLop/
@@ -76,7 +76,7 @@ Deno.test("start() skriver en lesbar kjorer-head ved seq 0 uten at skriv() er ka
   const { store, rekkefolge } = fakeStore();
   const s = lagSkriver(store, "j1", () => 1000);
   await s.start();
-  assertEquals(await lesHead(store, "j1"), { seq: 0, state: "kjorer", start: 1000 });
+  assertEquals(await lesHead(store, "j1"), { seq: 0, state: "kjorer", start: 1000, oppdatert: 1000 });
   // Ingen buffer å flushe → ingen chunk-nøkkel, bare selve headen.
   assertEquals(rekkefolge, ["j1/head"]);
 });
@@ -169,4 +169,120 @@ Deno.test("150 ms-grensen er eksakt — 149 ms flushes ikke, 150 ms flushes", as
   na = 1150;  // 150 ms senere
   await s2.skriv('data: {"type":"delta","text":"b"}\n\n');
   assertEquals(rekkefolge2, ["j1/000001", "j1/head"], "150 ms skal trigre flush");
+});
+
+// ── Livstegn og idempotens (sikkerhetsrunde 2026-10-08) ────────────────────
+// Dødjobb-vakten i jobb-tail.ts måler nå tid siden SISTE head-skriving, ikke
+// siden start. Hver head-skriving må derfor stemple `oppdatert`, og jobben må
+// kunne skrive et rent livstegn når den står stille (prefiks, forord-retry,
+// 429-backoff, venting på headers).
+
+Deno.test("hver head-skriving stempler oppdatert med nåtid, start står fast", async () => {
+  const { store } = fakeStore();
+  let na = 1000;
+  const s = lagSkriver(store, "j1", () => na);
+  await s.start();
+  na = 5000;
+  await s.skriv('data: {"type":"done"}\n\n');
+  assertEquals(await lesHead(store, "j1"), { seq: 1, state: "kjorer", start: 1000, oppdatert: 5000 });
+});
+
+Deno.test("hjerteslag() skriver head på nytt med fersk oppdatert og samme seq", async () => {
+  const { store, rekkefolge } = fakeStore();
+  let na = 1000;
+  const s = lagSkriver(store, "j1", () => na);
+  await s.start();
+  na = 61_000;
+  await s.hjerteslag();
+  assertEquals(await lesHead(store, "j1"), { seq: 0, state: "kjorer", start: 1000, oppdatert: 61_000 });
+  assertEquals(rekkefolge, ["j1/head", "j1/head"]);
+});
+
+Deno.test("hjerteslag() flusher buffret tekst i stedet for å la den ligge", async () => {
+  const { store } = fakeStore();
+  let na = 1000;
+  const s = lagSkriver(store, "j1", () => na);
+  await s.skriv('data: {"type":"delta","text":"a"}\n\n');   // buffres
+  na = 1050;
+  await s.hjerteslag();
+  assertEquals((await lesHead(store, "j1"))?.seq, 1);
+  assertEquals(await lesChunks(store, "j1", 0, 1), ['data: {"type":"delta","text":"a"}\n\n']);
+});
+
+Deno.test("etter avslutt() er skriv() og hjerteslag() no-ops — sluttilstanden kan ikke snus til kjorer", async () => {
+  const { store, rekkefolge } = fakeStore();
+  let na = 1000;
+  const s = lagSkriver(store, "j1", () => na);
+  await s.start();
+  await s.avslutt("ferdig");
+  assertEquals(s.avsluttet, true);
+  const antall = rekkefolge.length;
+  na = 9000;
+  await s.hjerteslag();
+  await s.skriv('data: {"type":"error","message":"sen"}\n\n');
+  assertEquals(rekkefolge.length, antall);
+  assertEquals((await lesHead(store, "j1"))?.state, "ferdig");
+});
+
+Deno.test("startHvisNy() tar jobben når ingen head finnes", async () => {
+  const { store } = fakeStore();
+  const s = lagSkriver(store, "j1", () => 1000);
+  assertEquals(await s.startHvisNy(), true);
+  assertEquals(await lesHead(store, "j1"), { seq: 0, state: "kjorer", start: 1000, oppdatert: 1000 });
+});
+
+Deno.test("startHvisNy() rører IKKE en eksisterende jobb (Netlify-retry) og gjør skriveren inert", async () => {
+  const { store, data } = fakeStore();
+  await store.set(chunkNokkel("j1", 1), "data: gammelt\n\n");
+  await store.setJSON(headNokkel("j1"), { seq: 1, state: "kjorer", start: 0, oppdatert: 0 });
+  const s = lagSkriver(store, "j1", () => 1000);
+  assertEquals(await s.startHvisNy(), false);
+  await s.skriv('data: {"type":"done"}\n\n');
+  await s.avslutt("ferdig");
+  // Ingenting overskrevet: seq 1, gammel chunk, gammel start.
+  assertEquals(await lesHead(store, "j1"), { seq: 1, state: "kjorer", start: 0, oppdatert: 0 });
+  assertEquals(data.get(chunkNokkel("j1", 1)), "data: gammelt\n\n");
+});
+
+Deno.test("startHvisNy() respekterer en atomisk onlyIfNew-avvisning fra storen", async () => {
+  // Kappløp: lesHead så ingenting, men en annen invokasjon rakk å skrive head
+  // før oss. Netlify Blobs svarer da {modified:false} på onlyIfNew.
+  const { store } = fakeStore();
+  const sett: unknown[] = [];
+  const kappStore: BlobbStore = {
+    ...store,
+    setJSON: (k, v, o) => {
+      sett.push(o);
+      return o?.onlyIfNew ? Promise.resolve({ modified: false }) : store.setJSON(k, v);
+    },
+  };
+  const s = lagSkriver(kappStore, "j1", () => 1000);
+  assertEquals(await s.startHvisNy(), false);
+  assertEquals(sett, [{ onlyIfNew: true }]);
+  assertEquals(s.avsluttet, true);
+});
+
+Deno.test("merkGjentattJobbFeilet avslutter en hengende kjorer-jobb med en ren feil", async () => {
+  const { store } = fakeStore();
+  await store.set(chunkNokkel("j1", 2), "data: x\n\n");
+  await store.setJSON(headNokkel("j1"), { seq: 2, state: "kjorer", start: 0, oppdatert: 10 });
+  await merkGjentattJobbFeilet(store, "j1", () => 5000);
+  const head = await lesHead(store, "j1");
+  assertEquals(head, { seq: 3, state: "feil", start: 0, oppdatert: 5000 });
+  const [c] = await lesChunks(store, "j1", 2, 3);
+  const ev = JSON.parse(c.slice(6));
+  assertEquals(ev.type, "error");
+});
+
+Deno.test("merkGjentattJobbFeilet lar en ferdig jobb være i fred", async () => {
+  const { store, rekkefolge } = fakeStore();
+  await store.setJSON(headNokkel("j1"), { seq: 4, state: "ferdig", start: 0, oppdatert: 10 });
+  const for_ = rekkefolge.length;
+  await merkGjentattJobbFeilet(store, "j1", () => 5000);
+  assertEquals(rekkefolge.length, for_);
+  assertEquals((await lesHead(store, "j1"))?.state, "ferdig");
+});
+
+Deno.test("HJERTESLAG_MS er kort nok til at vakten tåler flere tapte slag", () => {
+  if (!(HJERTESLAG_MS > 0 && HJERTESLAG_MS <= 30_000)) throw new Error(`HJERTESLAG_MS=${HJERTESLAG_MS}`);
 });

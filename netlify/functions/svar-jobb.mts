@@ -6,12 +6,27 @@
 // enkelt POST. Både auth-porten OG jobb-hemmeligheten er derfor påkrevd —
 // hemmeligheten fordi rate-limiten bor på /api/svar, og et direkte kall hit
 // ellers ville gått utenom den.
+//
+// DNS REBINDING: leverandørens base_url sjekkes av isPublicHttpUrl (ssrf.ts),
+// som bare ser på vertsnavnet. Her, i Node, slås navnet opp med vanlig DNS
+// ved hver fetch, så et offentlig navn som peker (eller senere peker om) til
+// en privat adresse fanges IKKE. Kjent begrensning: kallet bærer bare
+// brukerens egen nøkkel til brukerens egen valgte vert, aldri serverens
+// nøkler, og alle leverandør-fetch bruker redirect: "error".
+//
+// RETRY: en bakgrunnsfunksjon som kaster kan bli kjørt på nytt av Netlify med
+// samme body (samme jobId). kjorJobb (_lib/jobb-kjoring.ts) sørger for at bare
+// første invokasjon tar jobben, og at ingen feil slipper ut av handleren.
 import type { Config } from "@netlify/functions";
-import { extractByokKey, runGate, timingSafeEqual } from "../edge-functions/_lib/auth.ts";
+import {
+  extractByokKey, extractLlmKey, runGate, timingSafeEqual,
+} from "../edge-functions/_lib/auth.ts";
 import { coerceQuality, resolveLlm } from "../edge-functions/_lib/llm-choice.ts";
-import { lagSkriver } from "../edge-functions/_lib/jobb-blobb.ts";
+import { kjorJobb } from "../edge-functions/_lib/jobb-kjoring.ts";
+import { scrubKey } from "../edge-functions/_lib/providers/config.ts";
 import { skrivForord } from "../edge-functions/_lib/forord.ts";
 import { byggLop, nyHopSamler } from "../edge-functions/_lib/svar-lop.ts";
+import type { JobbSkriver } from "../edge-functions/_lib/jobb-blobb.ts";
 import { journalfor } from "../edge-functions/_lib/feiljournal.ts";
 import {
   feiljournalStore, ingenRateLimit, jobbStore, nodeEnv,
@@ -29,6 +44,17 @@ import {
 const TUR_FRIST_MS = 300_000;
 
 export default async (request: Request): Promise<Response> => {
+  // Ytterste nett: ingenting skal kunne kaste ut av en bakgrunnsfunksjon —
+  // et kast betyr en Netlify-retry med samme jobId.
+  try {
+    return await handler(request);
+  } catch (e) {
+    console.error("svar-jobb: uventet feil i handleren:", String(e).slice(0, 300));
+    return new Response(null, { status: 500 });
+  }
+};
+
+async function handler(request: Request): Promise<Response> {
   const hemmelighet = nodeEnv("SVAR_JOBB_SECRET") ?? "";
   const presentert = request.headers.get("x-jobb-nokkel") ?? "";
   if (!hemmelighet || !timingSafeEqual(presentert, hemmelighet)) {
@@ -45,13 +71,20 @@ export default async (request: Request): Promise<Response> => {
   });
   if (gateResp) return gateResp;
 
-  const body = await request.json();
+  // deno-lint-ignore no-explicit-any
+  let body: Record<string, any>;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response("Ugyldig JSON", { status: 400 });
+  }
+  if (!body || typeof body !== "object") return new Response("Ugyldig body", { status: 400 });
   const jobId = String(body.jobId ?? "");
   if (!/^[0-9a-f-]{36}$/.test(jobId)) {
     return new Response("Ugyldig jobId", { status: 400 });
   }
 
-  // Skriveren opprettes og head skrives HER — rett etter porten og
+  // Head skrives (via kjorJobb) HER — rett etter porten og
   // jobId-valideringen, FØR resolveLlm eller byggLop. Grunnen: tailerens
   // ventPaaHeadMs (10 s, jobb-tail.ts) starter å telle idet klienten fikk
   // 202 fra /api/svar, altså FØR denne bakgrunnsinvokasjonen i det hele tatt
@@ -80,28 +113,55 @@ export default async (request: Request): Promise<Response> => {
     ? rå as { role: "user" | "assistant"; content: string }[]
     : undefined;
 
-  const skriver = lagSkriver(jobbStore(), jobId, () => Date.now());
-  await skriver.start();
+  // Nøklene som kan dukke opp i feiltekst: skrubbes før noe skrives til
+  // klienten eller loggen.
+  const byokKey = extractByokKey(request);
+  const llmKey = extractLlmKey(request);
+  const skrubb = (t: string): string =>
+    [byokKey, llmKey].reduce<string>((acc, k) => (k ? scrubKey(acc, k) : acc), t);
 
-  // byokKey beregnes HER (ikke bare inne i resolveLlm) fordi byggLop trenger
+  await kjorJobb({
+    store: jobbStore(), jobId, skrubb,
+    arbeid: (skriver) => kjorLopet(request, body, skriver, {
+      byokKey, skrubb, forhistorikk, hoppStart, samler,
+    }),
+  });
+  return new Response(null, { status: 202 });
+}
+
+async function kjorLopet(
+  request: Request,
+  // deno-lint-ignore no-explicit-any
+  body: Record<string, any>,
+  skriver: JobbSkriver,
+  k: {
+    byokKey: string | null;
+    skrubb: (t: string) => string;
+    forhistorikk: { role: "user" | "assistant"; content: string }[] | undefined;
+    hoppStart: number;
+    samler: ReturnType<typeof nyHopSamler>;
+  },
+): Promise<void> {
+  const { byokKey, skrubb, forhistorikk, hoppStart, samler } = k;
+  // byokKey beregnes i handleren (ikke bare inne i resolveLlm) fordi byggLop trenger
   // sin egen kopi til upstreamErrorResponse(e, byokKey) — se svar.ts, som gjør
   // det samme. LopInput.byokKey er PÅKREVD (task-4-report-rulingen): utelates
   // den, degraderer BYOK-feilmeldinger stille til en generisk 502 i stedet for
   // 401 «Ugyldig Anthropic-nøkkel», og ingen test i dette repoet fanger det —
   // verken deno check (Node-funksjoner er utenfor Deno-sjekken) eller esbuild
   // (typefeil, ikke bundlefeil).
-  const byokKey = extractByokKey(request);
   const choice = resolveLlm(request, body, "svar", nodeEnv);
   if (choice instanceof Response) {
     // Uten dette blir jobben stående som «kjorer» ved seq 0 helt til
-    // dødjobb-vakten (16 min, jobb-tail.ts) rydder den — resolveLlm feiler
-    // her praktisk talt aldri (svar.ts har alt validert samme body), men når
-    // den gjør det, skal taileren få vite det i sekunder, ikke minutter.
+    // dødjobb-vakten (MAKS_STILLHET_MS, 3 min uten livstegn, jobb-tail.ts)
+    // rydder den — resolveLlm feiler her praktisk talt aldri (svar.ts har
+    // alt validert samme body), men når den gjør det, skal taileren få vite
+    // det i sekunder, ikke minutter.
     await skriver.skriv(`data: ${JSON.stringify({
       type: "error", message: `Kunne ikke starte løpet (HTTP ${choice.status})`,
     })}\n\n`);
     await skriver.avslutt("feil");
-    return choice;
+    return;
   }
 
   // erPersonlig regnes ut HER, fra tokenet — den kommer ALDRI fra bodyen.
@@ -148,7 +208,7 @@ export default async (request: Request): Promise<Response> => {
       type: "error", message: `Kunne ikke bygge løpet (HTTP ${lop.status})`,
     })}\n\n`);
     await skriver.avslutt("feil");
-    return new Response(null, { status: 202 });
+    return;
   }
 
   // Bare når turen faktisk kommer til å tenke (altså «Grundig»), og bare på
@@ -181,8 +241,9 @@ export default async (request: Request): Promise<Response> => {
     }
     await skriver.avslutt("ferdig");
   } catch (e) {
+    // Skrubbet: feilteksten kan i verste fall ekko oppstrøms-detaljer.
     await skriver.skriv(`data: ${JSON.stringify({
-      type: "error", message: String(e),
+      type: "error", message: skrubb(String(e)),
     })}\n\n`);
     await skriver.avslutt("feil");
   }
@@ -191,6 +252,8 @@ export default async (request: Request): Promise<Response> => {
   // frem. Journalen er best-effort (journalfor feiler åpent), og skrives kun
   // for personlig-autentisert trafikk — journal er null ellers.
   if (journal) {
+    // Best-effort: jobben er allerede avsluttet, så en feil her skal aldri
+    // ende som et kast (kjorJobb ville da prøvd å skrive en sen feil).
     await journalfor(journal, {
       type: "svar",
       sporsmal: question,
@@ -211,9 +274,8 @@ export default async (request: Request): Promise<Response> => {
       oppslag: samler.oppslag,
       slutt: samler.slutt || "ukjent",
       usage: samler.usage,
-    });
+    }).catch((e) => console.error("svar-jobb: journal feilet:", skrubb(String(e))));
   }
-  return new Response(null, { status: 202 });
-};
+}
 
 export const config: Config = { path: "/api/svar-jobb", background: true };

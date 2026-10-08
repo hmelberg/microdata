@@ -3,20 +3,79 @@
 // cannot pre-resolve DNS, so a public hostname resolving to a private IP is
 // not catchable here. Compensating controls: no credential forwarding,
 // GET/POST-json only, byte cap, timeout, redirect hops re-checked.
+//
+// DNS REBINDING: the same hostname-only guard also protects the user-supplied
+// provider base_url, and the svar agentic loop now runs in a Node background
+// function (netlify/functions/svar-jobb.mts) with ordinary DNS resolution. A
+// public hostname that resolves (or later re-resolves) to a private address is
+// NOT caught here, on either runtime. Accepted limitation: those fetches send
+// only the user's own key to the user's own chosen host, never server
+// credentials, and use redirect: "error".
 
-const PRIVATE_V4 = [
-  /^10\./, /^127\./, /^169\.254\./, /^192\.168\./, /^0\./,
-  /^172\.(1[6-9]|2\d|3[01])\./,
+// Reserverte/ikke-offentlige IPv4-områder som [nettverk, prefikslengde].
+const RESERVERT_V4: [number, number][] = [
+  [0x00000000, 8],   // 0.0.0.0/8      «denne» nettverket
+  [0x0a000000, 8],   // 10.0.0.0/8     privat
+  [0x64400000, 10],  // 100.64.0.0/10  CGNAT
+  [0x7f000000, 8],   // 127.0.0.0/8    loopback
+  [0xa9fe0000, 16],  // 169.254.0.0/16 link-local (sky-metadata)
+  [0xac100000, 12],  // 172.16.0.0/12  privat
+  [0xc0000000, 24],  // 192.0.0.0/24   IETF-protokolltildelinger
+  [0xc0a80000, 16],  // 192.168.0.0/16 privat
+  [0xc6120000, 15],  // 198.18.0.0/15  benchmarking
+  [0xe0000000, 4],   // 224.0.0.0/4    multicast
+  [0xf0000000, 4],   // 240.0.0.0/4    reservert + 255.255.255.255
 ];
+
+function erReservertV4(ip: number): boolean {
+  return RESERVERT_V4.some(([nett, len]) => {
+    const maske = len === 0 ? 0 : (~0 << (32 - len)) >>> 0;
+    return ((ip & maske) >>> 0) === nett;
+  });
+}
+
+/** Tolker en vertsstreng som IPv4 i alle inet_aton-former (desimal, 0x-heks,
+ * 0-oktal, 1-4 deler: «127.1», «2130706433», «0x7f.1»). null = ikke en IPv4.
+ * new URL() kanoniserer disse allerede, men vi stoler ikke blindt på det. */
+export function ipv4Tall(host: string): number | null {
+  const deler = host.split(".");
+  if (deler.length < 1 || deler.length > 4) return null;
+  const tall: number[] = [];
+  for (const d of deler) {
+    let n: number;
+    if (/^0x[0-9a-f]*$/i.test(d)) n = d.length === 2 ? 0 : parseInt(d.slice(2), 16);
+    else if (/^0[0-7]+$/.test(d)) n = parseInt(d, 8);
+    else if (/^(0|[1-9]\d*)$/.test(d)) n = parseInt(d, 10);
+    else return null;
+    if (!Number.isFinite(n)) return null;
+    tall.push(n);
+  }
+  const siste = tall.pop()!;
+  if (tall.some((n) => n > 255)) return null;
+  const restBits = 8 * (4 - tall.length);
+  if (siste >= 2 ** restBits) return null;
+  let ip = 0;
+  for (const n of tall) ip = ip * 256 + n;
+  return ip * 2 ** restBits + siste;
+}
 
 export function isPublicHttpUrl(raw: string): boolean {
   let u: URL;
   try { u = new URL(raw); } catch { return false; }
   if (u.protocol !== "http:" && u.protocol !== "https:") return false;
-  const host = u.hostname.toLowerCase();
-  if (host === "localhost" || host.endsWith(".local") || host.endsWith(".internal")) return false;
-  if (host.includes(":")) return false; // IPv6 literals: reject
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(host) && PRIVATE_V4.some((re) => re.test(host))) return false;
+  // Normaliser FØRST: små bokstaver og ingen avsluttende punktum. Uten dette
+  // slapp «localhost.» og «metadata.google.internal.» forbi suffiks-sjekkene
+  // (new URL() beholder punktumet), selv om DNS behandler dem likt.
+  const host = u.hostname.toLowerCase().replace(/\.+$/, "");
+  if (!host) return false;
+  if (host === "localhost" || host.endsWith(".localhost")) return false;
+  if (host.endsWith(".local") || host === "internal" || host.endsWith(".internal")) return false;
+  if (host.includes(":") || host.startsWith("[")) return false; // IPv6 literals (inkl. IPv4-mapped): reject
+  const ip = ipv4Tall(host);
+  if (ip !== null) return !erReservertV4(ip);
+  // Ser ut som et tall-literal, men lot seg ikke tolke (f.eks. «09.1.1.1»):
+  // avvis heller enn å la resolveren gjette.
+  if (/^[0-9.x]+$/i.test(host) && /^\d/.test(host)) return false;
   return true;
 }
 

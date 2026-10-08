@@ -6,7 +6,7 @@
 // DETERMINISTISK: den henger på tailerens egen klokke, ikke på uforutsigbar
 // modell-latens. Derfor kan den ikke lenger overraske oss midt i et svar.
 import {
-  type BlobbStore, lesChunks, lesHead, slettJobb,
+  type BlobbStore, type JobbHead, lesChunks, lesHead, slettJobb,
 } from "./jobb-blobb.ts";
 
 export const SSE_HEADERS = {
@@ -29,18 +29,33 @@ export interface TailOpts {
 
 const sse = (obj: unknown): string => `data: ${JSON.stringify(obj)}\n\n`;
 
-/** En jobb som står «kjorer» lenger enn dette er død — bakgrunnsfunksjonen ble
- * drept (OOM, plattformdrap) etter at head var skrevet, men før avslutt.
- * Uten denne grensen overleverer taileren hvert 45. sekund i det uendelige og
- * klienten kobler seg på like lenge.
+/** En jobb som står «kjorer» uten ett eneste livstegn (head-skriving) på
+ * lenger enn dette er død — bakgrunnsfunksjonen ble drept (OOM, plattformdrap,
+ * kastet handler) etter at head var skrevet, men før avslutt. Uten grensen
+ * overleverer taileren hvert 45. sekund i det uendelige.
  *
- * 7 min er satt ut fra TUR_FRIST_MS (5 min i svar-jobb.mts), ikke ut fra
- * plattformtaket: en levende jobb er én modelltur pluss prefiks-bygging og
- * et eventuelt forord, altså ~5,2 min i verste fall. Marginen er derfor reell,
- * men jobben blir ikke hengende i 16 minutter når den umulig kan leve så lenge.
- * EKSPORTERT med vilje — testen speilet den tidligere som literal, og da ville
- * en endring her latt testene stå grønne mot den gamle grensen. */
-export const MAKS_JOBB_MS = 7 * 60 * 1000;
+ * Måles mot `head.oppdatert` (siste flush eller hjerteslag), IKKE mot
+ * `head.start`: en levende jobb kan legitimt bruke mer enn 7 min totalt
+ * (prefiks-bygging, forord-retry 30 s × 3, 429/529-backoff, og en 5-minutters
+ * turfrist som først starter når headers er mottatt). svar-jobb.mts skriver
+ * et hjerteslag hvert HJERTESLAG_MS (20 s), så 3 min er ni tapte slag.
+ * EKSPORTERT med vilje — testene leser grensen i stedet for å speile den. */
+export const MAKS_STILLHET_MS = 3 * 60 * 1000;
+
+/** Heads skrevet av eldre kode (før 2026-10-08) har ingen `oppdatert`. For
+ * dem faller vakten tilbake til `start` og plattformtaket (15 min) pluss
+ * margin, så en jobb på gammel kode under en deploy ikke drepes levende. */
+export const MAKS_JOBB_UTEN_STEMPEL_MS = 16 * 60 * 1000;
+
+/** Sann når en «kjorer»-jobb har vært stille for lenge til å kunne leve. */
+function erDod(head: JobbHead, na: number): boolean {
+  if (head.state !== "kjorer") return false;
+  return typeof head.oppdatert === "number"
+    ? na - head.oppdatert > MAKS_STILLHET_MS
+    : na - head.start > MAKS_JOBB_UTEN_STEMPEL_MS;
+}
+
+const STILLHET_MIN = Math.round(MAKS_STILLHET_MS / 60_000);
 
 export function tailStream(opts: TailOpts): ReadableStream<Uint8Array> {
   const {
@@ -98,15 +113,15 @@ export function tailStream(opts: TailOpts): ReadableStream<Uint8Array> {
           if (head.state !== "kjorer" && cursor >= head.seq) {
             return;
           }
-          // Dødjobb-vakt: en jobb som har stått «kjorer» lenger enn
-          // MAKS_JOBB_MS kommer aldri til å bli ferdig — bakgrunnsprosessen
-          // som skulle kalt avslutt() finnes ikke lenger. Rydd og forklar i
-          // stedet for å overlevere til enda en tailer som ville ventet like
-          // forgjeves.
-          if (head.state === "kjorer" && now() - head.start > MAKS_JOBB_MS) {
+          // Dødjobb-vakt: en jobb som har stått «kjorer» uten livstegn i mer
+          // enn MAKS_STILLHET_MS kommer aldri til å bli ferdig —
+          // bakgrunnsprosessen som skulle kalt avslutt() finnes ikke lenger.
+          // Rydd og forklar i stedet for å overlevere til enda en tailer som
+          // ville ventet like forgjeves.
+          if (erDod(head, now())) {
             send(sse({
               type: "error",
-              message: "Svarjobben stanset uventet (over 16 minutter uten å bli ferdig). Prøv spørsmålet på nytt.",
+              message: `Svarjobben stanset uventet (ingen livstegn på over ${STILLHET_MIN} minutter). Prøv spørsmålet på nytt.`,
             }));
             await slettJobb(store, jobId);
             return;

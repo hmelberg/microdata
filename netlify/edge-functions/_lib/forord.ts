@@ -19,7 +19,7 @@ const INSTRUKS =
   "Ikke svar på det, ikke still spørsmål tilbake, ikke bruk overskrifter.";
 
 export async function skrivForord(
-  skriver: JobbSkriver,
+  skriver: Pick<JobbSkriver, "skriv">,
   opts: ForordOpts,
 ): Promise<void> {
   try {

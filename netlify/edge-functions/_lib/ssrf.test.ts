@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { fetchGuarded, guardedFetchImpl, isPublicHttpUrl } from "./ssrf.ts";
+import { fetchGuarded, guardedFetchImpl, ipv4Tall, isPublicHttpUrl } from "./ssrf.ts";
 
 Deno.test("isPublicHttpUrl blocks non-http, private and local hosts", () => {
   const bad = [
@@ -107,4 +107,71 @@ Deno.test("guardedFetchImpl: privat vert blokkeres, unntatt eksakt trustedOrigin
   const twice = guardedFetchImpl(guardedFetchImpl(raw), { trustedOrigin: "http://localhost:8888" });
   assertEquals((await twice("http://localhost:8888/data/x.json")).status, 200);
   assertEquals(calls, 2);
+});
+
+// ── Normalisering + reserverte områder (sikkerhetsrunde 2026-10-08) ────────
+// new URL() kanoniserer allerede desimal/heks/oktal IPv4 til prikket desimal
+// (målt i både Deno og Node: http://2130706433/ → 127.0.0.1), men den lar en
+// avsluttende punktum stå: «localhost.» og «metadata.google.internal.» slapp
+// derfor forbi suffiks-sjekkene. Testene under låser begge deler.
+Deno.test("isPublicHttpUrl: trailing dot, *.localhost and .internal. are rejected", () => {
+  const bad = [
+    "http://localhost./x", "http://LOCALHOST./x", "http://localhost../x",
+    "http://a.localhost/x", "http://a.b.localhost./x",
+    "http://metadata.google.internal./computeMetadata/v1/",
+    "http://metadata.google.internal/computeMetadata/v1/",
+    "http://printer.local./x", "http://127.0.0.1./x",
+  ];
+  for (const u of bad) assertEquals(isPublicHttpUrl(u), false, u);
+});
+
+Deno.test("isPublicHttpUrl: reserved IPv4 ranges are rejected", () => {
+  const bad = [
+    "http://100.64.0.1/", "http://100.127.255.254/",          // CGNAT 100.64/10
+    "http://0.1.2.3/", "http://127.8.9.10/", "http://169.254.1.1/",
+    "http://192.0.0.8/",                                         // 192.0.0/24
+    "http://198.18.0.1/", "http://198.19.255.255/",              // 198.18/15
+    "http://224.0.0.1/", "http://239.255.255.250/",              // 224/4
+    "http://240.0.0.1/", "http://255.255.255.255/",              // 240/4 + broadcast
+  ];
+  for (const u of bad) assertEquals(isPublicHttpUrl(u), false, u);
+  // Grensene rett utenfor områdene er offentlige.
+  const good = ["http://100.63.255.255/", "http://100.128.0.1/", "http://198.17.0.1/",
+    "http://198.20.0.1/", "http://192.0.1.1/", "http://223.255.255.255/", "https://8.8.8.8/"];
+  for (const u of good) assertEquals(isPublicHttpUrl(u), true, u);
+});
+
+Deno.test("isPublicHttpUrl: decimal, hex and octal IPv4 forms are rejected", () => {
+  const bad = [
+    "http://2130706433/", "http://0x7f.1/", "http://017700000001/",
+    "http://0x7f000001/", "http://127.1/", "http://0300.0250.0.1/",
+    "http://0x7f.0.0.1./", "http://0xa9.0xfe.0xa9.0xfe/",
+  ];
+  for (const u of bad) assertEquals(isPublicHttpUrl(u), false, u);
+});
+
+Deno.test("isPublicHttpUrl: IPv6 literals incl. IPv4-mapped stay rejected", () => {
+  for (const u of ["http://[::ffff:127.0.0.1]/", "http://[::ffff:7f00:1]/", "http://[2001:4860::8888]/"]) {
+    assertEquals(isPublicHttpUrl(u), false, u);
+  }
+});
+
+Deno.test("isPublicHttpUrl: public hostnames with a trailing dot are still allowed", () => {
+  assertEquals(isPublicHttpUrl("https://data.ssb.no./api/"), true);
+});
+
+// ipv4Tall er hjelperen bak de numeriske formene. new URL() kanoniserer dem
+// i dag, men hjelperen skal stå på egne bein — den er forsvaret om en
+// fremtidig runtime eller kaller sender inn en rå vertsstreng.
+Deno.test("ipv4Tall parses decimal, hex, octal and short IPv4 forms", () => {
+  assertEquals(ipv4Tall("127.0.0.1"), 0x7f000001);
+  assertEquals(ipv4Tall("2130706433"), 0x7f000001);
+  assertEquals(ipv4Tall("0x7f.1"), 0x7f000001);
+  assertEquals(ipv4Tall("017700000001"), 0x7f000001);
+  assertEquals(ipv4Tall("0300.0250.0.1"), 0xc0a80001);
+  assertEquals(ipv4Tall("10.1"), 0x0a000001);
+  assertEquals(ipv4Tall("data.ssb.no"), null);
+  assertEquals(ipv4Tall("1.2.3.4.5"), null);
+  assertEquals(ipv4Tall("256.1.1.1"), null);
+  assertEquals(ipv4Tall("09.1.1.1"), null);
 });

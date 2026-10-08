@@ -26,7 +26,8 @@ export default async (): Promise<void> => {
     const head = await lesHead(store, jobId);
     // Head mangler (halvskrevet jobb — kastet før første flush) eller er
     // eldre enn en time → bort med den. Én time er god margin over BÅDE
-    // 16-minutters dødjobb-vakten i jobb-tail.ts og enhver realistisk
+    // plattformtaket på 15 min (dødjobb-vakten i jobb-tail.ts slår til etter
+    // 3 min uten livstegn, eller 16 min for heads uten stempel) og enhver realistisk
     // nettglipp-retry, så feieren aldri konkurrerer med en jobb som
     // fremdeles kan bli hentet.
     if (!head || na - head.start > MAKS_ALDER_MS) {

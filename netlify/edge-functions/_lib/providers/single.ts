@@ -28,6 +28,7 @@ import {
 import { flushSseBuffer, parseSseFrames } from "../sse-frames.ts";
 import { type ProviderConfig, scrubKey } from "./config.ts";
 import { erEffortFeil } from "./fallback.ts";
+import { isPublicHttpUrl } from "../ssrf.ts";
 
 export interface SingleChoice {
   effort?: string;
@@ -97,6 +98,12 @@ function bodyFor(
 }
 
 function endpointFor(cfg: ProviderConfig): string {
+  // Forsvar i dybden: parseProviderConfig har alt sjekket base-URL-en, men
+  // nøkkel + prompt skal aldri gå til en intern vert selv om en fremtidig
+  // kallevei bygger ProviderConfig på annen måte.
+  if (!isPublicHttpUrl(cfg.baseUrl)) {
+    throw new Error("blokkert base-URL for leverandøren (ikke offentlig http/https)");
+  }
   return cfg.type === "openai-responses"
     ? `${cfg.baseUrl}/responses`
     : `${cfg.baseUrl}/chat/completions`;
@@ -210,6 +217,7 @@ export async function streamProvider(
     method: "POST",
     headers: authHeaders(cfg),
     body: JSON.stringify(bodyFor(cfg, opts, choice, true)),
+    redirect: "error",
   }, deps);
   const svar = await utenEffortVed400(resp, cfg, opts, choice, true, deps);
   if (!svar.ok || !svar.body) return fail(svar, cfg);
@@ -230,6 +238,7 @@ export async function messageProvider(
     method: "POST",
     headers: authHeaders(cfg),
     body: JSON.stringify(bodyFor(cfg, opts, choice, false)),
+    redirect: "error",
   }, deps);
   const svar = await utenEffortVed400(resp, cfg, opts, choice, false, deps);
   if (!svar.ok) return fail(svar, cfg);
