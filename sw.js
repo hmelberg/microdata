@@ -4,7 +4,7 @@
 // py2m/py2m_runner.html and export_data*.html — update all together when
 // upgrading Pyodide.
 const PYODIDE_VERSION = 'v314.0.2';
-const CACHE = 'm2py-v17';
+const CACHE = 'm2py-v18';
 const CDN_HOSTS = new Set([
   'cdn.jsdelivr.net',
   'cdn.plot.ly',
@@ -14,19 +14,19 @@ const CDN_HOSTS = new Set([
   'repo.r-wasm.org'     // wasm-R-pakker: jmv, scatr m.fl. (~170 MB, cache-first)
 ]);
 
-// Cache-first KUN for uforanderlige (versjonspinnede) URL-er. Alt annet på
-// CDN_HOSTS er muterbart — f.eks. brukerdata fra en gren
-// (cdn.jsdelivr.net/gh/eier/repo@main/data.csv), micropips
-// pypi.org/pypi/<pkg>/json-oppslag og webR-repoets PACKAGES-indeks — og går
-// network-first (cachet kopi kun som fallback ved nettverksfeil/!ok).
-// (Portet fra openstat, review 2026-09-26.)
+// Cache Storage holder KUN uforanderlige, versjonspinnede BIBLIOTEK-URL-er
+// (cache-first). Alt annet på CDN_HOSTS går rett til nettet og lagres ALDRI
+// her: brukerdata (cdn.jsdelivr.net/gh/eier/repo@<hva som helst>/data.csv —
+// også commit-pinnet, det er fortsatt brukerens data), muterbare refs (@main,
+// @latest, @1), micropips pypi.org/pypi/<pkg>/json-oppslag og webR-repoets
+// PACKAGES-indeks. Den gamle network-first-grenen la slikt i Cache Storage
+// uten grense (review 2026-10-08); m2py-v18-bumpen sletter de gamle oppføringene.
 const EXACT_SEMVER = String.raw`v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?`;
 const JSDELIVR_IMMUTABLE = [
   /^\/pyodide\/v\d+(?:\.\d+)+\//,
   // /npm/pkg@1.2.3/… og /npm/@scope/pkg@1.2.3/… (ikke @1, @^1, @latest)
-  new RegExp('^/npm/(?:@[^/@]+/)?[^/@]+@' + EXACT_SEMVER + '(?:/|$)'),
-  // /gh/eier/repo@<commit-sha|semver-tag>/… (ikke @main, @master, …)
-  new RegExp('^/gh/[^/@]+/[^/@]+@(?:[0-9a-f]{7,40}|' + EXACT_SEMVER + ')(?:/|$)', 'i')
+  new RegExp('^/npm/(?:@[^/@]+/)?[^/@]+@' + EXACT_SEMVER + '(?:/|$)')
+  // Bevisst IKKE /gh/…: det er brukerens repo-innhold (data), ikke bibliotek.
 ];
 function isImmutableUrl(url) {
   const p = url.pathname;
@@ -87,7 +87,8 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
   if (CDN_HOSTS.has(url.hostname)) {
-    e.respondWith(isImmutableUrl(url) ? cacheFirst(e.request) : networkFirst(e.request));
+    // Muterbart / brukerdata: ingen respondWith → vanlig nettverk/HTTP-cache.
+    if (isImmutableUrl(url)) e.respondWith(cacheFirst(e.request));
     return;
   }
 
@@ -120,26 +121,6 @@ async function cacheFirst(req) {
     // en resolved !ok-respons nådde aldri catch-fallbacken under.
     // Eksakt nøkkel (ikke ignoreSearch): en annen query-variant av samme sti
     // kan være et helt annet innhold (f.eks. jsdelivr ?-parametre, API-kall).
-    const stale = await cache.match(req);
-    return stale || res;
-  } catch (err) {
-    const fallback = await cache.match(req);
-    if (fallback) return fallback;
-    throw err;
-  }
-}
-
-// Muterbart CDN-innhold: nettverk først, cachet kopi (eksakt nøkkel) kun når
-// nettverket feiler eller svarer !ok — gir offline-støtte uten å fryse
-// f.eks. @main-data eller pypi-JSON for alltid.
-async function networkFirst(req) {
-  const cache = await caches.open(CACHE);
-  try {
-    const res = await fetch(req);
-    if (res && res.ok) {
-      cache.put(req, res.clone()).catch(() => {});
-      return res;
-    }
     const stale = await cache.match(req);
     return stale || res;
   } catch (err) {

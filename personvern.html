@@ -62,33 +62,42 @@
   <a class="back-link" href="personvern.en.html">In English</a>
   <h1>Personvernerklæring</h1>
   <p class="lead">Microdata Script Runner er en gratis, offentlig versjon uten innlogging og uten kontoer.</p>
-  <p class="meta">Sist oppdatert: 2026-07-06.</p>
+  <p class="meta">Sist oppdatert: 2026-10-08.</p>
 
   <h2>1. Hva er dette?</h2>
-  <p>Microdata Script Runner er et hobbyprosjekt drevet av Hans Olav Melberg som hjelper brukere å skrive og kjøre kode mot microdata.no-syntaks, Python og R direkte i nettleseren. Denne versjonen krever <strong>ingen innlogging og ingen konto</strong>. Skriptet ditt, datasettene du laster inn og kjøreresultatene forblir i nettleseren din — de sendes aldri til noen server, med mindre du selv bruker AI-assistenten.</p>
+  <p>Microdata Script Runner er et hobbyprosjekt drevet av Hans Olav Melberg som hjelper brukere å skrive og kjøre kode mot microdata.no-syntaks, Python og R direkte i nettleseren. Denne versjonen krever <strong>ingen innlogging og ingen konto</strong>. Skriptet ditt, datasettene du laster inn og kjøreresultatene blir i utgangspunktet i nettleseren din. De forlater den bare i tilfellene som er beskrevet under: når du bruker AI-funksjonene (punkt 2), og når appen henter biblioteker eller data fra nett, eller du selv kobler til GitHub (punkt 4).</p>
 
   <h2>2. Hva skjer når du bruker AI-assistenten?</h2>
-  <p>AI-funksjonene (kodeforslag, tolkning av resultater, dataminimeringsvurdering, web-søk) krever at du limer inn din egen API-nøkkel under AI-innstillinger. Du velger selv <strong>hvilken leverandør</strong> nøkkelen gjelder: Anthropic er standardvalget, men du kan i stedet oppgi OpenAI, Mistral eller en hvilken som helst annen tjeneste med et OpenAI-kompatibelt API. Da gjelder:</p>
+  <p>AI-funksjonene (kodeforslag, tolkning av resultater, personvernvurdering, web-søk) krever at du limer inn din egen API-nøkkel under AI-innstillinger. Du velger selv <strong>hvilken leverandør</strong> nøkkelen gjelder: Anthropic er standardvalget, men du kan i stedet oppgi OpenAI, Mistral eller en hvilken som helst annen tjeneste med et OpenAI-kompatibelt API. Da gjelder:</p>
   <ul>
-    <li><strong>Nøkkelen</strong> lagres kun lokalt i nettleseren din (<code>localStorage</code>) og sendes som header (<code>X-Anthropic-Key</code> eller <code>X-Llm-Key</code>) til vår server, som videresender den direkte til <em>den leverandøren du har valgt</em> for den ene forespørselen. Vi lagrer eller logger ikke nøkkelen.</li>
-    <li><strong>Spørsmålet og skriptutdraget du sender</strong> videresendes til den samme leverandøren for å generere et svar. Vi lagrer ikke innholdet i disse forespørslene på egen server.</li>
+    <li><strong>Nøkkelen</strong> lagres kun lokalt i nettleseren din (<code>localStorage</code>) og sendes som header (<code>X-Anthropic-Key</code> eller <code>X-Llm-Key</code>) til vår server, som videresender den direkte til <em>den leverandøren du har valgt</em> for den ene forespørselen. Nøkkelen lagres eller logges aldri på serveren — heller ikke i den midlertidige jobblagringen som er beskrevet under.</li>
+    <li><strong>Hva som sendes til leverandøren</strong> avhenger av funksjonen, og kan omfatte: spørsmålet ditt; scriptet i editoren (når du huker av for å ta det med, og alltid ved resultattolkning og personvernvurdering); kjøreresultater og utskrift (ved resultattolkning, og når assistenten selv kjører et script i emulatoren — <code>run_code</code> — og leser resultatet); tidligere meldinger i samtalen (samtalehistorikken); egne instruksjoner du har lagt inn; og konteksten du skriver i personvernvurderingen. Verdier i <code>key(...)</code> maskeres som <code>key(***)</code> i nettleseren før noe sendes.</li>
+    <li><strong>Midlertidig lagring av AI-svar.</strong> Svarene fra AI-assistenten lages av en bakgrunnsjobb på serveren. Jobben lagrer det strømmede svaret, scriptene modellen skriver og samtaletilstanden (som inneholder spørsmålet, scriptet, kjøreresultater og samtalehistorikken) midlertidig i Netlify Blobs, slik at nettleseren kan hente svaret fortløpende og fortsette etter et nettbrudd. En automatisk opprydding kjører hver time og sletter jobber som er eldre enn én time, så innholdet ligger der normalt i 1–2 timer. Resultattolkning og personvernvurdering strømmes direkte tilbake og lagres ikke.</li>
     <li><strong>Har du valgt en annen leverandør enn Anthropic</strong>, går forespørselen — og nøkkelen — til den API-adressen du selv har oppgitt i innstillingene, og behandles etter <em>den</em> tjenestens vilkår og personvernregler. Vi har ingen avtale med, og ingen kontroll over, en leverandør du velger på denne måten.</li>
-    <li><strong>IP-adressen din</strong> brukes midlertidig til enkel hastighetsbegrensning (rate limiting) for å hindre misbruk, og slettes fortløpende.</li>
+    <li><strong>IP-adressen din og hastighetsbegrensning.</strong> For å hindre misbruk teller serveren kall til <code>/api/</code>-endepunktene per IP-adresse (for IPv6: per /64-nett) og endepunkt. Tellerne lagres i Netlify Blobs: for hver kombinasjon av endepunkt og IP-adresse lagres adressen (som en del av nøkkelen) sammen med tidspunktene for kallene den siste timen. Eldre tidspunkter fjernes neste gang samme adresse gjør et kall, men <strong>selve oppføringen med IP-adressen slettes ikke automatisk</strong> — den blir liggende til den overskrives av et nytt kall fra samme adresse.</li>
+    <li>Kall som er autentisert med eierens personlige tilgangspassord (eierens egen bruk) føres i en feiljournal i Netlify Blobs for feilsøking. Kall med egen API-nøkkel eller delt tilgangspassord journalføres aldri.</li>
     <li>Forbruket (tokens/kostnad) belastes din egen konto hos leverandøren du har valgt — vi ser eller lagrer ikke betalingsinformasjon.</li>
   </ul>
 
   <h2>3. Informasjonskapsler og lokal lagring</h2>
-  <p>Appen bruker kun <code>localStorage</code> i din egen nettleser til å huske dine innstillinger (f.eks. API-nøkkel, valgt AI-leverandør og modell, kvalitetsnivå, valgt modus, tema). Ingenting av dette sendes til oss med mindre du aktivt bruker AI-funksjonene.</p>
+  <p>Appen bruker ingen informasjonskapsler. Den bruker <code>localStorage</code> i din egen nettleser til å huske innstillinger og arbeid: API-nøkkel eller tilgangspassord, valgt AI-leverandør og modell, kvalitetsnivå, GitHub-token og -profiler (hvis du har koblet til GitHub), utkast og nylig brukte script, valgt modus og tema. Ingenting av dette sendes til oss, utover det som er beskrevet i punkt 2 og 4. En service worker lagrer faste versjoner av programbiblioteker (som Pyodide og Plotly) i nettleserens Cache Storage for raskere oppstart; datasett du laster inn lagres ikke der.</p>
 
-  <h2>4. Deling med tredjepart</h2>
-  <p>Vi selger eller leier ikke ut data. Når du bruker AI-funksjonene, deles spørsmålet/skriptet med:</p>
+  <h2>4. Deling med tredjepart og annen utgående trafikk</h2>
+  <p>Vi selger eller leier ikke ut data. Når du bruker AI-funksjonene, deles innholdet som er beskrevet i punkt 2 med:</p>
   <ul>
     <li>AI-leverandøren du har valgt i innstillingene — for å generere svaret. Uten eget valg er dette Anthropic (USA); har du oppgitt en annen leverandør, er det den, på API-adressen du selv har fylt inn.</li>
-    <li>Netlify (hosting av appen og serverfunksjonene)</li>
+    <li>Netlify (hosting av appen og serverfunksjonene, og lagringen i Netlify Blobs).</li>
+  </ul>
+  <p>I tillegg kobler nettleseren seg til disse tjenestene. De ser IP-adressen din og hvilken adresse som hentes, slik det er ved alle nettsider:</p>
+  <ul>
+    <li><strong>Biblioteker fra CDN:</strong> cdn.jsdelivr.net (Pyodide, markdown-it, Tabulator, Brython og Python-pakker), cdn.plot.ly (Plotly), pypi.org og files.pythonhosted.org (Python-pakker som installeres ved behov) og webr.r-wasm.org / repo.r-wasm.org (R-modus).</li>
+    <li><strong>Navneregisteret og GitHub-lenker:</strong> Åpner du en lenke med et kort navn (f.eks. <code>#mitt-dashbord</code>), slås navnet opp i et register på raw.githubusercontent.com. Lenker til script eller data på GitHub hentes også derfra.</li>
+    <li><strong>Data du laster inn:</strong> Når et script laster data fra en URL, henter nettleseren dem direkte fra den adressen. Blokkerer kilden slike hentinger (CORS), går forespørselen i stedet via appens proxy <code>/api/hent</code>: serveren henter adressen for deg og sender innholdet tilbake uten å lagre det. Som tilgangsbevis sender nettleseren da Anthropic-nøkkelen din i <code>X-Anthropic-Key</code>-headeren til vår server; proxyen sjekker bare formatet på nøkkelen og sender den ikke videre til datakilden. Kallene telles i hastighetsbegrensningen beskrevet i punkt 2.</li>
+    <li><strong>GitHub (api.github.com):</strong> Kobler du til GitHub med ditt eget tilgangstoken, snakker nettleseren direkte med GitHubs API for å liste, hente og lagre filer i repoene du velger. Tokenet lagres kun i nettleseren og sendes bare til GitHub. Script du lagrer havner i repoet ditt, med <code>key(...)</code>-verdier maskert.</li>
   </ul>
 
   <h2>5. Dine rettigheter</h2>
-  <p>Siden ingen personopplysninger lagres av oss (ingen konto, ingen innhold lagret server-side), er det normalt ingenting å be om innsyn i eller sletting av. Har du spørsmål, ta kontakt (se under). Du kan også klage til Datatilsynet (<a href="https://www.datatilsynet.no" target="_blank" rel="noopener">datatilsynet.no</a>).</p>
+  <p>Vi har ingen kontoer og lagrer ikke innhold varig: AI-jobbene i Netlify Blobs slettes etter 1–2 timer. Det som ligger igjen over tid, er hastighetsbegrensningens oppføringer med IP-adresse og tidspunkter (punkt 2). Vil du ha innsyn i eller sletting av slike opplysninger, eller har du andre spørsmål, ta kontakt (se under). Du kan også klage til Datatilsynet (<a href="https://www.datatilsynet.no" target="_blank" rel="noopener">datatilsynet.no</a>).</p>
 
   <h2>6. Endringer i erklæringen</h2>
   <p>Endringer publiseres på denne siden.</p>
