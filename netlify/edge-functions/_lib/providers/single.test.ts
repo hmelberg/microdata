@@ -177,3 +177,39 @@ Deno.test("messageProvider handles openai-responses output_text", async () => {
   assertEquals(r.text, "hei");
   assertEquals(r.usage.inputTokens, 3);
 });
+
+// ── Sikkerhetsrunde 2026-10-08 ─────────────────────────────────────────────
+/** Fanger RequestInit for hvert kall. */
+function initFanger(body?: unknown) {
+  const inits: RequestInit[] = [];
+  const fetchImpl = ((_u: string | URL | Request, init?: RequestInit) => {
+    inits.push(init ?? {});
+    return Promise.resolve(body === undefined
+      ? new Response(new ReadableStream({ start: (c) => c.close() }))
+      : Response.json(body));
+  }) as typeof fetch;
+  return { inits, deps: { fetchImpl, sleep: () => Promise.resolve(), retries: 0 } };
+}
+
+Deno.test("every provider type refuses redirects, streamed and single-shot", async () => {
+  for (const t of ["openai-compat", "openai-responses", "anthropic-compat"] as const) {
+    const s = initFanger();
+    await streamProvider(prov(t), base(), {}, s.deps);
+    assertEquals(s.inits[0].redirect, "error", `${t} stream`);
+    const m = initFanger({ choices: [], output: [], content: [], usage: {} });
+    await messageProvider(prov(t), base(), {}, m.deps);
+    assertEquals(m.inits[0].redirect, "error", `${t} message`);
+  }
+});
+
+Deno.test("a non-public baseUrl never reaches fetch, for any provider type", async () => {
+  for (const t of ["openai-compat", "openai-responses", "anthropic-compat"] as const) {
+    const cfg = { ...prov(t), baseUrl: "http://metadata.google.internal./v1" };
+    const s = initFanger();
+    const e1 = await streamProvider(cfg, base(), {}, s.deps).then(() => "NO THROW").catch(String);
+    const e2 = await messageProvider(cfg, base(), {}, s.deps).then(() => "NO THROW").catch(String);
+    assertEquals(e1.includes("blokkert"), true, `${t} stream: ${e1}`);
+    assertEquals(e2.includes("blokkert"), true, `${t} message: ${e2}`);
+    assertEquals(s.inits.length, 0, t);
+  }
+});

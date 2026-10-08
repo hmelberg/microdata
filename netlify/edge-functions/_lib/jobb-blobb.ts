@@ -10,7 +10,9 @@
 export interface BlobbStore {
   get(key: string, opts?: { type?: "text" | "json" }): Promise<unknown>;
   set(key: string, value: string): Promise<unknown>;
-  setJSON(key: string, value: unknown): Promise<unknown>;
+  /** `onlyIfNew` er Netlify Blobs' atomiske «opprett bare hvis nøkkelen ikke
+   * finnes»; svaret er da `{ modified: false }` hvis den fantes. */
+  setJSON(key: string, value: unknown, opts?: { onlyIfNew?: boolean }): Promise<unknown>;
   delete(key: string): Promise<unknown>;
   list(opts: { prefix: string }): Promise<{ blobs: { key: string }[] }>;
 }
@@ -19,14 +21,33 @@ export interface JobbHead {
   seq: number;
   state: "kjorer" | "ferdig" | "feil";
   start: number;
+  /** Tidspunktet for SISTE head-skriving (flush eller hjerteslag). Det er
+   * dette dødjobb-vakten i jobb-tail.ts måler mot — ikke `start`. Mangler i
+   * heads skrevet av eldre kode (før 2026-10-08). */
+  oppdatert?: number;
 }
 
 export interface JobbSkriver {
   /** Skriver head UBETINGET, uansett bufferstatus — se lagSkriver for hvorfor. */
   start(): Promise<void>;
+  /** Som start(), men tar jobben BARE hvis ingen head finnes fra før (atomisk
+   * via onlyIfNew). false = jobId er allerede brukt (Netlify-retry av en
+   * kastet invokasjon); skriveren er da inert og rører aldri den gamle jobben. */
+  startHvisNy(): Promise<boolean>;
   skriv(sse: string): Promise<void>;
+  /** Livstegn: flusher eventuell buffer og skriver head med fersk `oppdatert`. */
+  hjerteslag(): Promise<void>;
   avslutt(state: "ferdig" | "feil"): Promise<void>;
+  /** Sann etter avslutt() (eller en avvist startHvisNy()): alle videre
+   * skrivinger er no-ops, så en sen skriv/hjerteslag aldri kan snu en
+   * «ferdig»/«feil»-head tilbake til «kjorer». */
+  readonly avsluttet: boolean;
 }
+
+/** Hvor ofte svar-jobb.mts skriver et livstegn i head mens jobben står stille
+ * (prefiks-bygging, forord-retry, 429/529-backoff, venting på headers).
+ * Dødjobb-vakten (MAKS_STILLHET_MS i jobb-tail.ts) er et multiplum av denne. */
+export const HJERTESLAG_MS = 20_000;
 
 const FLUSH_MS = 150;
 
@@ -48,6 +69,7 @@ export function lagSkriver(
   let buffer = "";
   let seq = 0;
   let sistFlush = start;
+  let avsluttet = false;
 
   // Alle skrivinger serialiseres gjennom denne kjeden. Uten den deler skriv()
   // og flush() muterbar tilstand (buffer, seq) på tvers av await, og to
@@ -68,8 +90,9 @@ export function lagSkriver(
       await store.set(chunkNokkel(jobId, seq), buffer);   // FØRST
       buffer = "";
     }
-    await store.setJSON(headNokkel(jobId), { seq, state, start });  // SÅ
-    sistFlush = now();
+    const na = now();
+    await store.setJSON(headNokkel(jobId), { seq, state, start, oppdatert: na });  // SÅ
+    sistFlush = na;
   };
 
   return {
@@ -85,11 +108,42 @@ export function lagSkriver(
     // ufarlig uansett) ikke kan skrive en head med lavere seq etterpå.
     start(): Promise<void> {
       return iKo(async () => {
-        await store.setJSON(headNokkel(jobId), { seq: 0, state: "kjorer", start });
+        if (avsluttet) return;
+        await store.setJSON(headNokkel(jobId), { seq: 0, state: "kjorer", start, oppdatert: now() });
+      });
+    },
+    // Idempotens ved Netlify-retry (sikkerhetsrunde 2026-10-08): en kastet
+    // bakgrunnsinvokasjon kan bli kjørt på nytt med SAMME jobId. Uten denne
+    // sjekken nullstilte retryen head til seq 0, overskrev chunk-nøklene og
+    // spleiset to løp sammen — og kalte modellen på nytt på brukerens nøkkel.
+    // Leses først (billig, dekker fakes og eldre stores), deretter onlyIfNew
+    // for det smale kappløpet mellom to samtidige invokasjoner.
+    startHvisNy(): Promise<boolean> {
+      let ny = false;
+      return iKo(async () => {
+        if (avsluttet) return;
+        if (await lesHead(store, jobId)) { avsluttet = true; return; }
+        const r = await store.setJSON(
+          headNokkel(jobId),
+          { seq: 0, state: "kjorer", start, oppdatert: now() },
+          { onlyIfNew: true },
+        );
+        if (r && typeof r === "object" && (r as { modified?: unknown }).modified === false) {
+          avsluttet = true;
+          return;
+        }
+        ny = true;
+      }).then(() => ny);
+    },
+    hjerteslag(): Promise<void> {
+      return iKo(async () => {
+        if (avsluttet) return;
+        await flush("kjorer");
       });
     },
     skriv(sse: string): Promise<void> {
       return iKo(async () => {
+        if (avsluttet) return;
         buffer += sse;
         if (TVINGER_FLUSH.test(sse) || now() - sistFlush >= FLUSH_MS) {
           await flush("kjorer");
@@ -97,9 +151,34 @@ export function lagSkriver(
       });
     },
     avslutt(state: "ferdig" | "feil"): Promise<void> {
-      return iKo(() => flush(state));
+      return iKo(async () => {
+        if (avsluttet) return;
+        avsluttet = true;
+        await flush(state);
+      });
     },
+    get avsluttet() { return avsluttet; },
   };
+}
+
+/** Retry-veien: en ny invokasjon fant en head for sin jobId. Står den gamle
+ * jobben fortsatt «kjorer», døde den (handleren kastet, eller prosessen ble
+ * drept) — avslutt den med en forklart feil slik at taileren gir brukeren en
+ * ren melding i stedet for å vente på dødjobb-vakten. En ferdig/feilet jobb
+ * røres ikke. Chunk før head, som ellers. */
+export async function merkGjentattJobbFeilet(
+  store: BlobbStore,
+  jobId: string,
+  now: () => number,
+): Promise<void> {
+  const head = await lesHead(store, jobId);
+  if (!head || head.state !== "kjorer") return;
+  const seq = head.seq + 1;
+  await store.set(chunkNokkel(jobId, seq), `data: ${JSON.stringify({
+    type: "error",
+    message: "Svarjobben ble avbrutt underveis og startes ikke på nytt automatisk. Prøv spørsmålet på nytt.",
+  })}\n\n`);
+  await store.setJSON(headNokkel(jobId), { seq, state: "feil", start: head.start, oppdatert: now() });
 }
 
 export async function lesHead(

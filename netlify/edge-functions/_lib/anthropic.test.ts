@@ -351,3 +351,100 @@ Deno.test("messageAnthropic carries effort and apiBase the same way", async () =
   assertEquals(seen.url, "https://gw.example/v1/messages");
   assertEquals(seen.body.output_config, { effort: "medium" });
 });
+
+// ── Sikkerhetsrunde 2026-10-08: redirect, base-URL-vakt, skrubbet logging ──
+
+/** Fanger init for hvert kall og svarer med `svar()`. */
+function initFanger(svar: () => Response) {
+  const inits: RequestInit[] = [];
+  const fetchImpl = ((_u: string | URL | Request, init?: RequestInit) => {
+    inits.push(init ?? {});
+    return Promise.resolve(svar());
+  }) as typeof fetch;
+  return { inits, deps: { fetchImpl, sleep: noSleep, retries: 0 } };
+}
+
+const tomSse = () => new Response(new ReadableStream({ start: (c) => c.close() }), { status: 200 });
+
+Deno.test("all three Anthropic fetches refuse redirects (redirect: error)", async () => {
+  const a = initFanger(tomSse);
+  await streamAnthropic({ apiKey: "k", model: "m", prompt: "p", apiBase: "https://gw.example/v1" }, a.deps);
+  assertEquals(a.inits[0].redirect, "error");
+
+  const b = initFanger(() => Response.json({ content: [], usage: {} }));
+  await messageAnthropic({ apiKey: "k", model: "m", prompt: "p" }, b.deps);
+  assertEquals(b.inits[0].redirect, "error");
+
+  const c = initFanger(() => new Response(sseUpstream(streamedTextTurn("hei")), { status: 200 }));
+  await collectSse(runAgenticStream({
+    apiKey: "k", model: "m", system: "s", userContent: "q", tools: [],
+    executeTool: () => Promise.resolve(""), deps: c.deps,
+  }));
+  assertEquals(c.inits[0].redirect, "error");
+});
+
+Deno.test("a non-public apiBase is refused before any fetch", async () => {
+  for (const apiBase of ["http://169.254.169.254/latest", "http://localhost./v1", "http://100.64.0.1/v1"]) {
+    const a = initFanger(tomSse);
+    await assertRejects(() => streamAnthropic({ apiKey: "k", model: "m", prompt: "p", apiBase }, a.deps));
+    await assertRejects(() => messageAnthropic({ apiKey: "k", model: "m", prompt: "p", apiBase }, a.deps));
+    const ev = await collectSse(runAgenticStream({
+      apiKey: "k", model: "m", system: "s", userContent: "q", tools: [], apiBase,
+      executeTool: () => Promise.resolve(""), deps: a.deps,
+    }));
+    assertEquals(ev.at(-1)?.type, "error");
+    assertEquals(a.inits.length, 0, `fetch kalt mot ${apiBase}`);
+  }
+});
+
+/** Kjør f med console.error fanget; returnerer alt som ble logget. */
+async function fangLogg(f: () => Promise<unknown>): Promise<string> {
+  const orig = console.error;
+  const linjer: string[] = [];
+  console.error = (...a: unknown[]) => { linjer.push(a.map(String).join(" ")); };
+  try { await f().catch(() => {}); } finally { console.error = orig; }
+  return linjer.join("\n");
+}
+
+Deno.test("upstream error bodies are logged with the key scrubbed", async () => {
+  const KEY = "sk-ant-hemmelig-nokkel-123";
+  const ekko = () => new Response(`invalid x-api-key ${KEY}`, { status: 401 });
+
+  const l1 = await fangLogg(() => streamAnthropic({ apiKey: KEY, model: "m", prompt: "p" }, initFanger(ekko).deps));
+  const l2 = await fangLogg(() => messageAnthropic({ apiKey: KEY, model: "m", prompt: "p" }, initFanger(ekko).deps));
+  const l3 = await fangLogg(() => collectSse(runAgenticStream({
+    apiKey: KEY, model: "m", system: "s", userContent: "q", tools: [],
+    executeTool: () => Promise.resolve(""), deps: initFanger(ekko).deps,
+  })));
+  for (const [navn, l] of [["stream", l1], ["message", l2], ["agentic", l3]]) {
+    assertEquals(l.includes("401"), true, `${navn}: loggen mangler status`);
+    assertEquals(l.includes(KEY), false, `${navn}: nøkkelen lekket i loggen`);
+    assertEquals(l.includes("***"), true, `${navn}: skrubbet detalj mangler`);
+  }
+});
+
+Deno.test("verboseUpstream error event never carries the key", async () => {
+  const KEY = "sk-ant-hemmelig-nokkel-456";
+  const ev = await collectSse(runAgenticStream({
+    apiKey: KEY, model: "m", system: "s", userContent: "q", tools: [],
+    executeTool: () => Promise.resolve(""),
+    deps: { ...initFanger(() => new Response(`bad ${KEY}`, { status: 400 })).deps, verboseUpstream: true },
+  }));
+  const feil = String(ev.at(-1)?.message ?? "");
+  assertEquals(feil.includes("400"), true);
+  assertEquals(feil.includes(KEY), false);
+});
+
+Deno.test("a mid-stream error event is scrubbed before it reaches the client", async () => {
+  const KEY = "sk-ant-hemmelig-nokkel-789";
+  const fetchImpl = (() => Promise.resolve(new Response(sseUpstream([
+    { type: "message_start", message: { usage: {} } },
+    { type: "error", error: { message: `echo ${KEY}` } },
+  ]), { status: 200 }))) as unknown as typeof fetch;
+  const ev = await collectSse(runAgenticStream({
+    apiKey: KEY, model: "m", system: "s", userContent: "q", tools: [],
+    executeTool: () => Promise.resolve(""), deps: { fetchImpl, sleep: noSleep, retries: 0 },
+  }));
+  assertEquals(ev.at(-1)?.type, "error");
+  assertEquals(String(ev.at(-1)?.message).includes(KEY), false);
+});
