@@ -111,7 +111,7 @@ export async function byggLop(inp: LopInput): Promise<ReadableStream<Uint8Array>
 
   const executeTool = async (name: string, input: Record<string, unknown>): Promise<string> => {
     if (name === "variabel_info") {
-      return await variabelInfo(origin, String(input.navn ?? ""));
+      return await variabelInfo(origin, String(input.navn ?? ""), {}, String(input.kode_sok ?? ""));
     }
     throw new Error(`ukjent verktøy: ${name}`);
   };

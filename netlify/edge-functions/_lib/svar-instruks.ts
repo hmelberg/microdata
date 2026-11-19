@@ -22,10 +22,16 @@ export const RUN_CODE_TOOL = {
 export const VARIABEL_INFO_TOOL = {
   name: "variabel_info",
   description:
-    "Slå opp detaljer for registervariabler: full beskrivelse, type, gyldighetsperiode og kodeliste. Kall med eksakt variabelnavn, eller et søkeord for å finne kandidater.",
+    "Slå opp detaljer for registervariabler: full beskrivelse, type, gyldighetsperiode og kodeliste. Kall med eksakt variabelnavn, eller et søkeord for å finne kandidater. Store kodelister (ICD-10, prosedyrekoder, ICD-O-3) avkortes — oppgi da kode_sok (kode-prefiks som \"I21\" eller ord som \"hjerteinfarkt\") for å finne de konkrete kodene.",
   input_schema: {
     type: "object",
-    properties: { navn: { type: "string", description: "variabelnavn eller søkeord" } },
+    properties: {
+      navn: { type: "string", description: "variabelnavn eller søkeord" },
+      kode_sok: {
+        type: "string",
+        description: "valgfritt: filtrer kodelisten til variabelen på kode-prefiks eller etikett-tekst",
+      },
+    },
     required: ["navn"],
   },
 };
@@ -66,7 +72,9 @@ emulator og returnerer kjøringens tekst-output og eventuell feilmelding
 (suksess starter med «OK.», feil med «FEIL:»). Arbeidsmåte:
 
 1. Trenger du variabeldetaljer eller kodelister underveis: bruk
-   variabel_info. IKKE gjett koder.
+   variabel_info. IKKE gjett koder. For store kodeverk (ICD-10-diagnoser,
+   prosedyrekoder, kreftsete/morfologi) oppgi kode_sok, f.eks.
+   variabel_info(navn="SOM_EP_HOVEDTILSTAND1", kode_sok="hjerteinfarkt").
 2. Skriv HELE scriptet og kall run_code med det. ALDRI legg scriptet som
    kodeblokk i svarteksten i stedet for å kalle run_code — scriptet settes
    automatisk inn i brukerens editor når det kjøres.
@@ -145,7 +153,10 @@ export function questionTurn(question: string, script?: string): string {
 export function progressLabel(name: string, input: Record<string, unknown>): string {
   switch (name) {
     case "run_code": return "▶ Kjører scriptet …";
-    case "variabel_info": return `Slår opp ${String(input.navn ?? "").slice(0, 60)} …`;
+    case "variabel_info": {
+      const kode = String(input.kode_sok ?? "").trim();
+      return `Slår opp ${String(input.navn ?? "").slice(0, 60)}${kode ? ` (koder: ${kode.slice(0, 30)})` : ""} …`;
+    }
     default: return `Kjører ${name} …`;
   }
 }

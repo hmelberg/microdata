@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { abbrevType, cleanDescription, extractValidPeriod, renderLabels } from "./catalog-format.ts";
+import { abbrevType, cleanDescription, extractValidPeriod, renderCodelistSample, renderLabels } from "./catalog-format.ts";
 
 Deno.test("abbrevType maps classes and surfaces date format", () => {
   assertEquals(abbrevType("Alfanumerisk", ""), "alfa");
@@ -45,4 +45,20 @@ Deno.test("renderLabels shows up to 30 labels, truncates beyond with a count", (
   assertEquals(renderLabels(big).includes("(+27 flere)"), true);
   // empty stays empty.
   assertEquals(renderLabels({}), "");
+});
+
+Deno.test("renderLabels: kode = etikett vises bare som koden", () => {
+  assertEquals(renderLabels({ "1a": "1a", X: "X", Y: "Ukjent" }), " {1a, X, Y=Ukjent}");
+});
+
+Deno.test("renderCodelistSample: utvalg + totalantall for store kodelister", () => {
+  const out = renderCodelistSample({
+    labels_sample: { I219: "Uspesifisert akutt hjerteinfarkt", E119: "Diabetes type 2" },
+    codelist_size: 20384,
+  });
+  assertEquals(
+    out,
+    " {utvalg: I219=Uspesifisert akutt hjerteinfarkt, E119=Diabetes type 2; 20384 koder totalt — slå opp med variabel_info + kode_sok}",
+  );
+  assertEquals(renderCodelistSample({ labels: { "1": "a" } }), "");
 });

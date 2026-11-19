@@ -3,7 +3,7 @@
 // per modus (microdata/python/r). EKSTRAHERT ordrett fra kode-svar.ts
 // 2026-08-28 (samlet svar-pipeline, Task 2) slik at /api/svar kan gjenbruke
 // den; ingen semantikk endret. Historikken til blokkene: prompts/kode-svar.md.
-import { abbrevType, cleanDescription, extractValidPeriod, renderLabels } from "./catalog-format.ts";
+import { abbrevType, cleanDescription, extractValidPeriod, renderCodelistSample, renderLabels } from "./catalog-format.ts";
 
 const SYSTEM_INTRO = `\
 Du er en ekspert-assistent for analysesystemet microdata.no — et Stata-likt DSL
@@ -35,15 +35,18 @@ const GRAMMAR_CHEATSHEET = `\
 ## microdata.no DSL — minimal grammatikk
 
 - Kommentarer starter med \`//\`.
-- Hvert script starter med \`require <databank> as <alias>\`, deretter
-  \`create-dataset <navn>\` (eller \`use <navn>\`), så én eller flere
-  \`import\`-setninger.
+- Hvert script starter med \`require <databank>:<versjon> as <alias>\` (én linje
+  per databank scriptet bruker), deretter \`create-dataset <navn>\` (eller
+  \`use <navn>\`), så én eller flere \`import\`-setninger.
 - Import (kommando avhenger av temporalitet — se under):
     - \`import db/VAR_NAVN [YYYY-MM-DD] [as alias] [, opsjoner]\` — Fast (uten dato),
       Tverrsnitt / Akkumulert (med ÉN dato). Opsjoner etter komma:
       \`outer_join\` (full union — ta med enheter som mangler i datasettet),
       \`inner_join\` (kun enheter i begge), \`values(kode, …)\` (kun gitte
-      kodeverdier), \`values_from(datasett)\` (kun enheter i et annet datasett).
+      kodeverdier, f.eks. \`values("0301", "4601")\`), \`values_from(datasett)\`
+      (på en koblingsnøkkel, f.eks. \`import db/ARBEIDSFORHOLD_PERSON,
+      values_from(oslobosatte)\`: kun rader der nøkkelen peker på en enhet i det
+      andre datasettet — slik gjenbrukes en populasjon på tvers av enhetstyper).
     - \`import-event db/VAR_NAVN YYYY-MM-DD to YYYY-MM-DD [as alias]\` — Forløp/
       hendelsesdata inn i et paneldatasett. (NB: eget kommandonavn, ikke
       \`import ... to ...\`.)
@@ -92,13 +95,20 @@ nedover, men det rå UPPER_CASE-navnet er det som valideres mot katalogen.`;
 const DATABANK_CHEATSHEET = `\
 ## Databank-oppsett
 
-Hvert script trenger ÉN \`require\`-linje øverst, før import. Bruk det korte
-aliaset (\`as <alias>\`) som prefiks i påfølgende imports.
+Hvert script trenger én \`require\`-linje per databank det henter variabler
+fra, øverst før import. Bruk det korte aliaset (\`as <alias>\`) som prefiks i
+påfølgende imports. SSB FDB trengs nesten alltid; FHI-databankene tar du KUN
+med når analysen faktisk bruker variabler derfra.
 
 | Databank | \`require\`-linje | Alias | Brukes til |
 |---|---|---|---|
 | SSB FDB | \`require no.ssb.fdb:53 as db\` | \`db\` | All SSB registerdata (inntekt, demografi, utdanning, geografi). Gjeldende versjon er **53** — bruk nyeste med mindre brukeren ber om en eldre. |
-| FHI NPR | \`require no.fhi.npr:DRAFT as fnpr\` | \`fnpr\` | Norsk pasientregister — sykehusinnleggelser (egen databank i tillegg til SSB FDB). |
+| FHI NPR | \`require no.fhi.npr:1 as dnpr\` | \`dnpr\` | Norsk pasientregister, somatiske sykehus 2016–2025: episoder (\`SOM_EP_*\`: diagnoser, inn-/utdato, omsorgsnivå, hastegrad, RHF) og prosedyrer (\`SOM_PROS_*\`). |
+| FHI Kreftregisteret | \`require no.fhi.kreftregisteret:1 as krg\` | \`krg\` | Kreftregisteret: ett krefttilfelle per rad (\`S_*\`: kreftsete, morfologi, stadium/TNM, behandling; \`P_*\`: personstatus). |
+
+Hver variabel importeres med aliaset til SIN databank (katalogen grupperer
+variablene per databank): \`import dnpr/SOM_EP_HOVEDTILSTAND1 as diag\`,
+\`import krg/S_TOPOGRAFIICD10 as sete\` — aldri \`db/SOM_EP_...\`.
 
 **Temporalitet** (fra katalog-metadata) bestemmer import-kommandoen. Det finnes
 FIRE verdier (ingen "Event"-temporalitet):
@@ -175,7 +185,8 @@ const DATASET_STRUCTURE = `\
 
 Variabelens **enhetstype** (fra katalog-metadata) sier hva en rad representerer.
 Mulige verdier: \`Person\` (klart flest), \`Jobb\` (arbeidsforhold), \`Kjøretøy\`,
-\`Kurs\`, \`Målepunkt\`, \`Kommune\`, \`Trafikkulykke\` og \`Person i trafikkulykke\`.
+\`Kurs\`, \`Målepunkt\`, \`Kommune\`, \`Trafikkulykke\`, \`Person i trafikkulykke\`,
+og fra FHI: \`Episode NPR\`, \`Prosedyre NPR\` og \`Krefttilfelle\`.
 
 **Person-nivå** (\`enhetstype = Person\`, én rad per person): de fleste SSB
 FDB-variabler (\`BEFOLKNING_*\`, \`INNTEKT_*\`, \`NUDB_*\`). Implisitt rad-id:
@@ -183,8 +194,8 @@ FDB-variabler (\`BEFOLKNING_*\`, \`INNTEKT_*\`, \`NUDB_*\`). Implisitt rad-id:
 
 **Fler-rad-per-person** (\`enhetstype ≠ Person\`, én rad per hendelse/jobb/kurs/
 bil/...): hvert slikt datasett har en person-ref-kolonne som peker tilbake til
-personen (f.eks. NPR \`NPRID\`, jobb \`ARBEIDSFORHOLD_PERSON\`, kurs
-\`NUDB_KURS_FNR\`). Importer alltid person-ref-kolonnen. Hold ulike enhetstyper
+personen (f.eks. NPR-episode \`SOM_EP_PERSONID\`, jobb \`ARBEIDSFORHOLD_PERSON\`,
+kurs \`NUDB_KURS_FNR\`). Importer alltid person-ref-kolonnen. Hold ulike enhetstyper
 i SEPARATE datasett.
 
 **Variabelomfang.** Etter \`use <datasett>\` er bare variablene i det aktive
@@ -332,7 +343,9 @@ inn i persondatasettet. "Antall X per person" = \`collapse (count) ... by(ref)\`
 | Jobb (A-ordningen) | \`ARBEIDSFORHOLD_PERSON\` |
 | Kjøretøy | \`KJORETOY_KJORETOYID_FNR\` |
 | Kurs | \`NUDB_KURS_FNR\` |
-| Sykehus (NPR) | \`NPRID\` |
+| Sykehusepisode (NPR) | \`SOM_EP_PERSONID\` |
+| Prosedyre (NPR) | \`SOM_PROS_PERSONID\` (episode-ref: \`SOM_PROS_EPISODEID\`) |
+| Krefttilfelle (Kreftregisteret) | \`P_PERSONIDMICRODATA\` |
 | Elhub målepunkt | \`ELHUB_PERS_MALEPUNKTID_FNR\` |
 | Foretak (hovedjobb) | \`REGSYS_FRTK_ID_SSB\` (2015+), \`REGSYS_ORGFOR\` (–2014) |
 | Virksomhet (hovedjobb) | \`REGSYS_VIRK_ID_SSB\` (2015+), \`REGSYS_ORGBED\` (–2014) |
@@ -447,8 +460,11 @@ const DATE_QUIRKS = `\
 
 Mange SSB-dato-variabler lagres som **heltall**, ikke ISO-datoer:
 - \`BEFOLKNING_FOEDSELS_AAR_MND\` er \`YYYYMM\` (198403 = mars 1984).
-- Noen er \`YYYYMMDD\` (20220115). NPR-datoer (f.eks. \`INNDATO\`) er heltall —
-  dager siden 1970-01-01.
+- Noen er \`YYYYMMDD\` (20220115).
+- FHI-datoer (\`SOM_EP_INNDATO\`, \`SOM_EP_UTDATO\`, \`S_DIAGNOSEDATO\`; type
+  \`Dato (Instant)\`, \`date:epoch\`) er DATOVERDIER (dager siden 1970-01-01), ikke
+  YYYYMMDD: bruk \`year(d)\`, \`month(d)\`, \`isoformatdate(d)\`, sammenlign med
+  \`date(2023, 1, 1)\`, og liggetid = \`utdato - inndato\` (dager). Aldri \`/10000\`.
 - Trekk ut år: \`gen year = int(date_var/10000)\` (YYYYMMDD) eller
   \`int(date_var/100)\` (YYYYMM). Filtrering som \`keep if uh <= 2009\` på et
   YYYYMM-felt dropper ALLE rader — bruk \`<= 200912\` eller trekk ut året.
@@ -535,12 +551,89 @@ kategorier, færre kategoriske dummies, eller større populasjon.
 **Inspeksjon av enkeltobservasjoner er alltid forbudt:** aldri \`list\`/\`browse\`/\`print\`/\`head\`/\`tail\`/\`show\`.`;
 
 const NPR_RULES = `\
-## NPR (Norsk pasientregister) — fallgruver
+## Helsedata fra FHI: NPR og Kreftregisteret
 
-- Ikke importer \`AGGRSHOPPID\` sammen med \`NPRID\` i samme datasett (ulik
-  enhetstype → unit_id-feil).
-- I \`collapse\`, send alltid \`by(<person-alias>)\` eksplisitt, f.eks.
-  \`collapse (count) icd1 -> n_dx, by(pid)\`.`;
+**Bare når det trengs.** Ta med \`require no.fhi.npr:1 as dnpr\` og/eller
+\`require no.fhi.kreftregisteret:1 as krg\` KUN når spørsmålet krever
+sykehus-/kreftvariabler. Rene SSB-analyser skal ikke ha dem.
+
+**Enhetstyper — ett datasett per type** (alle variablene er \`Fast\` → import
+UTEN dato):
+
+| Enhetstype | Én rad per | Person-ref | Annen nøkkel |
+|---|---|---|---|
+| \`Episode NPR\` (\`SOM_EP_*\`) | sykehusepisode (poliklinisk kontakt, dagbehandling eller døgnopphold) | \`SOM_EP_PERSONID\` | — |
+| \`Prosedyre NPR\` (\`SOM_PROS_*\`) | prosedyre utført i en episode | \`SOM_PROS_PERSONID\` | \`SOM_PROS_EPISODEID\` → episoden |
+| \`Krefttilfelle\` (\`S_*\`, \`P_*\`) | krefttilfelle (én person kan ha flere) | \`P_PERSONIDMICRODATA\` | — |
+
+Person-ref-verdien er personens \`PERSONID_1\` i SSB-data, så \`merge … on <pid>\`
+kobler direkte til et persondatasett. Person-refene er nøkkelvariabler: bruk dem
+bare i \`by()\`/\`on\`/\`values_from()\`, aldri i analyse. Bland aldri enhetstyper
+i samme datasett.
+
+**NPR er svært stort — avgrens ALLTID ved import.** Første import definerer
+populasjonen i datasettet, så sett filteret der:
+- På år: \`import dnpr/SOM_EP_AAR as aar, values("2023")\` som første import
+  (flere år: \`values("2022", "2023")\`). \`SOM_EP_AAR\` er alfanumerisk → årstall
+  i fnutter. Vil brukeren ha «alle år», velg likevel en avgrenset periode og si
+  hvorfor, eller begrens på populasjon.
+- På populasjon: bygg persondatasettet først, så
+  \`import dnpr/SOM_EP_PERSONID as pid, values_from(personer)\` — gir bare
+  episodene til personene i \`personer\`. \`values_from()\` skal stå på
+  KOBLINGSNØKKELEN (person-/episode-refen) og være FØRSTE import i det nye
+  datasettet; den beholder rader der nøkkelens verdi finnes som enhet i det
+  andre datasettet. Tilsvarende for prosedyrer:
+  \`import dnpr/SOM_PROS_EPISODEID as epid, values_from(episoder)\` gir bare
+  prosedyrer i episodene i \`episoder\`.
+- På kode: \`values()\` tar EKSAKTE koder (ikke prefikser), f.eks.
+  \`import dnpr/SOM_EP_OMSORGSNIVA as omsorg, values("1")\` (døgnopphold). For en
+  diagnosegruppe: importer diagnosen og filtrer med
+  \`keep if substr(diag, 1, 3) == 'I21'\`.
+Kreftregisteret er mye mindre; avgrens heller med \`keep if diagaar >= 2010\` på
+\`S_DIAGNOSEAR\` (numerisk).
+
+**Kodeverk.** \`SOM_EP_HOVEDTILSTAND1/2\` og \`S_TOPOGRAFIICD10\` er ICD-10 UTEN
+punktum (\`'I219'\`, \`'C509'\`), alfanumeriske → sammenlign i fnutter, grupper med
+\`substr(x, 1, 3)\` (kategori) eller \`substr(x, 1, 1)\` (kapittel-bokstav).
+Prosedyrer (\`SOM_PROS_PROSEDYREKODE\`) er NCMP/NCSP-koder. Katalogen viser bare
+et utvalg av de store kodelistene; slå opp konkrete koder med
+\`variabel_info\` (\`navn\` = variabelen, \`kode_sok\` = kode-prefiks eller
+fritekst, f.eks. \`"hjerteinfarkt"\` eller \`"I21"\`) i stedet for å gjette.
+
+Mønster (andel med hjerteinfarkt-episode i 2023, etter kjønn):
+\`\`\`microdata
+require no.ssb.fdb:53 as db
+require no.fhi.npr:1 as dnpr
+
+create-dataset personer
+import db/BEFOLKNING_KJOENN as kjonn
+
+create-dataset episoder
+import dnpr/SOM_EP_AAR as aar, values("2023")      // avgrens først
+import dnpr/SOM_EP_PERSONID as pid
+import dnpr/SOM_EP_HOVEDTILSTAND1 as diag
+generate ami = 0
+replace ami = 1 if substr(diag, 1, 3) == 'I21'      // I21 = akutt hjerteinfarkt
+collapse (max) ami -> ami, by(pid)
+merge ami into personer on pid                      // pid ↔ PERSONID_1
+use personer
+replace ami = 0 if sysmiss(ami)                     // ingen episode ⇒ 0
+tabulate kjonn ami
+\`\`\`
+
+Mønster (krefttilfeller etter kreftsete, 2015 og senere):
+\`\`\`microdata
+require no.fhi.kreftregisteret:1 as krg
+create-dataset kreft
+import krg/P_PERSONIDMICRODATA as pid
+import krg/S_DIAGNOSEAR as diagaar
+import krg/S_TOPOGRAFIICD10 as sete
+keep if diagaar >= 2015
+generate sete3 = substr(sete, 1, 3)
+tabulate sete3
+\`\`\`
+
+- I \`collapse\`, send alltid \`by(<person-alias>)\` eksplisitt.`;
 
 const OUTPUT_INSTRUCTION = `\
 ## Svarformat
@@ -867,7 +960,8 @@ const _cachedPrefix: Record<GenMode, string | null> = { microdata: null, python:
 
 const DATABANK_ALIAS: Record<string, string> = {
   "no.ssb.fdb": "db",
-  "no.fhi.npr": "fnpr",
+  "no.fhi.npr": "dnpr",
+  "no.fhi.kreftregisteret": "krg",
 };
 
 function renderCatalog(meta: unknown): string {
@@ -927,6 +1021,8 @@ function renderCatalog(meta: unknown): string {
     "  importer også person-ref-kolonnen og koble via collapse+merge (se",
     "  Relasjoner og koblinger).",
     "- {verdier}: kode→betydning for kategoriske variabler (kun når få nok).",
+    "  Store kodeverk (ICD-10, prosedyrer, ICD-O-3) vises som {utvalg: …; N koder",
+    "  totalt}: utvalget viser FORMATET; slå opp konkrete koder med variabel_info.",
     "",
   ];
   for (const bank of banks) {
@@ -944,7 +1040,7 @@ function renderCatalog(meta: unknown): string {
       if (period) tagParts.push(period);
       const tag = `[${tagParts.filter((p) => p).join(", ")}]`;
       const text = cleanDescription(desc, String(v.short_title ?? ""));
-      const labels = renderLabels(v.labels);
+      const labels = renderLabels(v.labels) || renderCodelistSample(v);
       lines.push(text ? `- \`${name}\` ${tag} — ${text}${labels}` : `- \`${name}\` ${tag}${labels}`);
     }
     lines.push("");
