@@ -193,3 +193,39 @@ def test_citation_lists_required_databanks_in_order():
 def test_citation_without_require_is_an_error():
     _, out = _run("create-dataset p\ncitation\n")
     assert "FEIL" in out and "require" in out
+
+
+# ── KOSTRA (enhetstype Kommune) ─────────────────────────────────────────────
+
+def test_kostra_is_one_row_per_kommune_and_merges_on_kommune():
+    it, out = _run("""require no.ssb.fdb:60 as db
+create-dataset bosted
+import db/BOSATTEFDT_BOSTED 2023-12-31 as kommune
+aggregate (count) kommune -> bosatte, by(kommune)
+create-dataset kostradata
+import db/SB12362_KOSTRA_LONNSUTGIFTER_F_BARNEHAGE 2023-12-31 as barnehage
+import db/SB12362_KOSTRA_LONNSUTGIFTER_F_GRUNNSKOLE 2023-12-31 as grunnskole
+merge barnehage grunnskole into bosted on kommune
+use bosted
+generate per_pers = barnehage / bosatte
+""")
+    assert "FEIL" not in out
+    k = it.datasets["kostradata"]
+    assert 350 <= len(k) <= 360                      # ~357 kommuner i 2023
+    assert k["KOMMUNENR"].is_unique
+    assert "4601" in set(k["KOMMUNENR"]) and "1201" not in set(k["KOMMUNENR"])
+    b = it.datasets["bosted"]
+    assert b["barnehage"].notna().mean() > 0.9
+    # Samme kommune ⇒ samme KOSTRA-verdi for alle bosatte.
+    assert (b.dropna(subset=["barnehage"]).groupby("kommune")["barnehage"].nunique() == 1).all()
+    assert 1 < b["per_pers"].median() < 50           # 1000 kr per bosatt, plausibelt nivå
+
+
+def test_kostra_kommune_list_follows_reform_year():
+    it, _ = _run("""require no.ssb.fdb:60 as db
+create-dataset k19
+import db/SB12362_KOSTRA_LONNSUTGIFTER_F_BARNEHAGE 2019-12-31 as b
+""")
+    koms = set(it.datasets["k19"]["KOMMUNENR"])
+    assert "1201" in koms and "4601" not in koms     # Bergen før 2020-reformen
+    assert len(koms) > 400

@@ -371,6 +371,37 @@ Mange registre har egen kommune-variabel (Alfanumerisk kommunekode — bruk
 \`tabulate\`/\`by()\`, ikke numerisk). Bosted: \`BEFOLKNING_KOMMNR_FAKTISK\` /
 \`BEFOLKNING_KOMMNR_FORMELL\`. Fylke: \`generate fylke = substr(komm, 1, 2)\`.
 
+### KOSTRA (kommunedata)
+112 variabler \`SB<tabell>_KOSTRA_*\` med enhetstype \`Kommune\` (Akkumulert,
+årlige verdier): kommunale lønnsutgifter per tjenesteområde (\`SB12362_*\`,
+1000 kr, fratrukket sykelønnsrefusjon; \`_F_\` = sammenslåtte funksjons-
+grupper, f.eks. \`F_BARNEHAGE\` = FGK7), husholdningsavfall per innbygger
+(\`SB12241_*\`), skatteinntekter m.m. Tallet i prefikset er Statistikkbank-
+tabellen. Én rad per KOMMUNE — kan ikke importeres i et persondatasett:
+1. Persondatasett med bostedskommune (samme år), og antall bosatte per kommune
+   med \`aggregate (count) kommune -> bosatte, by(kommune)\`.
+2. Eget kommunedatasett med KOSTRA-variablene (årsslutt-dato for årstallet).
+3. \`merge <kostra-vars> into <persondatasett> on kommune\` — alle personer får
+   kommunens verdi. Per innbygger = beløp / bosatte; fylke/land: \`collapse\`.
+Brukes også som kontekstvariabel for individanalyser (bosteds- eller arbeids-
+stedskommune). Kommunenumrene er årsavhengige — bruk samme år på bosted og
+KOSTRA. Beløpene er WINSORISERT (kommunene under 1. / over 99. persentil settes
+til grenseverdien): si det i tolkningen; eksakte tall finnes i Statistikkbanken.
+
+Mønster (lønnsutgifter til barnehage per innbygger, 2023):
+\`\`\`microdata
+require no.ssb.fdb:60 as db
+create-dataset bosted
+import db/BOSATTEFDT_BOSTED 2023-12-31 as kommune
+aggregate (count) kommune -> bosatte, by(kommune)
+create-dataset kostradata
+import db/SB12362_KOSTRA_LONNSUTGIFTER_F_BARNEHAGE 2023-12-31 as barnehage
+merge barnehage into bosted on kommune
+use bosted
+generate barnehage_per_pers = barnehage / bosatte   // 1000 kr per bosatt
+tabulate kommune, summarize(barnehage_per_pers) rowsort() top(10)
+\`\`\`
+
 ### Grunnkrets og egne områder (under kommunenivå)
 \`BEFOLKNING_GRUNNKRETS\` (bosted, \`Tverrsnitt\`, årlig per \`YYYY-01-01\`,
 1990–2026) er det fineste geografiske nivået (~14 000 kretser, ~1 550

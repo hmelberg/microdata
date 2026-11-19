@@ -20,7 +20,7 @@ from collections import namedtuple
 ENTITY_KEY_COLS = (
     "PERSONID_1", "ARBEIDSFORHOLD_ID", "KJORETOY_ID",
     "NUDB_KURS_LOEPENR", "NPR_EPISODEID", "NPR_PROSEDYREID",
-    "KRG_TILFELLEID", "AGGRSHOPPID", "NPRID", "unit_id",
+    "KRG_TILFELLEID", "KOMMUNENR", "AGGRSHOPPID", "NPRID", "unit_id",
 )
 
 # Resolution result. ``left_on``/``right_on`` are the join columns (target side /

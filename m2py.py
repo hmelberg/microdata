@@ -3332,6 +3332,71 @@ class MockDataEngine:
             var_name: vals,
         })
 
+    def _kommune_universe(self, year):
+        """(kommunenumre gyldige i året, {kommune: antall bosatte i emulatoren}).
+
+        Kommunelisten kommer fra grunnkretskodene (gyldighetsår per kode, følger
+        reformene), supplert med kodene emulatoren gir bosatte.
+        """
+        cache = self.__dict__.setdefault('_kommune_universe_cache', {})
+        if year in cache:
+            return cache[year]
+        self.ensure_variable_resolved('BEFOLKNING_GRUNNKRETS')
+        gyldig = (self.catalog.get('BEFOLKNING_GRUNNKRETS') or {}).get('gyldig') or {}
+        koms = {str(c)[:4] for c, g in gyldig.items()
+                if len(str(c)) == 8 and g[0] <= year and (g[1] is None or g[1] >= year)}
+        pop = {}
+        try:
+            bo = self.generate('import', {'var': 'db/BOSATTEFDT_BOSTED', 'date1': f'{year}-12-31'},
+                               pd.DataFrame())
+            # Samme skala som emulatorens befolkning, så «per bosatt» (beløp /
+            # antall bosatte i datasettet, som i manualens eksempel) blir realistisk.
+            counts = bo['BOSATTEFDT_BOSTED'].astype(str).value_counts()
+            pop = {k: float(v) for k, v in counts.items() if k.isdigit() and len(k) == 4}
+        except Exception:
+            pop = {}
+        koms |= set(pop)
+        koms = sorted(k for k in koms if k.isdigit() and len(k) == 4 and k[:2] not in ('21', '22', '23'))
+        pops = {k: max(1.0, pop.get(k, 0.0)) for k in koms}
+        cache[year] = (koms, pops)
+        return cache[year]
+
+    def _generate_kommune_entity(self, short_name, var_name, parsed_args, meta, current_df):
+        """KOSTRA-lignende kommunevariabler: én rad per kommune (ID = KOMMUNENR).
+
+        Beløp (1000 kr) ∝ innbyggertall × en fast per-innbygger-sats per variabel,
+        med stabil kommunestøy; «per innbygger»-variabler får nivå uten skalering.
+        """
+        d1 = (parsed_args or {}).get('date1') or f"{_DEMO_REF_YEAR}-12-31"
+        try:
+            year = int(str(d1)[:4])
+        except (TypeError, ValueError):
+            year = int(_DEMO_REF_YEAR)
+        koms, pops = self._kommune_universe(year)
+        if current_df is not None and not current_df.empty and 'KOMMUNENR' in current_df.columns:
+            koms = current_df['KOMMUNENR'].astype(str).tolist()
+        ids = np.array([int(k) for k in koms], dtype=np.int64)
+        name = short_name or var_name
+        vseed = int(hashlib.md5(f"kommune_rate:{name}".encode()).hexdigest(), 16) % (2**31)
+        title = f"{name} {(meta or {}).get('short_title', '')}".lower()
+        per_capita = 'innbygger' in title
+        dt = str((meta or {}).get('data_type', '')).lower()
+        if dt in ('int', 'float', 'integer', 'numeric') or 'numerisk' in str((meta or {}).get('microdata_datatype', '')).lower():
+            rate = float(np.exp(np.random.default_rng(vseed).normal(np.log(300.0 if per_capita else 3.0), 0.6)))
+            noise = np.exp(0.35 * (_fhi_u01(ids, vseed % 1000 + 40) - 0.5) * 2)
+            trend = 1.03 ** (year - 2015)
+            if per_capita:
+                vals = rate * noise * trend
+            else:
+                vals = rate * noise * trend * np.array([pops.get(k, 1.0) for k in koms])
+            vals = np.round(vals).astype(float)
+            vals[_fhi_u01(ids, vseed % 1000 + 41) < 0.02] = np.nan   # enkelte kommuner mangler
+        else:
+            labels = list(((meta or {}).get('labels') or {}).keys()) or ['1']
+            vals = np.array([labels[int(u * len(labels))] for u in _fhi_u01(ids, vseed % 1000 + 42)],
+                            dtype=object)
+        return pd.DataFrame({'KOMMUNENR': koms, var_name: vals})
+
     def _generate_grunnkrets(self, uids, parsed_args):
         d1 = (parsed_args or {}).get('date1') or f"{_DEMO_REF_YEAR}-01-01"
         try:
@@ -3646,6 +3711,11 @@ class MockDataEngine:
 
         # Multi-record enhetstyper (jobb, kjøretøy, kurs): bygg 1:N-struktur ved første import
         _var_entity = _meta_check.get('entity_type', 'person')
+
+        # Kommune-enheter (KOSTRA): én rad per kommune som gjelder i året.
+        if _var_entity == 'kommune' and cmd == 'import':
+            return self._generate_kommune_entity(short_name, var_name, parsed_args,
+                                                 _meta_check, current_df)
         if (cmd == 'import'
             and current_df.empty
             and _var_entity in _ENTITY_MULTI_RECORD_PROFILE):
@@ -4207,6 +4277,7 @@ _ENTITY_ID_COL = {
     'jobb': 'ARBEIDSFORHOLD_ID',
     'kjoretoy': 'KJORETOY_ID',
     'kurs': 'NUDB_KURS_LOEPENR',
+    'kommune': 'KOMMUNENR',          # KOSTRA m.fl.: én rad per kommune, ID = kommunenummer
     'npr_episode': 'NPR_EPISODEID',
     'npr_prosedyre': 'NPR_PROSEDYREID',
     'krg_krefttilfelle': 'KRG_TILFELLEID',
@@ -4470,7 +4541,7 @@ def _get_df_key_col(df):
     # hot, import-time-safe helper carries no dependency on m2py_runtime.
     for c in ('PERSONID_1', 'ARBEIDSFORHOLD_ID', 'KJORETOY_ID',
               'NUDB_KURS_LOEPENR', 'NPR_EPISODEID', 'NPR_PROSEDYREID',
-              'KRG_TILFELLEID', 'AGGRSHOPPID', 'NPRID', 'unit_id'):
+              'KRG_TILFELLEID', 'KOMMUNENR', 'AGGRSHOPPID', 'NPRID', 'unit_id'):
         if c in df.columns:
             return c
     return None

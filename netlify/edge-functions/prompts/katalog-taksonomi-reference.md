@@ -29,7 +29,7 @@ vises per variabel i prompten — denne fila er kun orientering. -->
 
 ## Enhetstype (hva en rad representerer)
 - Person: 496
-- Kommune: 112  (geografiske nøkkel-/kodevariabler)
+- Kommune: 112  (KOSTRA-variabler `SB<tabell>_KOSTRA_*`, én rad per kommune; koble via bostedskommune)
 - Jobb: 53  (arbeidsforhold; person-ref `ARBEIDSFORHOLD_PERSON`)
 - Kjøretøy: 25  (person-ref `KJORETOY_KJORETOYID_FNR`)
 - Kurs: 16  (person-ref `NUDB_KURS_FNR`)
