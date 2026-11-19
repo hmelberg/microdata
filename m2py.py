@@ -3274,40 +3274,19 @@ class MockDataEngine:
         har 0..max enheter basert på _ENTITY_MULTI_RECORD_PROFILE.
         Returnerer DataFrame med [entity_id_col, person_ref_col, var_name].
         """
-        profile = _ENTITY_MULTI_RECORD_PROFILE[entity_type]
-        p_has = profile['p_has']
-        mean_count = profile['mean']
-        max_count = profile['max']
-
-        seed = int(hashlib.md5(f"multirecord_{entity_type}".encode()).hexdigest(), 16) % (2**31)
-        rng = np.random.default_rng(seed)
-
-        persons = self.person_universe
-        n_persons = len(persons)
-
-        # Hvem har minst én enhet?
-        has_record = rng.random(n_persons) < p_has
-        persons_with = persons[has_record]
-        n_with = int(has_record.sum())
-
-        if n_with == 0:
-            id_col = _ENTITY_ID_COL.get(entity_type, 'unit_id')
-            ref_col = _ENTITY_PERSON_REF_COL.get(entity_type, 'person_ref')
-            return pd.DataFrame({id_col: [], ref_col: [], var_name: []})
-
-        # Antall enheter per person (Poisson, minst 1, maks max_count)
-        counts = np.clip(rng.poisson(max(0.1, mean_count), n_with), 1, max_count)
-        total = int(counts.sum())
-
-        # Person-IDer gjentatt per enhet
-        person_ids = np.repeat(persons_with, counts.astype(int)).tolist()
-        person_ids = np.array(person_ids, dtype=np.int64)
-
-        # Enhets-IDer (løpenummer)
-        entity_ids = np.arange(1, total + 1, dtype=np.int64)
+        struct = self._entity_structure(entity_type)
+        entity_ids = struct['entity_ids']
+        person_ids = struct['person_ids']
+        total = int(len(entity_ids))
 
         id_col = _ENTITY_ID_COL.get(entity_type, 'unit_id')
         ref_col = _ENTITY_PERSON_REF_COL.get(entity_type, 'person_ref')
+
+        if total == 0:
+            cols = {id_col: [], ref_col: []}
+            if var_name != ref_col:
+                cols[var_name] = []
+            return pd.DataFrame(cols)
 
         # Generer variabelverdier med person-basert latent-z for realisme.
         # Seed på short_name (kanonisk variabel) + dato, ikke alias — ellers gir
@@ -3327,17 +3306,142 @@ class MockDataEngine:
                     or getattr(self, '_catalog_by_short', {}).get(short_name)
                     or meta or {})
 
-        # Generer verdier basert på metadata (distribution/labels/mean+std)
-        vals = self._generate_variable_values(
-            var_name, short_name, var_meta, total, var_rng,
-            uids=person_ids, ages_vec=ages_vec, gender_vec=gender_vec, z_vec=z_vec,
-            parsed_args=parsed_args)
+        # Strukturelle (person-/enhets-ref) og avledede FHI-verdier først;
+        # ellers generering basert på metadata (distribution/labels/mean+std).
+        vals = self._entity_structural_values(
+            entity_type, short_name, entity_ids, person_ids, var_meta, var_rng,
+            ages_vec=ages_vec, gender_vec=gender_vec)
+        if vals is None:
+            vals = self._generate_variable_values(
+                var_name, short_name, var_meta, total, var_rng,
+                uids=person_ids, ages_vec=ages_vec, gender_vec=gender_vec, z_vec=z_vec,
+                parsed_args=parsed_args)
 
+        if var_name == ref_col:
+            # `import X/<person-ref>` uten alias: kolonnen ER person-ref-kolonnen.
+            return pd.DataFrame({id_col: entity_ids, ref_col: person_ids})
         return pd.DataFrame({
             id_col: entity_ids,
             ref_col: person_ids,
             var_name: vals,
         })
+
+    def _entity_structure(self, entity_type):
+        """Deterministisk 1:N-struktur for en enhetstype (cachet per motor).
+
+        Returnerer {'entity_ids', 'person_ids', 'parent_ids'} (numpy int64).
+        Prosedyrer (npr_prosedyre) bygges fra episodestrukturen, slik at
+        SOM_PROS_EPISODEID peker på ekte episode-ID-er og SOM_PROS_PERSONID er
+        samme person som episodens SOM_EP_PERSONID.
+        """
+        cache = self.__dict__.setdefault('_entity_struct_cache', {})
+        if entity_type in cache:
+            return cache[entity_type]
+        seed = int(hashlib.md5(f"multirecord_{entity_type}".encode()).hexdigest(), 16) % (2**31)
+        rng = np.random.default_rng(seed)
+        profile = _ENTITY_MULTI_RECORD_PROFILE[entity_type]
+        if entity_type == 'npr_prosedyre':
+            ep = self._entity_structure('npr_episode')
+            has = rng.random(len(ep['entity_ids'])) < profile['p_has']
+            counts = np.clip(rng.poisson(profile['mean'], int(has.sum())), 1, profile['max'])
+            parent = np.repeat(ep['entity_ids'][has], counts.astype(int)).astype(np.int64)
+            persons = np.repeat(ep['person_ids'][has], counts.astype(int)).astype(np.int64)
+            struct = {'entity_ids': np.arange(1, len(parent) + 1, dtype=np.int64),
+                      'person_ids': persons, 'parent_ids': parent}
+        else:
+            persons = self.person_universe
+            # Hvem har minst én enhet?
+            p_has = profile['p_has']
+            if entity_type in _ENTITY_AGE_WEIGHT:
+                # Kreft og sykehusbruk øker sterkt med alder: vekt sannsynligheten
+                # etter personens alder (snitt = p_has over populasjonen).
+                ages = np.array([_norway_demo_age_at(int(u)) for u in persons], dtype=float)
+                w = _ENTITY_AGE_WEIGHT[entity_type](ages)
+                p_has = np.clip(p_has * w / max(w.mean(), 1e-9), 0, 0.98)
+            has_record = rng.random(len(persons)) < p_has
+            persons_with = persons[has_record]
+            n_with = int(has_record.sum())
+            if n_with == 0:
+                empty = np.array([], dtype=np.int64)
+                struct = {'entity_ids': empty, 'person_ids': empty, 'parent_ids': None}
+            else:
+                # Antall enheter per person (Poisson, minst 1, maks max)
+                counts = np.clip(rng.poisson(max(0.1, profile['mean']), n_with), 1, profile['max'])
+                person_ids = np.repeat(persons_with, counts.astype(int)).astype(np.int64)
+                struct = {'entity_ids': np.arange(1, len(person_ids) + 1, dtype=np.int64),
+                          'person_ids': person_ids, 'parent_ids': None}
+        cache[entity_type] = struct
+        return struct
+
+    def _entity_lookup(self, entity_type, entity_ids, field):
+        """Slå opp person_ids/parent_ids for gitte enhets-ID-er (ID = løpenr 1..N)."""
+        struct = self._entity_structure(entity_type)
+        arr = struct.get(field)
+        ids = np.asarray(entity_ids, dtype=np.int64)
+        if arr is None or len(arr) == 0:
+            return np.zeros(len(ids), dtype=np.int64)
+        return arr[np.clip(ids - 1, 0, len(arr) - 1)]
+
+    def _entity_structural_values(self, entity_type, short_name, entity_ids, person_ids,
+                                  meta, rng, ages_vec=None, gender_vec=None):
+        """Verdier som følger av enhetsstrukturen, ikke av tilfeldig trekk.
+
+        - person-ref-variabelen (f.eks. SOM_EP_PERSONID, ARBEIDSFORHOLD_PERSON) = personens ID
+        - enhets-ref (SOM_PROS_EPISODEID) = foreldre-enhetens ID
+        - FHI-avledede: år/datoer/omsorgsnivå fra enhets-ID, ICD-10 vektet etter alder/kjønn
+        Returnerer None når variabelen ikke er strukturell (vanlig generering).
+        """
+        ids = np.asarray(entity_ids, dtype=np.int64)
+        if short_name and short_name == _ENTITY_PERSON_REF_COL.get(entity_type):
+            return np.asarray(person_ids, dtype=np.int64)
+        if short_name in _ENTITY_PARENT_REF and _ENTITY_PARENT_REF[short_name][0] == entity_type:
+            return self._entity_lookup(entity_type, ids, 'parent_ids')
+        n = len(ids)
+        if entity_type == 'npr_episode':
+            if short_name == 'SOM_EP_AAR':
+                return _npr_episode_year(ids).astype(str).astype(object)
+            if short_name == 'SOM_EP_INNDATO':
+                return _npr_episode_inndato(ids)
+            if short_name == 'SOM_EP_UTDATO':
+                return _npr_episode_utdato(ids)
+            if short_name == 'SOM_EP_OMSORGSNIVA':
+                return _npr_episode_omsorg(ids).astype(object)
+            if short_name in ('SOM_EP_HOVEDTILSTAND1', 'SOM_EP_HOVEDTILSTAND2'):
+                pick = _icd_subcode_picker((meta or {}).get('labels'))
+                pids = np.asarray(person_ids, dtype=np.int64)
+                ages = (ages_vec if ages_vec is not None and len(ages_vec) == n else
+                        np.array([_norway_synth_age_from_uid(int(u)) for u in pids]))
+                sexes = (gender_vec if gender_vec is not None and len(gender_vec) == n else
+                         np.array([_norway_synth_kjonn_from_uid(int(u)) for u in pids]))
+                vals = np.array([pick(self._pick_icd10(int(ages[i]), int(sexes[i]), rng), rng)
+                                 for i in range(n)], dtype=object)
+                if short_name == 'SOM_EP_HOVEDTILSTAND2':
+                    vals[_fhi_u01(ids, 15) < 0.65] = np.nan
+                return vals
+        if entity_type == 'krg_krefttilfelle':
+            if short_name == 'S_DIAGNOSEAR':
+                return _krg_diagnoseaar(ids)
+            if short_name == 'S_DIAGNOSEDATO':
+                return _fhi_epoch_jan1(_krg_diagnoseaar(ids)) + (_fhi_u01(ids, 22) * 365).astype(np.int64)
+            if short_name == 'S_ALDERDIAGNOSE':
+                years = _krg_diagnoseaar(ids)
+                return np.array([max(0, min(105, _norway_demo_age_at(int(p), int(y))))
+                                 for p, y in zip(np.asarray(person_ids, dtype=np.int64), years)],
+                                dtype=np.int64)
+            if short_name == 'S_TOPOGRAFIICD10':
+                pick = _icd_subcode_picker((meta or {}).get('labels'))
+                pids = np.asarray(person_ids, dtype=np.int64)
+                sexes = (gender_vec if gender_vec is not None and len(gender_vec) == n else
+                         np.array([_norway_synth_kjonn_from_uid(int(u)) for u in pids]))
+                codes = [c for c, _m, _k in _KRG_SITES]
+                w_m = np.array([m for _c, m, _k in _KRG_SITES]); w_m = w_m / w_m.sum()
+                w_k = np.array([k for _c, _m, k in _KRG_SITES]); w_k = w_k / w_k.sum()
+                out = np.empty(n, dtype=object)
+                for i in range(n):
+                    prefix = codes[int(rng.choice(len(codes), p=(w_m if int(sexes[i]) == 1 else w_k)))]
+                    out[i] = pick(prefix, rng) if rng.random() < 0.6 else prefix
+                return out
+        return None
 
     def _generate_variable_values(self, var_name, short_name, meta, n_rows, rng,
                                   uids=None, ages_vec=None, gender_vec=None, z_vec=None,
@@ -3534,6 +3638,40 @@ class MockDataEngine:
         rng = np.random.default_rng(seed)
 
         data = {_src_id: uids}
+
+        # Enhetsdatasett (jobb, NPR-episode, krefttilfelle …): strukturelle
+        # variabler (person-ref, enhets-ref) og FHI-avledede verdier slås opp fra
+        # den deterministiske enhetsstrukturen, så de er konsistente med første
+        # import uansett rekkefølge og filtrering.
+        if (_var_entity in _ENTITY_MULTI_RECORD_PROFILE
+                and not current_df.empty
+                and _src_id == _ENTITY_ID_COL.get(_var_entity)):
+            _sname = var_path.split('/')[-1] if var_path else ''
+            if _sname:
+                self.ensure_variable_resolved(_sname)
+            _smeta = self.catalog.get(_sname) or getattr(self, '_catalog_by_short', {}).get(_sname) or {}
+            _ref = _ENTITY_PERSON_REF_COL.get(_var_entity)
+            _ent_pids = (current_df[_ref].values.astype(np.int64)
+                         if _ref and _ref in current_df.columns
+                         else self._entity_lookup(_var_entity, uids, 'person_ids'))
+            _svals = self._entity_structural_values(
+                _var_entity, _sname, uids, _ent_pids, _smeta, rng,
+                ages_vec=ages_vec, gender_vec=gender_vec)
+            if _svals is not None:
+                if var_name in current_df.columns and _sname == _ref:
+                    return pd.DataFrame(data)   # person-ref-kolonnen finnes allerede
+                data[var_name] = _svals
+                return pd.DataFrame(data)
+
+        # Kjønn er en fast egenskap ved personen: avled den fra person-ID-en (som
+        # fødselsåret), ikke fra radrekkefølgen. Da stemmer BEFOLKNING_KJOENN med
+        # kjønnet entitets-/hendelsesgeneratorene bruker (NPR-diagnoser,
+        # kreftsete) uansett hvilken delpopulasjon datasettet har.
+        if (var_path.split('/')[-1] if var_path else '') == 'BEFOLKNING_KJOENN' \
+                and _var_entity == 'person' and len(uids) > 0:
+            data[var_name] = np.array([str(_norway_synth_kjonn_from_uid(int(u))) for u in uids],
+                                      dtype=object)
+            return pd.DataFrame(data)
 
         # Realism framework (opt-in via `realism` block in catalog metadata).
         # Takes precedence over rule_based so authors can migrate variables
@@ -3969,8 +4107,12 @@ _ENHETSTYPE_TO_ENTITY = {
     'Kurs':                     'kurs',
     'Trafikkulykke':            'trafikkulykke',
     'Person i trafikkulykke':   'person_i_trafikkulykke',
-    'Behandlingsopphold':       _NPR_ENTITY,   # npr-alias
+    'Behandlingsopphold':       _NPR_ENTITY,   # npr-alias (gammel DRAFT-databank)
     'Målepunkt':                'malepunkt',
+    # FHI-databankene (no.fhi.npr:1, no.fhi.kreftregisteret:1)
+    'Episode NPR':              'npr_episode',
+    'Prosedyre NPR':            'npr_prosedyre',
+    'Krefttilfelle':            'krg_krefttilfelle',
 }
 
 # Norsk visningsnavn for entity-typer (brukes i feilmeldinger)
@@ -3984,6 +4126,9 @@ _ENTITY_DISPLAY = {
     'person_i_trafikkulykke':   'Person i trafikkulykke',
     _NPR_ENTITY:                'Sykehusopphold (NPR)',
     'malepunkt':                'Målepunkt',
+    'npr_episode':              'Episode NPR',
+    'npr_prosedyre':            'Prosedyre NPR',
+    'krg_krefttilfelle':        'Krefttilfelle',
 }
 
 # Enhetstype → nøkkelkolonnenavn i DataFrame (fallback: 'unit_id')
@@ -3992,6 +4137,9 @@ _ENTITY_ID_COL = {
     'jobb': 'ARBEIDSFORHOLD_ID',
     'kjoretoy': 'KJORETOY_ID',
     'kurs': 'NUDB_KURS_LOEPENR',
+    'npr_episode': 'NPR_EPISODEID',
+    'npr_prosedyre': 'NPR_PROSEDYREID',
+    'krg_krefttilfelle': 'KRG_TILFELLEID',
 }
 
 # Enhetstype → person-referansekolonne (kobler enheten tilbake til person-ID)
@@ -4000,6 +4148,22 @@ _ENTITY_PERSON_REF_COL = {
     'kjoretoy': 'KJORETOY_KJORETOYID_FNR',
     'kurs':     'NUDB_KURS_FNR',
     _NPR_ENTITY: 'NPRID',
+    'npr_episode':       'SOM_EP_PERSONID',
+    'npr_prosedyre':     'SOM_PROS_PERSONID',
+    'krg_krefttilfelle': 'P_PERSONIDMICRODATA',
+}
+
+# Alders-vekt for hvem som har FHI-enheter (relativ; normaliseres til p_has).
+_ENTITY_AGE_WEIGHT = {
+    'npr_episode':       lambda a: 0.5 + np.clip(a, 0, 90) / 30.0,
+    'krg_krefttilfelle': lambda a: np.clip((a - 25.0) / 15.0, 0.02, 4.0) ** 2,
+}
+
+# Referanse fra en enhet til en ANNEN (ikke-person) enhet: variabel →
+# (enhetstype for raden, enhetstype verdien peker til). Verdien er den andre
+# enhetens ID, slik at values_from(<datasett av måltypen>) og merge on fungerer.
+_ENTITY_PARENT_REF = {
+    'SOM_PROS_EPISODEID': ('npr_prosedyre', 'npr_episode'),
 }
 
 # Multi-record profil: entity_type → (p_has, mean, max)
@@ -4010,6 +4174,12 @@ _ENTITY_MULTI_RECORD_PROFILE = {
     'jobb':     {'p_has': 0.72, 'mean': 1.4, 'max': 5},
     'kjoretoy': {'p_has': 0.55, 'mean': 1.2, 'max': 4},
     'kurs':     {'p_has': 0.45, 'mean': 2.5, 'max': 12},
+    # NPR-episoder 2016–2025 (alle år samlet; values("2023") gir ~1/10).
+    'npr_episode':       {'p_has': 0.55, 'mean': 5.0, 'max': 40},
+    # Prosedyrer bygges fra episodene (se _entity_structure), profilen er
+    # bare en markør for multi-record-stien.
+    'npr_prosedyre':     {'p_has': 0.45, 'mean': 1.6, 'max': 8},
+    'krg_krefttilfelle': {'p_has': 0.07, 'mean': 1.15, 'max': 4},
 }
 
 # Variabler som skal bruke hierarkisk NUS-kodegenerator
@@ -4081,6 +4251,7 @@ _PERSONID_REF_VARS = frozenset({
     'TRAFULYK_PERS_FNR',
     'ARBEIDSFORHOLD_PERSON',
     'NPRID',  # NPR person id — same encrypted PID as SSB PERSONID_1, lets cross-registry merges auto-detect.
+    'SOM_EP_PERSONID', 'SOM_PROS_PERSONID', 'P_PERSONIDMICRODATA',  # FHI person-refs (samme PID).
 })
 
 # Hendelses-profil for import-event variabler.
@@ -4228,7 +4399,8 @@ def _get_df_key_col(df):
     # Inline copy of m2py_runtime.keys.ENTITY_KEY_COLS (kept in sync) so this
     # hot, import-time-safe helper carries no dependency on m2py_runtime.
     for c in ('PERSONID_1', 'ARBEIDSFORHOLD_ID', 'KJORETOY_ID',
-              'NUDB_KURS_LOEPENR', 'AGGRSHOPPID', 'NPRID', 'unit_id'):
+              'NUDB_KURS_LOEPENR', 'NPR_EPISODEID', 'NPR_PROSEDYREID',
+              'KRG_TILFELLEID', 'AGGRSHOPPID', 'NPRID', 'unit_id'):
         if c in df.columns:
             return c
     return None
@@ -4361,6 +4533,85 @@ _DEMO_FALLBACK_META.update({
     'UTDATO':         {'entity_type': _NPR_ENTITY, 'data_type': 'int'},
     'UTTID':          {'entity_type': _NPR_ENTITY, 'data_type': 'string'},
 })
+
+# ── FHI (NPR + Kreftregisteret): deterministiske, konsistente syntetverdier ──
+# Datoer, år og omsorgsnivå avledes fra ENHETS-ID-en, slik at f.eks.
+# SOM_EP_AAR, SOM_EP_INNDATO og SOM_EP_UTDATO henger sammen uansett
+# importrekkefølge og filtrering (values("2023") gir episoder med inndato i 2023).
+
+def _fhi_u01(ids, salt):
+    """Vektorisert splitmix64 → uniform [0,1) per ID (deterministisk)."""
+    x = np.asarray(ids, dtype=np.int64).astype(np.uint64)
+    with np.errstate(over='ignore'):
+        x = (x + np.uint64(salt)) * np.uint64(0x9E3779B97F4A7C15)
+        x ^= x >> np.uint64(30)
+        x *= np.uint64(0xBF58476D1CE4E5B9)
+        x ^= x >> np.uint64(27)
+        x *= np.uint64(0x94D049BB133111EB)
+        x ^= x >> np.uint64(31)
+    return (x >> np.uint64(11)).astype(np.float64) / float(1 << 53)
+
+
+def _fhi_epoch_jan1(years):
+    years = np.asarray(years, dtype=np.int64)
+    return ((np.datetime64('1970', 'Y') + (years - 1970).astype('timedelta64[Y]'))
+            .astype('datetime64[D]').astype(np.int64))
+
+
+def _npr_episode_year(ids):
+    return 2016 + np.minimum(9, (_fhi_u01(ids, 11) * 10).astype(np.int64))
+
+
+def _npr_episode_inndato(ids):
+    return _fhi_epoch_jan1(_npr_episode_year(ids)) + (_fhi_u01(ids, 12) * 365).astype(np.int64)
+
+
+def _npr_episode_omsorg(ids):
+    u = _fhi_u01(ids, 13)
+    # 3 = poliklinisk (62 %), 2 = dagbehandling (10 %), 1 = døgn (25 %), 8 = poliklinisk for inneliggende (3 %)
+    return np.where(u < 0.62, '3', np.where(u < 0.72, '2', np.where(u < 0.97, '1', '8')))
+
+
+def _npr_episode_utdato(ids):
+    los = np.minimum(60, 1 + np.floor(-np.log1p(-_fhi_u01(ids, 14)) * 3.5)).astype(np.int64)
+    return _npr_episode_inndato(ids) + np.where(_npr_episode_omsorg(ids) == '1', los, 0)
+
+
+def _krg_diagnoseaar(ids):
+    # Flest nyere tilfeller (registeret vokser), hale tilbake til 1953.
+    back = np.floor(-np.log1p(-_fhi_u01(ids, 21)) * 18).astype(np.int64)
+    return np.clip(2024 - back, 1953, 2024)
+
+
+# Kreftsete (ICD-10, 3 tegn) med kjønnsvekter (mann, kvinne) — grovt etter
+# Kreftregisterets insidensfordeling.
+_KRG_SITES = [
+    ('C61', 30.0, 0.0), ('C50', 0.2, 28.0), ('C18', 9.0, 9.5), ('C34', 9.0, 9.0),
+    ('C43', 7.0, 7.0), ('C44', 6.0, 5.0), ('C20', 4.0, 2.5), ('C67', 5.0, 1.5),
+    ('C64', 2.5, 1.2), ('C25', 2.0, 2.0), ('C16', 1.5, 0.9), ('C54', 0.0, 4.0),
+    ('C56', 0.0, 2.0), ('C53', 0.0, 1.2), ('C73', 0.4, 1.2), ('C71', 1.0, 0.8),
+    ('C91', 1.2, 0.8), ('C92', 0.8, 0.6), ('C83', 1.5, 1.0), ('C90', 1.0, 0.7),
+    ('D05', 0.0, 1.5), ('D09', 1.0, 0.6),
+]
+
+
+def _icd_subcode_picker(labels):
+    """Lag f(prefiks, rng) → gyldig kode i kodelisten som starter med prefikset."""
+    by_prefix = {}
+    if labels:
+        for code, lab in labels.items():
+            c = str(code)
+            if len(c) < 3 or str(lab).lower().startswith(('ugyldig', 'ikke rapportert')):
+                continue
+            by_prefix.setdefault(c[:3], []).append(c)
+
+    def pick(prefix, rng):
+        opts = by_prefix.get(prefix)
+        if not opts:
+            return prefix if not labels else (prefix + '9' if (prefix + '9') in labels else prefix)
+        return opts[int(rng.integers(0, len(opts)))]
+    return pick
+
 
 class DataTransformHandler:
     """Håndterer rename, replace, drop, keep, clone-variables, destring, recode."""
@@ -10263,13 +10514,33 @@ class MicroInterpreter:
                 # values_from(ds): behold kun enheter som finnes i et annet datasett.
                 _alias_for_filter = args.get('alias') or (args.get('var', '').split('/')[-1] if args.get('var') else '')
                 if opts.get('values') not in (None, True) and _alias_for_filter in new_data.columns:
-                    _wanted = {v.strip() for v in str(opts['values']).split(',') if v.strip() != ''}
+                    # values("0301", "4601") / values(1, 2): koder med eller uten fnutter.
+                    _wanted = {v.strip().strip('"\'').strip() for v in str(opts['values']).split(',')}
+                    _wanted.discard('')
                     if _wanted:
-                        _col = new_data[_alias_for_filter].astype(str).str.strip()
-                        new_data = new_data[_col.isin(_wanted)].reset_index(drop=True)
+                        _raw = new_data[_alias_for_filter]
+                        _col = _raw.astype(str).str.strip()
+                        # Tall lagret som float (2023.0) skal matche values(2023).
+                        if pd.api.types.is_float_dtype(_raw):
+                            _col = _col.str.replace(r'\.0$', '', regex=True)
+                        new_data = new_data[_col.isin(_wanted) & _raw.notna()].reset_index(drop=True)
                 if opts.get('values_from') not in (None, True):
-                    _other = self.datasets.get(str(opts['values_from']).strip())
-                    if _other is not None and _id_col in _other.columns and _id_col in new_data.columns:
+                    _vf_name = str(opts['values_from']).strip()
+                    _other = self.datasets.get(_vf_name)
+                    if _other is None:
+                        self._log(_t("FEIL: Datasett '{name}' finnes ikke (values_from).", name=_vf_name))
+                        return
+                    _other_key = _get_df_key_col(_other)
+                    _vshort_vf = (args.get('var', '') or '').split('/')[-1]
+                    _is_ref = (_vmeta.get('entity_type', 'person') != 'person'
+                               and (_vshort_vf in _PERSONID_REF_VARS or _vshort_vf.endswith('_FNR')
+                                    or _vshort_vf in _ENTITY_PARENT_REF))
+                    if _is_ref and _alias_for_filter in new_data.columns and _other_key:
+                        # Nøkkelvariabel (f.eks. SOM_EP_PERSONID, ARBEIDSFORHOLD_PERSON,
+                        # SOM_PROS_EPISODEID): behold rader der VERDIEN er en enhet i
+                        # det andre datasettet (manualens values_from-eksempel).
+                        new_data = new_data[new_data[_alias_for_filter].isin(_other[_other_key])].reset_index(drop=True)
+                    elif _id_col in _other.columns and _id_col in new_data.columns:
                         new_data = new_data[new_data[_id_col].isin(_other[_id_col])].reset_index(drop=True)
                 if df_target.empty and len(df_target.columns) <= 1:
                     # Helt tomt datasett (ingen kolonner utenom evt. nøkkel) — fyll direkte

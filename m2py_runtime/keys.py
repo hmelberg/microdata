@@ -19,7 +19,8 @@ from collections import namedtuple
 # Entity key columns, in the same precedence order as m2py._get_df_key_col.
 ENTITY_KEY_COLS = (
     "PERSONID_1", "ARBEIDSFORHOLD_ID", "KJORETOY_ID",
-    "NUDB_KURS_LOEPENR", "AGGRSHOPPID", "NPRID", "unit_id",
+    "NUDB_KURS_LOEPENR", "NPR_EPISODEID", "NPR_PROSEDYREID",
+    "KRG_TILFELLEID", "AGGRSHOPPID", "NPRID", "unit_id",
 )
 
 # Resolution result. ``left_on``/``right_on`` are the join columns (target side /

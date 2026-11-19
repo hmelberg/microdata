@@ -10,8 +10,16 @@ vises per variabel i prompten — denne fila er kun orientering. -->
 
 ## Databanker
 - `no.ssb.fdb` — versjon **53**, 729 variabler (all SSB-registerdata).
-- `no.fhi.npr` — Norsk pasientregister (egen databank i VÅR versjon, i tillegg
-  til SSB FDB).
+- `no.fhi.npr` — versjon **1** (`require no.fhi.npr:1 as dnpr`), 12 variabler:
+  Norsk pasientregister, somatiske sykehus 2016–2025. Enhetstyper `Episode NPR`
+  (`SOM_EP_*`, person-ref `SOM_EP_PERSONID`) og `Prosedyre NPR` (`SOM_PROS_*`,
+  person-ref `SOM_PROS_PERSONID`, episode-ref `SOM_PROS_EPISODEID`).
+- `no.fhi.kreftregisteret` — versjon **1** (`require no.fhi.kreftregisteret:1 as
+  krg`), 30 variabler, enhetstype `Krefttilfelle` (person-ref
+  `P_PERSONIDMICRODATA`).
+- FHI-metadata (inkl. store kodelister i `codelists/`) bygges med
+  `python3 tools/fhi_metadata.py all` (henter variabelsidene fra
+  microdata.no/discovery). Erstattet den gamle `no.fhi.npr:DRAFT` 2026-11-19.
 
 ## Datatype (av 729)
 - Numerisk (heltall): 360

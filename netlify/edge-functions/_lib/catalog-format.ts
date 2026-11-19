@@ -65,8 +65,24 @@ export function renderLabels(labels: unknown): string {
   if (!labels || typeof labels !== "object") return "";
   const entries = Object.entries(labels as Record<string, unknown>);
   if (entries.length === 0) return "";
-  const shown = entries.slice(0, LABEL_SHOW).map(([k, val]) => `${k}=${String(val)}`);
+  // Kode = etikett (f.eks. TNM-stadier «1a=1a») vises bare som koden.
+  const shown = entries.slice(0, LABEL_SHOW).map(([k, val]) =>
+    String(val) === k ? k : `${k}=${String(val)}`
+  );
   const extra = entries.length - shown.length;
   const tail = extra > 0 ? `, …(+${extra} flere)` : "";
   return ` {${shown.join(", ")}${tail}}`;
+}
+
+// Store kodelister (ICD-10, prosedyrekoder …) ligger i codelists/<fil>.json og
+// vises ikke i katalogen. Raden får i stedet et lite, jevnt fordelt utvalg som
+// viser kodeformatet, pluss totalantallet og en peker til variabel_info-søket.
+export function renderCodelistSample(v: Record<string, unknown>): string {
+  const sample = v.labels_sample;
+  const size = Number(v.codelist_size ?? 0);
+  if (!sample || typeof sample !== "object" || !size) return "";
+  const shown = Object.entries(sample as Record<string, unknown>)
+    .map(([k, val]) => `${k}=${String(val).slice(0, 40)}`);
+  if (shown.length === 0) return "";
+  return ` {utvalg: ${shown.join(", ")}; ${size} koder totalt — slå opp med variabel_info + kode_sok}`;
 }
