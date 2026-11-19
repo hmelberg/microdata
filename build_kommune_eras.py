@@ -7,6 +7,10 @@ variable_metadata.json. Does NOT need to be deployed alongside m2py.py.
 
 Usage:
     python build_kommune_eras.py > kommune_eras_output.json
+    python build_kommune_eras.py --reform-map   # skriver codelists/KOMMUNE_REFORM_MAP.json
+
+Reform-kartet brukes av emulatoren (m2py._canonical_kommune) til å oversette
+én stabil bostedskommune per person mellom kodeepokene.
 """
 
 from __future__ import annotations
@@ -751,7 +755,26 @@ def build_labels_union(pre2020: dict, era2020: dict, era2024: dict) -> dict:
 # Main
 # ---------------------------------------------------------------------------
 
+def write_reform_map():
+    """codelists/KOMMUNE_REFORM_MAP.json: 2019→2020 og 2020→2024 (Haram skilt ut av Ålesund)."""
+    triples = parse_recode_table(RECODE_2019_TO_2020)
+    out = {
+        "beskrivelse": "Kommunenummer mellom kodeepoker: til_2020 (før-2020-kode → 2020-kode), "
+                       "til_2024 (2020-kode → 2024-kode, uendrede utelatt). 1580 Haram ble skilt "
+                       "ut av 1507 Ålesund 2024-01-01.",
+        "til_2020": {pre: post for pre, post, _ in triples},
+        "til_2024": dict(MAP_2020_TO_2024),
+        "utskilt_2024": {"1580": "1507"},
+    }
+    path = Path(__file__).resolve().parent / "codelists" / "KOMMUNE_REFORM_MAP.json"
+    path.write_text(json.dumps(out, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"skrev {path} ({len(out['til_2020'])} + {len(out['til_2024'])} koder)", file=sys.stderr)
+
+
 def main():
+    if "--reform-map" in sys.argv[1:]:
+        write_reform_map()
+        return
     triples = parse_recode_table(RECODE_2019_TO_2020)
     print(f"# Parsed {len(triples)} recode entries", file=sys.stderr)
 

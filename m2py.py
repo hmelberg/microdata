@@ -3332,6 +3332,123 @@ class MockDataEngine:
             var_name: vals,
         })
 
+    # Andel som flytter til en annen kommune per år (SSB: ~4–5 % av befolkningen).
+    _KOMMUNE_FLYTTERATE = 0.045
+    _KOMMUNE_BASISAAR = 2024
+
+    def _kommune_raw_draw(self, year):
+        """{person-ID: kommune} fra kommunegeneratoren (BEFOLKNING_KOMMNR_FORMELL per 1.1.).
+
+        Brukes for hvem som er bosatt i året og som kommunefordeling å trekke fra.
+        """
+        cache = self.__dict__.setdefault('_kommune_raw_cache', {})
+        if year in cache:
+            return cache[year]
+        self._in_canonical_kommune = True
+        try:
+            df = self.generate('import', {'var': 'db/BEFOLKNING_KOMMNR_FORMELL',
+                                          'date1': f'{year}-01-01'}, pd.DataFrame())
+            kcol = _get_df_key_col(df) or 'unit_id'
+            raw = {int(u): (str(v) if pd.notna(v) else np.nan)
+                   for u, v in zip(df[kcol].tolist(), df['BEFOLKNING_KOMMNR_FORMELL'].tolist())}
+        except Exception:
+            raw = None
+        finally:
+            self._in_canonical_kommune = False
+        cache[year] = raw
+        return raw
+
+    def _kommune_reform_map(self):
+        m = self.__dict__.get('_kommune_reform_map_cache')
+        if m is None:
+            d = self._fetch_external_json('codelists/KOMMUNE_REFORM_MAP.json') or {}
+            til_2020 = d.get('til_2020') or {}
+            til_2024 = d.get('til_2024') or {}
+            fra_2020 = {}
+            for pre, post in sorted(til_2020.items()):
+                fra_2020.setdefault(post, []).append(pre)
+            fra_2024 = {v: k for k, v in til_2024.items()}
+            fra_2024.update(d.get('utskilt_2024') or {})
+            m = {'til_2020': til_2020, 'til_2024': til_2024,
+                 'fra_2020': fra_2020, 'fra_2024': fra_2024}
+            self._kommune_reform_map_cache = m
+        return m
+
+    def _kommune_to_era(self, code, year, uid):
+        """Oversett en kommunekode (vilkårlig epoke) til koden som gjaldt i `year`."""
+        m = self._kommune_reform_map()
+        if not m['til_2020'] and not m['til_2024']:
+            return code
+        c = m['til_2020'].get(code, code)                   # → 2020-epoken
+        c = m['til_2024'].get(c, c)                         # → 2024-epoken
+        if year >= 2024:
+            return c
+        c = m['fra_2024'].get(c, c)                         # → 2020-epoken
+        if year >= 2020:
+            return c
+        pre = m['fra_2020'].get(c)
+        if not pre:
+            return c
+        # Sammenslått kommune: fast (per person) valg blant de gamle kommunene.
+        return pre[(int(uid) * 2654435761) % len(pre)]
+
+    def _canonical_kommune(self, parsed_args):
+        """{person-ID: bostedskommune} for importdatoens år (cachet per år).
+
+        Hver person har én bostedskommune som er stabil over tid: kommunen i
+        basisåret (2024-koder), og ved en flytting (~4,5 % per år, fast per
+        person og år) en ny kommune trukket fra samme fordeling. Koden
+        oversettes til epoken som gjaldt i året (2020- og 2024-reformene), og
+        hvem som er bosatt følger kommunegeneratoren for året. Uavhengig av
+        variabel, delutvalg og importrekkefølge.
+        """
+        d1 = (parsed_args or {}).get('date1') or f"{_DEMO_REF_YEAR}-01-01"
+        try:
+            year = int(str(d1)[:4])
+        except (TypeError, ValueError):
+            return None
+        cache = self.__dict__.setdefault('_canonical_kommune_cache', {})
+        if year in cache:
+            return cache[year]
+        raw = self._kommune_raw_draw(year)
+        base = self._kommune_raw_draw(self._KOMMUNE_BASISAAR)
+        rm = self._kommune_reform_map()
+        if raw is None or not base or not (rm['til_2020'] and rm['til_2024']):
+            # Uten reformkart kan koder ikke oversettes mellom epoker → årets trekning.
+            cache[year] = raw
+            return raw
+        pool = np.array([v for _, v in sorted(base.items()) if isinstance(v, str)], dtype=object)
+        if len(pool) == 0:
+            cache[year] = raw
+            return raw
+        uids = np.array(sorted(raw), dtype=np.int64)
+        size = int(max(uids.max(), max(base))) + 1
+        B = self._KOMMUNE_BASISAAR
+
+        def _moves(t):  # flyttet mellom år t-1 og t (fast per person og år)
+            return np.random.default_rng([7031, t]).random(size)[uids] < self._KOMMUNE_FLYTTERATE
+
+        seg = np.zeros(len(uids), dtype=np.int64)
+        if year > B:
+            for t in range(B + 1, year + 1):
+                seg += _moves(t)
+        elif year < B:
+            for t in range(year + 1, B + 1):
+                seg -= _moves(t)
+
+        codes = np.array([base.get(int(u), np.nan) for u in uids], dtype=object)
+        need = (seg != 0) | np.array([not isinstance(c, str) for c in codes])
+        for k in np.unique(seg[need]):
+            sel = need & (seg == k)
+            draw = np.random.default_rng([7032, int(k) + 1000]).integers(0, len(pool), size)[uids[sel]]
+            codes[sel] = pool[draw]
+        canon = {}
+        for u, c in zip(uids.tolist(), codes.tolist()):
+            r = raw.get(u)
+            canon[u] = self._kommune_to_era(c, year, u) if isinstance(r, str) else np.nan
+        cache[year] = canon
+        return canon
+
     def _kommune_universe(self, year):
         """(kommunenumre gyldige i året, {kommune: antall bosatte i emulatoren}).
 
@@ -3797,6 +3914,18 @@ class MockDataEngine:
                                       dtype=object)
             return pd.DataFrame(data)
 
+        # Bostedskommune er ÉN egenskap per person og år: alle bosteds-variablene
+        # (FORMELL/FAKTISK/BOSATTEFDT_BOSTED …) slår opp samme kanoniske kommune,
+        # generert én gang for hele befolkningen per år. Ellers ga hver variabel
+        # (og hvert delutvalg) sin egen, uavhengige trekning per rad.
+        _sname_k = var_path.split('/')[-1] if var_path else ''
+        if (_sname_k in _RESIDENCE_KOMMUNE_VARS and _var_entity == 'person' and len(uids) > 0
+                and not self.__dict__.get('_in_canonical_kommune')):
+            _canon = self._canonical_kommune(parsed_args)
+            if _canon is not None:
+                data[var_name] = np.array([_canon.get(int(u), np.nan) for u in uids], dtype=object)
+                return pd.DataFrame(data)
+
         # Grunnkrets: trekk en krets som gjelder på importdatoen, innenfor
         # personens bostedskommune (BEFOLKNING_KOMMNR_FORMELL samme dato), så
         # substr(gk, 1, 4) stemmer med kommunen.
@@ -4225,6 +4354,13 @@ _REJECTED_COLLAPSE_STATS = {'first', 'last'}
 _SUPPORTED_COLLAPSE_STATS_DISPLAY = (
     'count, sum, mean, sd, median, min, max, p25, p75, gini, iqr, percent'
 )
+
+# Bostedskommune-variabler som skal gi SAMME kommune for samme person og år
+# (se _canonical_kommune). Fødekommune, arbeidssted o.l. er bevisst utenfor.
+_RESIDENCE_KOMMUNE_VARS = frozenset({
+    'BEFOLKNING_KOMMNR_FORMELL', 'BEFOLKNING_KOMMNR_FAKTISK',
+    'BOSATTEFDT_BOSTED', 'BOSATT_KOMMUNE', 'KOMMNR_FORMELL',
+})
 
 # Kildenavn per databank i citation-teksten (samme etiketter som microdata.no
 # viser i databankoversikten).

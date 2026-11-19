@@ -229,3 +229,42 @@ import db/SB12362_KOSTRA_LONNSUTGIFTER_F_BARNEHAGE 2019-12-31 as b
     koms = set(it.datasets["k19"]["KOMMUNENR"])
     assert "1201" in koms and "4601" not in koms     # Bergen før 2020-reformen
     assert len(koms) > 400
+
+
+# ── Bostedskommune: én kommune per person og år ─────────────────────────────
+
+def test_residence_kommune_variables_agree_per_person():
+    it, out = _run("""require no.ssb.fdb:60 as db
+create-dataset p
+import db/BOSATTEFDT_BOSTED 2023-12-31 as bosted
+import db/BEFOLKNING_KOMMNR_FORMELL 2023-01-01 as formell
+import db/BEFOLKNING_KOMMNR_FAKTISK 2023-01-01 as faktisk
+create-dataset oslo
+import db/BEFOLKNING_KOMMNR_FORMELL 2023-01-01 as k, values("0301")
+import db/BOSATTEFDT_BOSTED 2023-06-30 as b
+""")
+    assert "FEIL" not in out
+    p = it.datasets["p"]
+    assert (p["bosted"] == p["formell"]).all()
+    assert (p["faktisk"] == p["formell"]).all()
+    o = it.datasets["oslo"]
+    assert len(o) > 0 and (o["b"] == "0301").all()   # delutvalg: samme kommune som i full populasjon
+
+
+def test_residence_is_mostly_stable_across_years_and_follows_reforms():
+    it, out = _run("""require no.ssb.fdb:60 as db
+create-dataset p
+import db/BOSATTEFDT_BOSTED 2019-12-31 as k19
+import db/BOSATTEFDT_BOSTED 2020-12-31 as k20
+import db/BOSATTEFDT_BOSTED 2022-12-31 as k22
+import db/BOSATTEFDT_BOSTED 2023-12-31 as k23
+""")
+    assert "FEIL" not in out
+    df = it.datasets["p"]
+    x = df[["k22", "k23"]].dropna()
+    stay = (x["k22"] == x["k23"]).mean()
+    assert 0.9 < stay < 0.99                         # ~4,5 % flytter per år
+    assert "1201" in set(df["k19"]) and "4601" not in set(df["k19"])
+    # Bergen 2019 (1201) og 2020 (4601) er samme kommune → de fleste «blir».
+    berg = df[df["k19"] == "1201"]
+    assert (berg["k20"] == "4601").mean() > 0.9
