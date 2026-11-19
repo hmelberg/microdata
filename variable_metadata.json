@@ -44,7 +44,7 @@
         "2011-01-01",
         "2012-01-01"
       ],
-      "description": "Lønnsinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Lønnsinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "short_title": "Lønnsinntekter",
       "temporalitet": "Akkumulert",
       "enhetstype": "Person",
@@ -109,7 +109,8 @@
         "latent_z_coefficient": 0.22,
         "min": 0,
         "as_int": true
-      }
+      },
+      "updated_at": "2026-02-24"
     },
     "BOSATT_KOMMUNE": {
       "type": "register",
@@ -2179,7 +2180,7 @@
     "ALDPENSJ2011FDT_GRAD": {
       "type": "register",
       "data_type": "int",
-      "description": "Alderspensjon fra folketrygden, uttaksgrad. Gyldighetsperiode: 2011-01-01 - 2024-12-01.",
+      "description": "Alderspensjon fra folketrygden, uttaksgrad. Gyldighetsperiode: 2011-01-01 – 2024-12-01.",
       "min": 0,
       "max": 100,
       "short_title": "Alderspensjon FT, uttaksgrad",
@@ -2189,7 +2190,8 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "alderspensjon"
-      ]
+      ],
+      "updated_at": "2025-11-20"
     },
     "AFPO1992FDT_MOTTAK": {
       "type": "register",
@@ -2378,7 +2380,7 @@
     "ARBEIDSSOKER_ARBEIDSSOKERSTATUS_FIN": {
       "type": "register",
       "data_type": "string",
-      "description": "Arbeidssøkerstatus, fin Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2002-10-31 – 2025-11-30.",
+      "description": "Arbeidssøkerstatus, fin Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2002-10-31 – 2026-09-30.",
       "labels": {
         "1": "Registrert ledig",
         "2": "Tiltak",
@@ -2395,12 +2397,13 @@
       "keywords": [
         "arbeidssøkerstatus",
         "fin"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ARBEIDSSOKER_ARBEIDSSOKERSTATUS_GROV": {
       "type": "register",
       "data_type": "string",
-      "description": "Arbeidssøkerstatus, grov Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2002-10-31 – 2025-11-30.",
+      "description": "Arbeidssøkerstatus, grov Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2002-10-31 – 2026-09-30.",
       "labels": {
         "1": "Ledig/tiltak",
         "2": "Arbeid/utdanning",
@@ -2414,12 +2417,13 @@
       "keywords": [
         "arbeidssøkerstatus",
         "grov"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ARBEIDSSOKER_AS_HOVED": {
       "type": "register",
       "data_type": "string",
-      "description": "Hovedstatus arbeidssøker Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2004-01-31 – 2025-11-30.",
+      "description": "Hovedstatus arbeidssøker Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2004-01-31 – 2026-09-30.",
       "labels": {
         "L": "Ledig",
         "T": "Tiltak",
@@ -2438,12 +2442,13 @@
       "keywords": [
         "arbeidssøker",
         "hovedstatus"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ARBEIDSSOKER_AS_YTELSE": {
       "type": "register",
       "data_type": "string",
-      "description": "Rettighetsstatus Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2004-01-31 – 2025-11-30.",
+      "description": "Rettighetsstatus Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2004-01-31 – 2026-09-30.",
       "labels": {
         "xx": "Ukjent livsoppholdsytelse",
         "AP": "Arbeidsavklaringspenger",
@@ -2463,12 +2468,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "rettighetsstatus"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ARBEIDSSOKER_DAGDATO1": {
       "type": "register",
       "data_type": "date:yyyymmdd",
-      "description": "Oppdateringsdato Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1990-01-31 – 2025-11-30.",
+      "description": "Oppdateringsdato Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1990-01-31 – 2026-09-30.",
       "short_title": "Oppdateringsdato",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -2476,7 +2482,8 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "oppdateringsdato"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ARBEIDSSOKER_ESTATUS": {
       "type": "register",
@@ -2508,7 +2515,7 @@
     "ARBEIDSSOKER_MAXDP": {
       "type": "register",
       "data_type": "int",
-      "description": "Maks dagpengerettigheter (uker) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2018-09-30 – 2025-11-30.",
+      "description": "Maks dagpengerettigheter (uker) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2018-09-30 – 2026-09-30.",
       "min": 0,
       "max": 9999,
       "short_title": "Maks dagpengerettigheter (uker)",
@@ -2520,7 +2527,8 @@
         "dagpengerettigheter",
         "maks",
         "uker"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ARBEIDSSOKER_REG_STAT": {
       "type": "register",
@@ -2549,7 +2557,7 @@
     "ARBEIDSSOKER_TILTAK": {
       "type": "register",
       "data_type": "string",
-      "description": "Ledig eller på tiltak Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1990-01-31 – 2025-11-30.",
+      "description": "Ledig eller på tiltak Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1990-01-31 – 2026-09-30.",
       "labels": {
         "0": "Helt ledige",
         "1": "Arbeidssøkere på tiltak",
@@ -2572,12 +2580,13 @@
       "keywords": [
         "ledig",
         "tiltak"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_ANSETTELSESFORM": {
       "type": "register",
       "data_type": "string",
-      "description": "Ansettelsesform Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2021-01-16 – 2025-09-16.",
+      "description": "Ansettelsesform Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2021-01-16 – 2026-08-16.",
       "labels": {
         "1": "Fast",
         "2": "Midlertidig",
@@ -2633,12 +2642,13 @@
             "probability": 0.35
           }
         ]
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_ARBEIDSTID": {
       "type": "register",
       "data_type": "float",
-      "description": "Avtalt arbeidstid per uke. Utledet fra stillingsprosent (ARBLONN_ARB_STILLINGSPST) og antall timer per uke som full stilling tilsvarer (ARBLONN_ARB_TIMEANT_FULLTID). Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2025-09-16.",
+      "description": "Avtalt arbeidstid per uke. Utledet fra stillingsprosent (ARBLONN_ARB_STILLINGSPST) og antall timer per uke som full stilling tilsvarer (ARBLONN_ARB_TIMEANT_FULLTID). Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2026-08-16.",
       "distribution": {
         "37.5": 0.62,
         "30.0": 0.08,
@@ -2664,12 +2674,13 @@
         "uke",
         "timer"
       ],
-      "min": 0.0
+      "min": 0.0,
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_ARBKOMM": {
       "type": "register",
       "data_type": "string",
-      "description": "Arbeidsstedskommune Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2025-09-30.",
+      "description": "Arbeidsstedskommune Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2026-08-31.",
       "short_title": "Arbeidsstedskommune",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Jobb",
@@ -2677,12 +2688,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "arbeidsstedskommune"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_ARBMARK_STATUS": {
       "type": "register",
       "data_type": "string",
-      "description": "Arbeidsmarkedsstatus Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "Arbeidsmarkedsstatus Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "labels": {
         "1": "Lønnstaker heltid",
         "2": "Lønnstaker deltid",
@@ -2728,12 +2740,13 @@
         "effects": {
           "age": "weakly_increases"
         }
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_H3LDELTID": {
       "type": "register",
       "data_type": "string",
-      "description": "Viser om arbeidsforholdet regnes som hel- eller deltidsjobb. Heltidsansatte har stillingsprosent >= 100, deltidsansatte har stillingsprosent < 100. Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2025-09-16.",
+      "description": "Viser om arbeidsforholdet regnes som hel- eller deltidsjobb. Heltidsansatte har stillingsprosent >= 100, deltidsansatte har stillingsprosent < 100. Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2026-08-16.",
       "labels": {
         "1": "Heltidsansatt",
         "2": "Deltidsansatt"
@@ -2767,12 +2780,13 @@
           },
           "age": "weakly_increases"
         }
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_HOVEDARBEID": {
       "type": "register",
       "data_type": "string",
-      "description": "Viser om arbeidsforholdet er hoved- eller biarbeidsforhold. Personer med flere arbeidsforhold i referanseuka får ett merket som hovedarbeidsforhold, øvrige blir biarbeidsforhold. Observasjoner med verdien 0 og uoppgitt (missing) er utelatt. Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "Viser om arbeidsforholdet er hoved- eller biarbeidsforhold. Personer med flere arbeidsforhold i referanseuka får ett merket som hovedarbeidsforhold, øvrige blir biarbeidsforhold. Observasjoner med verdien 0 og uoppgitt (missing) er utelatt. Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "labels": {
         "1": "Hovedarbeidsforhold",
         "2": "Biarbeidsforhold"
@@ -2790,12 +2804,13 @@
       "distribution": {
         "1": 0.9,
         "2": 0.1
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_KILDE": {
       "type": "register",
       "data_type": "string",
-      "description": "Kilde for arbeidsforhold Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "Kilde for arbeidsforhold Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "labels": {
         "A": "A-melding",
         "M": "Manuell",
@@ -2814,12 +2829,13 @@
         "A": 0.95,
         "M": 0.03,
         "F": 0.02
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_SLUTT": {
       "type": "register",
       "data_type": "date:epoch",
-      "description": "Sluttdato arbeidsforhold lagret som antall dager siden 1970-01-01 (epoch-dato). Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "Sluttdato arbeidsforhold lagret som antall dager siden 1970-01-01 (epoch-dato). Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "short_title": "Sluttdato arbeidsforhold",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Jobb",
@@ -2828,12 +2844,13 @@
       "keywords": [
         "arbeidsforhold",
         "sluttdato"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_SLUTTAARSAK": {
       "type": "register",
       "data_type": "string",
-      "description": "Årsak til slutt Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2021-01-16 – 2025-09-16.",
+      "description": "Årsak til slutt Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2021-01-16 – 2026-08-16.",
       "labels": {
         "1": "Oppsigelse",
         "2": "Avskjed",
@@ -2858,12 +2875,13 @@
         "5": 0.08,
         "2": 0.05,
         "4": 0.02
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_START": {
       "type": "register",
       "data_type": "date:epoch",
-      "description": "Startdato arbeidsforhold lagret som antall dager siden 1970-01-01 (epoch-dato). Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "Startdato arbeidsforhold lagret som antall dager siden 1970-01-01 (epoch-dato). Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "short_title": "Startdato arbeidsforhold",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Jobb",
@@ -2872,12 +2890,13 @@
       "keywords": [
         "arbeidsforhold",
         "startdato"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_STILLINGSPST": {
       "type": "register",
       "data_type": "float",
-      "description": "Avtalt stillingsprosent. Stillingsprosent er det man har avtalt å arbeide ifølge arbeidskontrakten. Arbeidsgiver skal ikke ta hensyn til merarbeid, overtid eller fravær. Basert på rapportering til a-ordningen med metodeforbedret datagrunnlag for arbeidstid. Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2025-09-16.",
+      "description": "Avtalt stillingsprosent. Stillingsprosent er det man har avtalt å arbeide ifølge arbeidskontrakten. Arbeidsgiver skal ikke ta hensyn til merarbeid, overtid eller fravær. Basert på rapportering til a-ordningen med metodeforbedret datagrunnlag for arbeidstid. Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2026-08-16.",
       "distribution": {
         "100": 0.62,
         "80": 0.08,
@@ -2900,12 +2919,13 @@
         "avtalt",
         "stillingsprosent",
         "arbeidstid"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_STILLINGSPST_INNRAPP": {
       "type": "register",
       "data_type": "float",
-      "description": "Innrapportert stillingsprosent Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2025-09-16.",
+      "description": "Innrapportert stillingsprosent Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2026-08-16.",
       "mean": 90.0,
       "std": 20.0,
       "short_title": "Innrapportert stillingsprosent",
@@ -2917,12 +2937,13 @@
         "innrapportert",
         "stillingsprosent"
       ],
-      "min": 0.0
+      "min": 0.0,
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_STILLINGSPST_KILDE": {
       "type": "register",
       "data_type": "string",
-      "description": "Kilde stillingsprosent Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2025-09-16.",
+      "description": "Kilde stillingsprosent Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2026-08-16.",
       "labels": {
         "A": "A-melding",
         "M": "Manuell",
@@ -2941,12 +2962,13 @@
         "A": 0.95,
         "M": 0.03,
         "F": 0.02
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_SYSS": {
       "type": "register",
       "data_type": "string",
-      "description": "Grunnlag for sysselsetting Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "Grunnlag for sysselsetting Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "labels": {
         "1": "Lønnstaker heltid",
         "2": "Lønnstaker deltid",
@@ -2993,12 +3015,13 @@
         "effects": {
           "age": "weakly_increases"
         }
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_TID_ORDNING": {
       "type": "register",
       "data_type": "string",
-      "description": "Arbeidstidsordning Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "Arbeidstidsordning Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "labels": {
         "-1": "Ugyldig kode",
         "-2": "Uoppgitt kode",
@@ -3044,12 +3067,13 @@
           },
           "age": "weakly_increases"
         }
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_TIMEANT_FULLTID": {
       "type": "register",
       "data_type": "float",
-      "description": "Timer per uke (fulltid) Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2025-09-16.",
+      "description": "Timer per uke (fulltid) Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2026-08-16.",
       "mean": 37.5,
       "std": 1.5,
       "short_title": "Timer per uke (fulltid)",
@@ -3063,12 +3087,13 @@
         "timer",
         "uke"
       ],
-      "min": 0.0
+      "min": 0.0,
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_TIMEANT_FULLTID_INNRAPP": {
       "type": "register",
       "data_type": "float",
-      "description": "Innrapporterte fulltidstimer Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2025-09-16.",
+      "description": "Innrapporterte fulltidstimer Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-02-16 – 2026-08-16.",
       "mean": 37.5,
       "std": 1.5,
       "short_title": "Innrapporterte fulltidstimer",
@@ -3080,12 +3105,13 @@
         "fulltidstimer",
         "innrapporterte"
       ],
-      "min": 0.0
+      "min": 0.0,
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_TYPE": {
       "type": "register",
       "data_type": "string",
-      "description": "Type arbeidsforhold (a-melding) Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "Type arbeidsforhold (a-melding) Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "labels": {
         "1": "Fast",
         "2": "Midlertidig",
@@ -3105,12 +3131,13 @@
         "1": 0.85,
         "2": 0.1,
         "3": 0.05
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_ARB_YRKE_STYRK08": {
       "type": "register",
       "data_type": "string",
-      "description": "Yrkeskode (STYRK-08) Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "Yrkeskode (STYRK-08) Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "labels": {
         "1": "Ledere",
         "2": "Akademikere",
@@ -3141,45 +3168,13 @@
         "7": 0.08,
         "8": 0.07,
         "9": 0.05
-      }
-    },
-    "ARBLONN_FRTK_SEKTOR_2014": {
-      "type": "register",
-      "data_type": "string",
-      "description": "Foretakssektor Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
-      "short_title": "Foretakssektor",
-      "temporalitet": "Tverrsnitt",
-      "enhetstype": "Jobb",
-      "microdata_datatype": "Alfanumerisk",
-      "databank": "no.ssb.fdb",
-      "keywords": [
-        "foretakssektor"
-      ],
-      "labels": {
-        "1110": "Statlig forvaltning",
-        "1120": "Statlige foretak",
-        "1510": "Kommunal forvaltning",
-        "1520": "Kommunale foretak",
-        "2100": "Private aksjeselskap mv.",
-        "2300": "Personlig næringsdrivende",
-        "2500": "Private ideelle organisasjoner",
-        "8200": "Utenlandsk eide foretak"
       },
-      "distribution": {
-        "2100": 0.5,
-        "1510": 0.2,
-        "1110": 0.12,
-        "2300": 0.06,
-        "1520": 0.04,
-        "2500": 0.04,
-        "1120": 0.02,
-        "8200": 0.02
-      }
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_ANNEN_BET": {
       "type": "register",
       "data_type": "float",
-      "description": "Annen lønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Annen lønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Annen lønn",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3218,12 +3213,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_BONUS": {
       "type": "register",
       "data_type": "float",
-      "description": "Bonus Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Bonus Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Bonus",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3261,12 +3257,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_EKV_BONUS": {
       "type": "register",
       "data_type": "float",
-      "description": "Heltidsekv. bonus Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-01-01 – 2025-09-30.",
+      "description": "Heltidsekv. bonus Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-01-01 – 2026-03-31.",
       "short_title": "Heltidsekv. bonus",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3305,12 +3302,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-05-29"
     },
     "ARBLONN_LONN_EKV_FMLONN": {
       "type": "register",
       "data_type": "float",
-      "description": "Heltidsekv. månedslønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-01-01 – 2025-09-30.",
+      "description": "Heltidsekv. månedslønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-01-01 – 2026-03-31.",
       "short_title": "Heltidsekv. månedslønn",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3337,12 +3335,13 @@
         "latent_z_coefficient": 0.22,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-05-29"
     },
     "ARBLONN_LONN_EKV_IALT": {
       "type": "register",
       "data_type": "float",
-      "description": "Heltidsekv. lønn i alt Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-01-01 – 2025-09-30.",
+      "description": "Heltidsekv. lønn i alt Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-01-01 – 2026-03-31.",
       "short_title": "Heltidsekv. lønn i alt",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3370,12 +3369,13 @@
         "latent_z_coefficient": 0.22,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-05-29"
     },
     "ARBLONN_LONN_EKV_UREGTIL": {
       "type": "register",
       "data_type": "float",
-      "description": "Heltidsekv. uregelm. tillegg Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-01-01 – 2025-09-30.",
+      "description": "Heltidsekv. uregelm. tillegg Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-01-01 – 2026-03-31.",
       "short_title": "Heltidsekv. uregelm. tillegg",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3415,12 +3415,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-05-29"
     },
     "ARBLONN_LONN_EKV_VEKT": {
       "type": "register",
       "data_type": "float",
-      "description": "Ekvivalentvekt Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-01-01 – 2025-09-30.",
+      "description": "Ekvivalentvekt Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-01-01 – 2026-03-31.",
       "short_title": "Ekvivalentvekt",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3445,12 +3446,13 @@
         },
         "min": 0,
         "max": 1.5
-      }
+      },
+      "updated_at": "2026-05-29"
     },
     "ARBLONN_LONN_FAST": {
       "type": "register",
       "data_type": "float",
-      "description": "Fastlønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Fastlønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Fastlønn",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3476,12 +3478,13 @@
         "latent_z_coefficient": 0.2,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_FAST_INNRAPP": {
       "type": "register",
       "data_type": "float",
-      "description": "Innrapportert fastlønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Innrapportert fastlønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Innrapportert fastlønn",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3508,12 +3511,13 @@
         "latent_z_coefficient": 0.18,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_FAST_TILLEGG": {
       "type": "register",
       "data_type": "float",
-      "description": "Faste tillegg Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Faste tillegg Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Faste tillegg",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3540,12 +3544,13 @@
         "latent_z_coefficient": 0.1,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_FAST_TILLEGG_INNRAPP": {
       "type": "register",
       "data_type": "float",
-      "description": "Innrapporterte faste tillegg Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Innrapporterte faste tillegg Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Innrapporterte faste tillegg",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3573,12 +3578,13 @@
         "latent_z_coefficient": 0.1,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_FERIE": {
       "type": "register",
       "data_type": "float",
-      "description": "Feriepenger Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Feriepenger Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Feriepenger",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3616,12 +3622,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_FERIE_TREKK": {
       "type": "register",
       "data_type": "float",
-      "description": "Ferietrekk Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-09-01 – 2025-09-30.",
+      "description": "Ferietrekk Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-09-01 – 2026-08-31.",
       "short_title": "Ferietrekk",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3659,12 +3666,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_GODTGJORELSE": {
       "type": "register",
       "data_type": "float",
-      "description": "Utgiftsgodtgjørelse Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Utgiftsgodtgjørelse Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Utgiftsgodtgjørelse",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3702,12 +3710,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_HELLIGDAGSTILLEGG": {
       "type": "register",
       "data_type": "float",
-      "description": "Helligdagstillegg Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Helligdagstillegg Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Helligdagstillegg",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3745,12 +3754,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_IMP_STATUS": {
       "type": "register",
       "data_type": "string",
-      "description": "Imputeringsstatus lønn Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2025-09-30.",
+      "description": "Imputeringsstatus lønn Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2026-08-31.",
       "labels": {
         "0": "Ikke imputert",
         "1": "Imputert"
@@ -3767,12 +3777,13 @@
       "distribution": {
         "0": 0.92,
         "1": 0.08
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_KONTANT_IMP": {
       "type": "register",
       "data_type": "float",
-      "description": "Kontantlønn (imputert) Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Kontantlønn (imputert) Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Kontantlønn (imputert)",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3799,12 +3810,13 @@
         "latent_z_coefficient": 0.2,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_KONTANT_INNRAPP": {
       "type": "register",
       "data_type": "float",
-      "description": "Innrapportert kontantlønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Innrapportert kontantlønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Innrapportert kontantlønn",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3831,12 +3843,13 @@
         "latent_z_coefficient": 0.2,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_NATURAL": {
       "type": "register",
       "data_type": "float",
-      "description": "Naturallønn (SKD) Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Naturallønn (SKD) Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Naturallønn (SKD)",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3875,12 +3888,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_OVERTID": {
       "type": "register",
       "data_type": "float",
-      "description": "Overtidsgodtgjørelse Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-01-01 – 2025-09-30.",
+      "description": "Overtidsgodtgjørelse Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2016-01-01 – 2026-03-31.",
       "short_title": "Overtidsgodtgjørelse",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3918,12 +3932,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-05-29"
     },
     "ARBLONN_LONN_OVERTID_INNRAPP": {
       "type": "register",
       "data_type": "float",
-      "description": "Innrapportert overtidsgodtgjørelse Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Innrapportert overtidsgodtgjørelse Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Innrapportert overtidsgodtgjørelse",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -3962,12 +3977,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_OVERTID_TIMER": {
       "type": "register",
       "data_type": "float",
-      "description": "Timeantall for overtid Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Timeantall for overtid Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Timeantall for overtid",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -4003,12 +4019,13 @@
           }
         ],
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_SLUTTVEDERLAG": {
       "type": "register",
       "data_type": "float",
-      "description": "Sluttvederlag Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Sluttvederlag Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Sluttvederlag",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -4046,12 +4063,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_TIME": {
       "type": "register",
       "data_type": "float",
-      "description": "Timelønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Timelønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Timelønn",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -4077,12 +4095,13 @@
         "latent_z_coefficient": 0.18,
         "as_int": false,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_TIME_ANTALL": {
       "type": "register",
       "data_type": "float",
-      "description": "Timeantall for timelønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Timeantall for timelønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Timeantall for timelønn",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -4106,12 +4125,13 @@
           }
         },
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_TIME_ANTALL_INNRAPP": {
       "type": "register",
       "data_type": "float",
-      "description": "Innrapportert timeantall (timelønn) Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Innrapportert timeantall (timelønn) Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Innrapportert timeantall (timelønn)",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -4136,12 +4156,13 @@
           }
         },
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_TIME_INNRAPP": {
       "type": "register",
       "data_type": "float",
-      "description": "Innrapportert timelønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Innrapportert timelønn Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Innrapportert timelønn",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -4168,12 +4189,13 @@
         "latent_z_coefficient": 0.18,
         "as_int": false,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_UREGTIL_ARBEIDET": {
       "type": "register",
       "data_type": "float",
-      "description": "Uregelm. tillegg (arbeidet tid) Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Uregelm. tillegg (arbeidet tid) Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Uregelm. tillegg (arbeidet tid)",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -4214,12 +4236,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_LONN_UREGTIL_UARBEIDET": {
       "type": "register",
       "data_type": "float",
-      "description": "Uregelm. tillegg (ikke-arbeidet tid) Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2025-09-30.",
+      "description": "Uregelm. tillegg (ikke-arbeidet tid) Enhetstype: Jobb. Temporalitet: Akkumulert. Gyldighetsperiode: 2015-01-01 – 2026-08-31.",
       "short_title": "Uregelm. tillegg (ikke-arbeidet tid)",
       "temporalitet": "Akkumulert",
       "enhetstype": "Jobb",
@@ -4260,12 +4283,13 @@
         "latent_z_coefficient": 0.15,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_PERS_ALDER": {
       "type": "register",
       "data_type": "int",
-      "description": "Alder per 16. i statistikkmåneden Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "Alder per 16. i statistikkmåneden Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "mean": 40,
       "std": 18,
       "short_title": "Alder per 16. i statistikkmåneden",
@@ -4277,12 +4301,13 @@
         "alder",
         "per",
         "statistikkmåneden"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_PERS_BOSETT_STATUS": {
       "type": "register",
       "data_type": "string",
-      "description": "Bosettingsstatus Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2025-09-30.",
+      "description": "Bosettingsstatus Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2026-08-31.",
       "labels": {
         "1": "Norskfødt",
         "2": "Innvandret",
@@ -4300,12 +4325,13 @@
         "1": 0.82,
         "2": 0.15,
         "3": 0.03
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_PERS_BOTID_FORST": {
       "type": "register",
       "data_type": "int",
-      "description": "År siden først bosatt Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "År siden først bosatt Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "min": 0,
       "max": 9999,
       "short_title": "År siden først bosatt",
@@ -4319,12 +4345,13 @@
         "siden"
       ],
       "mean": 25,
-      "std": 15
+      "std": 15,
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_PERS_BOTID_SISTE": {
       "type": "register",
       "data_type": "int",
-      "description": "År siden sist bosatt Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "År siden sist bosatt Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "min": 0,
       "max": 9999,
       "short_title": "År siden sist bosatt",
@@ -4338,12 +4365,13 @@
         "sist"
       ],
       "mean": 20,
-      "std": 15
+      "std": 15,
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_PERS_DNR": {
       "type": "register",
       "data_type": "string",
-      "description": "Merke for d-nummer Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2025-09-30.",
+      "description": "Merke for d-nummer Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2026-08-31.",
       "labels": {
         "0": "F-nummer",
         "1": "D-nummer"
@@ -4360,12 +4388,13 @@
       "distribution": {
         "0": 0.92,
         "1": 0.08
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_PERS_KJOENN": {
       "type": "register",
       "data_type": "string",
-      "description": "Kjønn Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "Kjønn Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "labels": {
         "1": "Mann",
         "2": "Kvinne"
@@ -4381,12 +4410,13 @@
       "distribution": {
         "1": 0.52,
         "2": 0.48
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_PERS_KOMMNR": {
       "type": "register",
       "data_type": "string",
-      "description": "Bostedskommune Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2025-09-30.",
+      "description": "Bostedskommune Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2026-08-31.",
       "short_title": "Bostedskommune",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -4394,12 +4424,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "bostedskommune"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_PERS_KOMMNR_KILDE": {
       "type": "register",
       "data_type": "string",
-      "description": "Kilde for bostedskommune Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2025-09-30.",
+      "description": "Kilde for bostedskommune Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2026-08-31.",
       "labels": {
         "A": "A-melding",
         "M": "Manuell",
@@ -4418,12 +4449,13 @@
         "A": 0.95,
         "M": 0.03,
         "F": 0.02
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_PERS_STATSBORGERSKAP": {
       "type": "register",
       "data_type": "string",
-      "description": "Statsborgerskap Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2025-09-30.",
+      "description": "Statsborgerskap Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-31 – 2026-08-31.",
       "short_title": "Statsborgerskap",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -5009,12 +5041,13 @@
         "980": 0.00025,
         "989": 0.00025,
         "990": 0.0005
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_PERS_SUM_ARBEIDSTID": {
       "type": "register",
       "data_type": "float",
-      "description": "Samlet avtalt arbeidstid per uke Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "Samlet avtalt arbeidstid per uke Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "short_title": "Samlet avtalt arbeidstid per uke",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -5042,12 +5075,13 @@
           "age": "peak_at_45_60"
         },
         "min": 0
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBLONN_PERS_SUM_STILLINGSPST": {
       "type": "register",
       "data_type": "float",
-      "description": "Samlet avtalt stillingsprosent Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2025-09-16.",
+      "description": "Samlet avtalt stillingsprosent Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-01-16 – 2026-08-16.",
       "short_title": "Samlet avtalt stillingsprosent",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -5074,7 +5108,8 @@
         },
         "min": 0,
         "max": 200
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ARBSOEK1992FDT_STONAD": {
       "type": "register",
@@ -5184,7 +5219,7 @@
     "ARBSTATUS_AKT_AFP": {
       "type": "register",
       "data_type": "string",
-      "description": "AFP (off./priv.) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "AFP (off./priv.) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5199,12 +5234,13 @@
       "keywords": [
         "afp",
         "off./priv"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_ALDERSP": {
       "type": "register",
       "data_type": "string",
-      "description": "Alderspensjon Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Alderspensjon Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5218,7 +5254,8 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "alderspensjon"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_ANNATF": {
       "type": "register",
@@ -5242,7 +5279,7 @@
     "ARBSTATUS_AKT_ANNENP": {
       "type": "register",
       "data_type": "string",
-      "description": "Pensjon utenfor Nav/FT Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-12-31 – 2023-12-31.",
+      "description": "Pensjon utenfor Nav/FT Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-12-31 – 2024-12-31.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5258,12 +5295,13 @@
         "nav/ft",
         "pensjon",
         "utenfor"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_ARBAP": {
       "type": "register",
       "data_type": "string",
-      "description": "Arbeidsavklaringspenger (AAP) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2010-11-30 – 2023-11-30.",
+      "description": "Arbeidsavklaringspenger (AAP) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2010-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5278,7 +5316,8 @@
       "keywords": [
         "aap",
         "arbeidsavklaringspenger"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_ATTFP": {
       "type": "register",
@@ -5302,7 +5341,7 @@
     "ARBSTATUS_AKT_DAGP": {
       "type": "register",
       "data_type": "string",
-      "description": "Dagpenger Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Dagpenger Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5316,12 +5355,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "dagpenger"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_ETTERL": {
       "type": "register",
       "data_type": "string",
-      "description": "Etterlatte-/gjenlevendepensjon Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Etterlatte-/gjenlevendepensjon Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5335,7 +5375,8 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "etterlatte-/gjenlevendepensjon"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_FORELUF": {
       "type": "register",
@@ -5360,7 +5401,7 @@
     "ARBSTATUS_AKT_INDST": {
       "type": "register",
       "data_type": "string",
-      "description": "Individstønad / tiltakspenger Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Individstønad / tiltakspenger Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5375,12 +5416,13 @@
       "keywords": [
         "individstønad",
         "tiltakspenger"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_INTRO": {
       "type": "register",
       "data_type": "string",
-      "description": "Introduksjonsprogram Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2023-11-16.",
+      "description": "Introduksjonsprogram Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2024-11-16.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5394,12 +5436,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "introduksjonsprogram"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_KONTANT": {
       "type": "register",
       "data_type": "string",
-      "description": "Kontantstøtte Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Kontantstøtte Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5413,12 +5456,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "kontantstøtte"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_LEDIG": {
       "type": "register",
       "data_type": "string",
-      "description": "Registrert helt ledig Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2023-11-16.",
+      "description": "Registrert helt ledig Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2024-11-16.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5434,12 +5478,13 @@
         "helt",
         "ledig",
         "registrert"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_LODELTID": {
       "type": "register",
       "data_type": "string",
-      "description": "Lønnstaker deltid Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2023-11-16.",
+      "description": "Lønnstaker deltid Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2024-11-16.",
       "labels": {
         "1": "Heltid",
         "2": "Deltid",
@@ -5456,12 +5501,13 @@
       "keywords": [
         "deltid",
         "lønnstaker"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_LOHELTID": {
       "type": "register",
       "data_type": "string",
-      "description": "Lønnstaker heltid Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2023-11-16.",
+      "description": "Lønnstaker heltid Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2024-11-16.",
       "labels": {
         "1": "Heltid",
         "2": "Deltid",
@@ -5478,7 +5524,8 @@
       "keywords": [
         "heltid",
         "lønnstaker"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_LOLTO": {
       "type": "register",
@@ -5505,7 +5552,7 @@
     "ARBSTATUS_AKT_NEDSIKT": {
       "type": "register",
       "data_type": "string",
-      "description": "Nedsatt arbeidsevne, ikke på tiltak Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Nedsatt arbeidsevne, ikke på tiltak Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5522,12 +5569,13 @@
         "ikke",
         "nedsatt",
         "tiltak"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_NEDST": {
       "type": "register",
       "data_type": "string",
-      "description": "Nedsatt arbeidsevne, på tiltak Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Nedsatt arbeidsevne, på tiltak Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5543,12 +5591,13 @@
         "arbeidsevne",
         "nedsatt",
         "tiltak"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_OPPDRAG": {
       "type": "register",
       "data_type": "string",
-      "description": "Frilanser / oppdragstaker Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2023-11-16.",
+      "description": "Frilanser / oppdragstaker Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2024-11-16.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5563,12 +5612,13 @@
       "keywords": [
         "frilanser",
         "oppdragstaker"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_ORDTILT": {
       "type": "register",
       "data_type": "string",
-      "description": "Ordinære tiltak Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Ordinære tiltak Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5583,12 +5633,13 @@
       "keywords": [
         "ordinære",
         "tiltak"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_ORDUTD": {
       "type": "register",
       "data_type": "string",
-      "description": "Ordinær utdanning Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-10-01 – 2023-10-01.",
+      "description": "Ordinær utdanning Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-10-01 – 2024-10-01.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5603,12 +5654,13 @@
       "keywords": [
         "ordinær",
         "utdanning"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_OVERGANGSSTOENAD": {
       "type": "register",
       "data_type": "string",
-      "description": "Overgangsstønad Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Overgangsstønad Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5622,12 +5674,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "overgangsstønad"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_SELVST": {
       "type": "register",
       "data_type": "string",
-      "description": "Selvstendig næringsdrivende Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-12-31 – 2023-12-31.",
+      "description": "Selvstendig næringsdrivende Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-12-31 – 2024-12-31.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5642,12 +5695,13 @@
       "keywords": [
         "næringsdrivende",
         "selvstendig"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_SOSHJ": {
       "type": "register",
       "data_type": "string",
-      "description": "Sosialhjelp Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Sosialhjelp Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5661,12 +5715,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "sosialhjelp"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_SUPPL": {
       "type": "register",
       "data_type": "string",
-      "description": "Supplerende stønad Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Supplerende stønad Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5681,12 +5736,13 @@
       "keywords": [
         "stønad",
         "supplerende"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_SYKEP": {
       "type": "register",
       "data_type": "string",
-      "description": "Sykepenger Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2023-11-16.",
+      "description": "Sykepenger Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2024-11-16.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5700,7 +5756,8 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "sykepenger"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_AKT_TIDSBUF": {
       "type": "register",
@@ -5725,7 +5782,7 @@
     "ARBSTATUS_AKT_VARIGUF": {
       "type": "register",
       "data_type": "string",
-      "description": "Varig uføretrygd Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Varig uføretrygd Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "labels": {
         "0": "Nei",
         "1": "Ja",
@@ -5740,12 +5797,13 @@
       "keywords": [
         "uføretrygd",
         "varig"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_ARB_ARBEIDSTID": {
       "type": "register",
       "data_type": "float",
-      "description": "Avtalt arbeidstid, eksakte timer Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2023-11-16.",
+      "description": "Avtalt arbeidstid, eksakte timer Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2024-11-16.",
       "mean": 35.0,
       "std": 10.0,
       "short_title": "Avtalt arbeidstid, eksakte timer",
@@ -5759,7 +5817,8 @@
         "eksakte",
         "timer"
       ],
-      "min": 0.0
+      "min": 0.0,
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_ARB_ARBTID": {
       "type": "register",
@@ -5803,7 +5862,7 @@
     "ARBSTATUS_ARB_KOMM_NR": {
       "type": "register",
       "data_type": "string",
-      "description": "Arbeidsstedskommune (hovedforhold) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Arbeidsstedskommune (hovedforhold) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "short_title": "Arbeidsstedskommune (hovedforhold)",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -5812,12 +5871,13 @@
       "keywords": [
         "arbeidsstedskommune",
         "hovedforhold"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_ARB_YRKE_STYRK08": {
       "type": "register",
       "data_type": "string",
-      "description": "Yrkeskode STYRK08 (hovedforhold) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2023-11-16.",
+      "description": "Yrkeskode STYRK08 (hovedforhold) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2024-11-16.",
       "labels": {
         "1": "Ledere",
         "2": "Akademikere",
@@ -5838,12 +5898,13 @@
         "hovedforhold",
         "styrk08",
         "yrkeskode"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_PERS_AFP_GRUPPERING": {
       "type": "register",
       "data_type": "string",
-      "description": "AFP-gruppering Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2011-11-30 – 2023-11-30.",
+      "description": "AFP-gruppering Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2011-11-30 – 2024-11-30.",
       "short_title": "AFP-gruppering",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -5851,12 +5912,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "afp-gruppering"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_PERS_ALDER": {
       "type": "register",
       "data_type": "int",
-      "description": "Alder Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2023-11-16.",
+      "description": "Alder Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2024-11-16.",
       "mean": 40,
       "std": 18,
       "short_title": "Alder",
@@ -5866,12 +5928,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "alder"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_PERS_KOMM_NR": {
       "type": "register",
       "data_type": "string",
-      "description": "Bostedskommune Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2023-11-30.",
+      "description": "Bostedskommune Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-30 – 2024-11-30.",
       "short_title": "Bostedskommune",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -5879,12 +5942,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "bostedskommune"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_PERS_NEET": {
       "type": "register",
       "data_type": "string",
-      "description": "NEET (15–29 år) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2023-11-16.",
+      "description": "NEET (15–29 år) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2024-11-16.",
       "labels": {
         "0": "Ikke NEET",
         "1": "NEET"
@@ -5897,12 +5961,13 @@
       "keywords": [
         "15–29",
         "neet"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_PERS_STATUS8": {
       "type": "register",
       "data_type": "string",
-      "description": "Prioritert arbeidsstyrkestatus (8 kategorier). Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2023-11-16.",
+      "description": "Prioritert arbeidsstyrkestatus (8 kategorier). Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2024-11-16.",
       "labels": {
         "1": "Sysselsatt",
         "2": "Registrert ledig",
@@ -5989,12 +6054,13 @@
       "keywords": [
         "arbeidsstyrkestatus",
         "prioritert"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_PERS_SUM_ARBEIDSTID": {
       "type": "register",
       "data_type": "float",
-      "description": "Samlet avtalt arbeidstid per uke Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2023-11-16.",
+      "description": "Samlet avtalt arbeidstid per uke Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2024-11-16.",
       "mean": 35.0,
       "std": 10.0,
       "short_title": "Samlet avtalt arbeidstid per uke",
@@ -6009,12 +6075,13 @@
         "samlet",
         "uke"
       ],
-      "min": 0.0
+      "min": 0.0,
+      "updated_at": "2026-03-04"
     },
     "ARBSTATUS_PERS_UTENFOR": {
       "type": "register",
       "data_type": "string",
-      "description": "Utenfor arbeid/utdanning/tiltak Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2023-11-16.",
+      "description": "Utenfor arbeid/utdanning/tiltak Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-11-16 – 2024-11-16.",
       "labels": {
         "0": "Nei",
         "1": "Ja"
@@ -6027,12 +6094,13 @@
       "keywords": [
         "arbeid/utdanning/tiltak",
         "utenfor"
-      ]
+      ],
+      "updated_at": "2026-03-04"
     },
     "BARNETRMOTFDT_ANTBARN": {
       "type": "register",
       "data_type": "int",
-      "description": "Barnetrygd, antall barn Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 1996-12-01 – 2023-12-01.",
+      "description": "Barnetrygd, antall barn Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 1996-12-01 – 2024-12-01.",
       "min": 0,
       "max": 100,
       "short_title": "Barnetrygd, antall barn",
@@ -6044,12 +6112,13 @@
         "antall",
         "barn",
         "barnetrygd"
-      ]
+      ],
+      "updated_at": "2026-01-27"
     },
     "BARNETRMOTFDT_BELOP": {
       "type": "register",
       "data_type": "int",
-      "description": "Barnetrygd, månedsbeløp Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 1996-12-01 – 2023-12-01.",
+      "description": "Barnetrygd, månedsbeløp Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 1996-12-01 – 2024-12-01.",
       "min": 0,
       "max": 9999,
       "short_title": "Barnetrygd, månedsbeløp",
@@ -6060,12 +6129,13 @@
       "keywords": [
         "barnetrygd",
         "månedsbeløp"
-      ]
+      ],
+      "updated_at": "2026-01-27"
     },
     "BARNETRMOTFDT_MOTTAK": {
       "type": "register",
       "data_type": "string",
-      "description": "Barnetrygd, mottaksperiode Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 1996-12-01 – 2023-12-01.",
+      "description": "Barnetrygd, mottaksperiode Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 1996-12-01 – 2024-12-01.",
       "short_title": "Barnetrygd, mottaksperiode",
       "temporalitet": "Forløp",
       "enhetstype": "Person",
@@ -6081,12 +6151,13 @@
       "distribution": {
         "1": 0.7,
         "0": 0.3
-      }
+      },
+      "updated_at": "2026-01-27"
     },
     "BARNETRMOTFDT_STATUSK": {
       "type": "register",
       "data_type": "string",
-      "description": "Barnetrygd, type mottak Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 1996-12-01 – 2023-12-01.",
+      "description": "Barnetrygd, type mottak Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 1996-12-01 – 2024-12-01.",
       "short_title": "Barnetrygd, type mottak",
       "temporalitet": "Forløp",
       "enhetstype": "Person",
@@ -6101,7 +6172,8 @@
         "1": "Ordinaer",
         "2": "Utvidet",
         "3": "Opphoert"
-      }
+      },
+      "updated_at": "2026-01-27"
     },
     "BARNEVERN_FODTAAR": {
       "type": "register",
@@ -6119,7 +6191,7 @@
     "BARNEVERN_HJELPETIL": {
       "type": "register",
       "data_type": "string",
-      "description": "Hjelpetiltak i løpet av året Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
+      "description": "Hjelpetiltak i løpet av året Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2025-12-31.",
       "short_title": "Hjelpetiltak i løpet av året",
       "temporalitet": "Akkumulert",
       "enhetstype": "Person",
@@ -6132,12 +6204,13 @@
       "labels": {
         "0": "Nei",
         "1": "Ja"
-      }
+      },
+      "updated_at": "2026-08-31"
     },
     "BARNEVERN_HJELPETIL12": {
       "type": "register",
       "data_type": "string",
-      "description": "Hjelpetiltak per 31.12 Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1993-12-31 – 2024-12-31.",
+      "description": "Hjelpetiltak per 31.12 Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1993-12-31 – 2025-12-31.",
       "short_title": "Hjelpetiltak per 31.12",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -6151,12 +6224,13 @@
       "labels": {
         "0": "Nei",
         "1": "Ja"
-      }
+      },
+      "updated_at": "2026-08-31"
     },
     "BARNEVERN_KOMM": {
       "type": "register",
       "data_type": "string",
-      "description": "Kommune (oppgavegiver) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1993-12-31 – 2024-12-31.",
+      "description": "Kommune (oppgavegiver) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1993-12-31 – 2025-12-31.",
       "short_title": "Kommune (oppgavegiver)",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -6164,12 +6238,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "oppgavegiver"
-      ]
+      ],
+      "updated_at": "2026-08-31"
     },
     "BARNEVERN_OMSORG": {
       "type": "register",
       "data_type": "string",
-      "description": "Omsorgstiltak i løpet av året Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
+      "description": "Omsorgstiltak i løpet av året Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2025-12-31.",
       "short_title": "Omsorgstiltak i løpet av året",
       "temporalitet": "Akkumulert",
       "enhetstype": "Person",
@@ -6182,12 +6257,13 @@
       "labels": {
         "0": "Nei",
         "1": "Ja"
-      }
+      },
+      "updated_at": "2026-08-31"
     },
     "BARNEVERN_OMSORG12": {
       "type": "register",
       "data_type": "string",
-      "description": "Omsorgstiltak per 31.12 Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1993-12-31 – 2024-12-31.",
+      "description": "Omsorgstiltak per 31.12 Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1993-12-31 – 2025-12-31.",
       "short_title": "Omsorgstiltak per 31.12",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -6201,7 +6277,8 @@
       "labels": {
         "0": "Nei",
         "1": "Ja"
-      }
+      },
+      "updated_at": "2026-08-31"
     },
     "BEFOLKNING_ANT_SOSKEN": {
       "type": "register",
@@ -6435,7 +6512,7 @@
     "BEFOLKNING_BYDEL": {
       "type": "register",
       "data_type": "string",
-      "description": "Bostedsbydel Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1990-01-01 – 2025-01-01.",
+      "description": "Bostedsbydel Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1990-01-01 – 2026-01-01.",
       "short_title": "Bostedsbydel",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -6451,7 +6528,8 @@
         "04": "Oest",
         "05": "Vest",
         "99": "Ikke bydel"
-      }
+      },
+      "updated_at": "2026-03-27"
     },
     "BEFOLKNING_DOEDS_DATO": {
       "type": "register",
@@ -6469,7 +6547,7 @@
     "BEFOLKNING_EKT_FNR": {
       "type": "register",
       "data_type": "int",
-      "description": "Fødselsnummer ektefelle Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1975-01-01 – 2024-01-01.",
+      "description": "Fødselsnummer ektefelle Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1975-01-01 – 2025-01-01.",
       "min": 0,
       "max": 9999,
       "short_title": "Fødselsnummer ektefelle",
@@ -6480,7 +6558,8 @@
       "keywords": [
         "ektefelle",
         "fødselsnummer"
-      ]
+      ],
+      "updated_at": "2026-03-27"
     },
     "BEFOLKNING_ELDST_I_HUSHNR": {
       "type": "register",
@@ -7335,7 +7414,7 @@
     "BEFOLKNING_KOMMNR_FORMELL": {
       "type": "register",
       "data_type": "string",
-      "description": "Bostedskommune (folkeregister) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1989-01-01 – 2025-01-01.",
+      "description": "Bostedskommune (folkeregister) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1989-01-01 – 2026-01-01.",
       "short_title": "Bostedskommune (folkeregister)",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -7344,7 +7423,8 @@
       "keywords": [
         "bostedskommune",
         "folkeregister"
-      ]
+      ],
+      "updated_at": "2026-03-27"
     },
     "BEFOLKNING_KONTAKT_HUSHNR": {
       "type": "register",
@@ -7902,7 +7982,7 @@
     "BEFOLKNING_SAMB_FNR": {
       "type": "register",
       "data_type": "int",
-      "description": "Fødselsnummer samboer Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1987-01-01 – 2024-01-01.",
+      "description": "Fødselsnummer samboer Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1987-01-01 – 2025-01-01.",
       "min": 0,
       "max": 9999,
       "short_title": "Fødselsnummer samboer",
@@ -7913,7 +7993,8 @@
       "keywords": [
         "fødselsnummer",
         "samboer"
-      ]
+      ],
+      "updated_at": "2026-03-27"
     },
     "BEFOLKNING_SOESKEN_FNR": {
       "type": "register",
@@ -7954,7 +8035,7 @@
     "BEFOLKNING_STATUSKODE": {
       "type": "register",
       "data_type": "string",
-      "description": "Statuskode fødselsnummer Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1986-01-01 – 2025-01-01.",
+      "description": "Statuskode fødselsnummer Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1986-01-01 – 2026-01-01.",
       "labels": {
         "1": "Bosatt",
         "3": "Utvandret",
@@ -7995,7 +8076,8 @@
       "keywords": [
         "fødselsnummer",
         "statuskode"
-      ]
+      ],
+      "updated_at": "2026-04-30"
     },
     "BEFOLKNING_STATUSKODE_FNR_SAMORD": {
       "type": "register",
@@ -8024,7 +8106,7 @@
     "BEFOLKNING_SVALBARD_KOMMNR": {
       "type": "register",
       "data_type": "string",
-      "description": "Bosted Svalbard Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2014-01-01 – 2025-07-01.",
+      "description": "Bosted Svalbard Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2014-01-01 – 2026-01-01.",
       "short_title": "Bosted Svalbard",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -8033,7 +8115,8 @@
       "keywords": [
         "bosted",
         "svalbard"
-      ]
+      ],
+      "updated_at": "2026-03-27"
     },
     "BEFOLKNING_TETTNR": {
       "type": "register",
@@ -8593,7 +8676,7 @@
       "data_type": "int",
       "min": -2,
       "max": 9999,
-      "description": "Adresse i følge folkeregisteret. En annen variabel, KOMMNR_FORMELL, angir bostedskommune per 1.1. hvert år. KOMMNR_FAKTISK viser faktisk bostedskommune når denne avviker fra folkeregistrert adresse. Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 1991-12-31 – 2023-12-31. Populasjon: Hovedsakelig bosatte i Norge (fnr), men noen ikke-bosatte kan inngå (dnr). 399 kategorier.",
+      "description": "Adresse i følge folkeregisteret. En annen variabel, KOMMNR_FORMELL, angir bostedskommune per 1.1. hvert år. KOMMNR_FAKTISK viser faktisk bostedskommune når denne avviker fra folkeregistrert adresse. Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 1991-12-31 – 2024-12-31. Populasjon: Hovedsakelig bosatte i Norge (fnr), men noen ikke-bosatte kan inngå (dnr). 399 kategorier.",
       "short_title": "Bostedskommune",
       "temporalitet": "Forløp",
       "enhetstype": "Person",
@@ -8601,12 +8684,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "bostedskommune"
-      ]
+      ],
+      "updated_at": "2026-01-27"
     },
     "BOSTOTTE_ANT_AVSLATT": {
       "type": "register",
       "data_type": "int",
-      "description": "Avslåtte søknader (antall) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2014-12-31 – 2024-12-31.",
+      "description": "Avslåtte søknader (antall) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2014-12-31 – 2025-12-31.",
       "min": 0,
       "max": 100,
       "short_title": "Avslåtte søknader (antall)",
@@ -8618,12 +8702,13 @@
         "antall",
         "avslåtte",
         "søknader"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "BOSTOTTE_ANT_INNVILGET": {
       "type": "register",
       "data_type": "int",
-      "description": "Innvilgede søknader (antall) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2014-12-31 – 2024-12-31.",
+      "description": "Innvilgede søknader (antall) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2014-12-31 – 2025-12-31.",
       "min": 0,
       "max": 100,
       "short_title": "Innvilgede søknader (antall)",
@@ -8635,12 +8720,13 @@
         "antall",
         "innvilgede",
         "søknader"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "BOSTOTTE_ANT_SOKNAD": {
       "type": "register",
       "data_type": "int",
-      "description": "Søknader om bostøtte (antall) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2014-12-31 – 2024-12-31.",
+      "description": "Søknader om bostøtte (antall) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2014-12-31 – 2025-12-31.",
       "min": 0,
       "max": 100,
       "short_title": "Søknader om bostøtte (antall)",
@@ -8652,12 +8738,13 @@
         "antall",
         "bostøtte",
         "søknader"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "BOSTOTTE_BOSTOTTE_GJSNITT": {
       "type": "register",
       "data_type": "float",
-      "description": "Bostøtte, gjennomsnitt Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2014-01-01 – 2024-12-31.",
+      "description": "Bostøtte, gjennomsnitt Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2014-01-01 – 2025-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Bostøtte, gjennomsnitt",
@@ -8668,12 +8755,13 @@
       "keywords": [
         "bostøtte",
         "gjennomsnitt"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "BOSTOTTE_BOUTGIFT_GJSNITT": {
       "type": "register",
       "data_type": "float",
-      "description": "Boutgift, gjennomsnitt Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2014-01-01 – 2024-12-31.",
+      "description": "Boutgift, gjennomsnitt Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2014-01-01 – 2025-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Boutgift, gjennomsnitt",
@@ -8684,12 +8772,13 @@
       "keywords": [
         "boutgift",
         "gjennomsnitt"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "BOSTOTTE_HUSSTANDSMEDLEMMER": {
       "type": "register",
       "data_type": "int",
-      "description": "Antall husstandsmedlemmer Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2014-12-31 – 2024-12-31.",
+      "description": "Antall husstandsmedlemmer Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2014-12-31 – 2025-12-31.",
       "min": 0,
       "max": 100,
       "short_title": "Antall husstandsmedlemmer",
@@ -8700,12 +8789,13 @@
       "keywords": [
         "antall",
         "husstandsmedlemmer"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "BOSTOTTE_OVERGANGSORDNING": {
       "type": "register",
       "data_type": "string",
-      "description": "Overgangsordning Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2014-12-31 – 2024-12-31.",
+      "description": "Overgangsordning Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2014-12-31 – 2025-12-31.",
       "short_title": "Overgangsordning",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -8713,12 +8803,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "overgangsordning"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "BOSTOTTE_SISTE_BOUTGIFTER": {
       "type": "register",
       "data_type": "float",
-      "description": "Siste boutgifter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2014-01-01 – 2024-12-31.",
+      "description": "Siste boutgifter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2014-01-01 – 2025-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Siste boutgifter",
@@ -8729,12 +8820,13 @@
       "keywords": [
         "boutgifter",
         "siste"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "BOSTOTTE_SUM_BOSTOTTE": {
       "type": "register",
       "data_type": "float",
-      "description": "Sum bostøtte Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2014-01-01 – 2024-12-31.",
+      "description": "Sum bostøtte Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2014-01-01 – 2025-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Sum bostøtte",
@@ -8745,12 +8837,13 @@
       "keywords": [
         "bostøtte",
         "sum"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "BOSTOTTE_SUM_BOUTGIFTER": {
       "type": "register",
       "data_type": "float",
-      "description": "Sum boutgifter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2014-01-01 – 2024-12-31.",
+      "description": "Sum boutgifter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2014-01-01 – 2025-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Sum boutgifter",
@@ -8761,12 +8854,13 @@
       "keywords": [
         "boutgifter",
         "sum"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "ELHUB_PERS_KRAFTPRODUKSJON": {
       "type": "register",
       "data_type": "float",
-      "description": "Kraftproduksjon Enhetstype: Målepunkt. Temporalitet: Akkumulert. Gyldighetsperiode: 2020-01-01 – 2025-11-30.",
+      "description": "Kraftproduksjon Enhetstype: Målepunkt. Temporalitet: Akkumulert. Gyldighetsperiode: 2020-01-01 – 2026-09-30.",
       "mean": 500.0,
       "std": 3000.0,
       "short_title": "Kraftproduksjon",
@@ -8777,12 +8871,13 @@
       "keywords": [
         "kraftproduksjon"
       ],
-      "min": 0.0
+      "min": 0.0,
+      "updated_at": "2026-11-04"
     },
     "ELHUB_PERS_MALEPUNKT_ADR_KOMMUNE": {
       "type": "register",
       "data_type": "string",
-      "description": "Målepunktkommune Enhetstype: Målepunkt. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-01-01 – 2025-11-01.",
+      "description": "Målepunktkommune Enhetstype: Målepunkt. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-01-01 – 2026-09-01.",
       "short_title": "Målepunktkommune",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Målepunkt",
@@ -8790,12 +8885,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "målepunktkommune"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ELHUB_PERS_MALEPUNKTID_FNR": {
       "type": "register",
       "data_type": "int",
-      "description": "Målepunkt-ID (person) Enhetstype: Målepunkt. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-01-01 – 2025-11-01.",
+      "description": "Målepunkt-ID (person) Enhetstype: Målepunkt. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-01-01 – 2026-09-01.",
       "min": 0,
       "max": 9999,
       "short_title": "Målepunkt-ID (person)",
@@ -8805,12 +8901,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "målepunkt-id"
-      ]
+      ],
+      "updated_at": "2026-11-04"
     },
     "ELHUB_PERS_PRISOMRADE": {
       "type": "register",
       "data_type": "string",
-      "description": "Prisområde Enhetstype: Målepunkt. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-01-01 – 2025-11-01.",
+      "description": "Prisområde Enhetstype: Målepunkt. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-01-01 – 2026-09-01.",
       "short_title": "Prisområde",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Målepunkt",
@@ -8832,12 +8929,13 @@
         "NO3": 0.15,
         "NO4": 0.1,
         "NO5": 0.3
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ELHUB_PERS_STROMFORBRUK": {
       "type": "register",
       "data_type": "float",
-      "description": "Strømforbruk Enhetstype: Målepunkt. Temporalitet: Akkumulert. Gyldighetsperiode: 2020-01-01 – 2025-11-30.",
+      "description": "Strømforbruk Enhetstype: Målepunkt. Temporalitet: Akkumulert. Gyldighetsperiode: 2020-01-01 – 2026-09-30.",
       "mean": 20000.0,
       "std": 8000.0,
       "short_title": "Strømforbruk",
@@ -8848,12 +8946,13 @@
       "keywords": [
         "strømforbruk"
       ],
-      "min": 0.0
+      "min": 0.0,
+      "updated_at": "2026-11-04"
     },
     "ELHUB_PERS_TYPE_STROMFORBRUK": {
       "type": "register",
       "data_type": "string",
-      "description": "Type strømforbruk Enhetstype: Målepunkt. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-01-01 – 2025-11-01.",
+      "description": "Type strømforbruk Enhetstype: Målepunkt. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-01-01 – 2026-09-01.",
       "short_title": "Type strømforbruk",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Målepunkt",
@@ -8872,7 +8971,8 @@
         "1": 0.8,
         "2": 0.12,
         "3": 0.08
-      }
+      },
+      "updated_at": "2026-11-04"
     },
     "ENSLIGBTSFDT_MOTTAK": {
       "type": "register",
@@ -9189,7 +9289,7 @@
     "INNTEKT_AFP_OFF": {
       "type": "register",
       "data_type": "int",
-      "description": "Avtalefestet pensjon, offentlig sektor Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2011-01-01 – 2023-12-31.",
+      "description": "Avtalefestet pensjon, offentlig sektor Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2011-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Avtalefestet pensjon, offentlig sektor",
@@ -9201,12 +9301,13 @@
         "avtalefestet",
         "offentlig",
         "pensjon"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_AFP_PRIV": {
       "type": "register",
       "data_type": "int",
-      "description": "Avtalefestet pensjon, privat sektor Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2011-01-01 – 2023-12-31.",
+      "description": "Avtalefestet pensjon, privat sektor Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2011-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Avtalefestet pensjon, privat sektor",
@@ -9218,12 +9319,13 @@
         "avtalefestet",
         "pensjon",
         "privat"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_AFP_SUM": {
       "type": "register",
       "data_type": "int",
-      "description": "Avtalefestet pensjon (sum) Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2004-01-01 – 2023-12-31.",
+      "description": "Avtalefestet pensjon (sum) Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2004-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Avtalefestet pensjon (sum)",
@@ -9235,12 +9337,13 @@
         "avtalefestet",
         "pensjon",
         "sum"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_AKSJEUTBYTTE": {
       "type": "register",
       "data_type": "float",
-      "description": "Aksjeutbytte Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Aksjeutbytte Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Aksjeutbytte",
@@ -9250,12 +9353,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "aksjeutbytte"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_ALDERSP_FOLKETR": {
       "type": "register",
       "data_type": "int",
-      "description": "Alderspensjon fra folketrygden Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Alderspensjon fra folketrygden Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "mean": 40,
       "std": 18,
       "short_title": "Alderspensjon fra folketrygden",
@@ -9266,12 +9370,13 @@
       "keywords": [
         "alderspensjon",
         "folketrygden"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_ANDREKAPINNT": {
       "type": "register",
       "data_type": "int",
-      "description": "Andre kapitalinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Andre kapitalinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Andre kapitalinntekter",
@@ -9282,12 +9387,13 @@
       "keywords": [
         "andre",
         "kapitalinntekter"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_ARBLED": {
       "type": "register",
       "data_type": "int",
-      "description": "Dagpenger ved arbeidsledighet Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Dagpenger ved arbeidsledighet Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Dagpenger ved arbeidsledighet",
@@ -9299,12 +9405,13 @@
         "arbeidsledighet",
         "dagpenger",
         "ved"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_ASK_MARK": {
       "type": "register",
       "data_type": "int",
-      "description": "Aksjesparekonto Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2017-01-01 – 2023-12-31.",
+      "description": "Aksjesparekonto Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2017-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Aksjesparekonto",
@@ -9314,7 +9421,8 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "aksjesparekonto"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_BANKINNSK": {
       "type": "register",
@@ -9334,7 +9442,7 @@
     "INNTEKT_BARNETRYGD": {
       "type": "register",
       "data_type": "int",
-      "description": "Barnetrygd Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Barnetrygd Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Barnetrygd",
@@ -9344,12 +9452,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "barnetrygd"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_BER_BRFORM": {
       "type": "register",
       "data_type": "int",
-      "description": "Beregnet bruttoformue Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2023-12-31.",
+      "description": "Beregnet bruttoformue Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2024-12-31.",
       "short_title": "Beregnet bruttoformue",
       "temporalitet": "Akkumulert",
       "enhetstype": "Person",
@@ -9358,12 +9467,13 @@
       "keywords": [
         "beregnet",
         "bruttoformue"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_BER_REALKAP": {
       "type": "register",
       "data_type": "float",
-      "description": "Beregnet realkapital Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2023-12-31.",
+      "description": "Beregnet realkapital Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2024-12-31.",
       "short_title": "Beregnet realkapital",
       "temporalitet": "Akkumulert",
       "enhetstype": "Person",
@@ -9372,12 +9482,13 @@
       "keywords": [
         "beregnet",
         "realkapital"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_BOSTOTTE": {
       "type": "register",
       "data_type": "int",
-      "description": "Bostøtte (inntekt) Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Bostøtte (inntekt) Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Bostøtte (inntekt)",
@@ -9388,7 +9499,8 @@
       "keywords": [
         "bostøtte",
         "inntekt"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_BRUTTO_FINANSKAPITAL": {
       "type": "register",
@@ -9451,7 +9563,7 @@
     "INNTEKT_FOND": {
       "type": "register",
       "data_type": "int",
-      "description": "Fond Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2013-01-01 – 2023-12-31.",
+      "description": "Fond Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2013-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Fond",
@@ -9461,12 +9573,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "fond"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_FORELDREPENGER": {
       "type": "register",
       "data_type": "int",
-      "description": "Foreldrepenger Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2023-12-31.",
+      "description": "Foreldrepenger Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Foreldrepenger",
@@ -9476,12 +9589,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "foreldrepenger"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_FORMUE_UTLAND": {
       "type": "register",
       "data_type": "int",
-      "description": "Formue i utlandet Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2023-12-31.",
+      "description": "Formue i utlandet Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2024-12-31.",
       "mean": 150000,
       "std": 1200000,
       "short_title": "Formue i utlandet",
@@ -9492,7 +9606,8 @@
       "keywords": [
         "formue",
         "utlandet"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_FORMUESKATT": {
       "type": "register",
@@ -9527,7 +9642,7 @@
     "INNTEKT_FTRYG": {
       "type": "register",
       "data_type": "int",
-      "description": "Pensjoner fra folketrygden Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Pensjoner fra folketrygden Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Pensjoner fra folketrygden",
@@ -9538,7 +9653,8 @@
       "keywords": [
         "folketrygden",
         "pensjoner"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_GJELD": {
       "type": "register",
@@ -9558,7 +9674,7 @@
     "INNTEKT_GRUNN_HJELP": {
       "type": "register",
       "data_type": "float",
-      "description": "Grunn- og hjelpestønad Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Grunn- og hjelpestønad Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Grunn- og hjelpestønad",
@@ -9569,12 +9685,13 @@
       "keywords": [
         "grunn-",
         "hjelpestønad"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_HUSH_IES": {
       "type": "register",
       "data_type": "float",
-      "description": "Husholdningens inntekt etter skatt Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2004-01-01 – 2023-12-31.",
+      "description": "Husholdningens inntekt etter skatt Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2004-01-01 – 2024-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Husholdningens inntekt etter skatt",
@@ -9587,12 +9704,13 @@
         "husholdningens",
         "inntekt",
         "skatt"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_HUSH_IES_EU": {
       "type": "register",
       "data_type": "float",
-      "description": "Inntekt etter skatt per forbruksenhet (EU-skala) Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2004-01-01 – 2023-12-31.",
+      "description": "Inntekt etter skatt per forbruksenhet (EU-skala) Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2004-01-01 – 2024-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Inntekt etter skatt per forbruksenhet (EU-skala)",
@@ -9607,12 +9725,13 @@
         "inntekt",
         "per",
         "skatt"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_HUSH_IES_OECD": {
       "type": "register",
       "data_type": "float",
-      "description": "Inntekt etter skatt per forbruksenhet (OECD-skala) Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2004-01-01 – 2023-12-31.",
+      "description": "Inntekt etter skatt per forbruksenhet (OECD-skala) Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2004-01-01 – 2024-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Inntekt etter skatt per forbruksenhet (OECD-skala)",
@@ -9627,12 +9746,13 @@
         "oecd-skala",
         "per",
         "skatt"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_HUSHNR": {
       "type": "register",
       "data_type": "int",
-      "description": "Husholdningsnummer Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2004-12-31 – 2023-12-31.",
+      "description": "Husholdningsnummer Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2004-12-31 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Husholdningsnummer",
@@ -9642,12 +9762,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "husholdningsnummer"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_KODE_PRIVATHUSH1": {
       "type": "register",
       "data_type": "string",
-      "description": "Privathusholdninger (ekskl. institusjonsbeboere m.m.) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2006-12-31 – 2023-12-31.",
+      "description": "Privathusholdninger (ekskl. institusjonsbeboere m.m.) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2006-12-31 – 2024-12-31.",
       "short_title": "Privathusholdninger (ekskl. institusjonsbeboere m.m.)",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -9666,12 +9787,13 @@
       "distribution": {
         "1": 0.92,
         "0": 0.08
-      }
+      },
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_KODE_PRIVATHUSH2": {
       "type": "register",
       "data_type": "string",
-      "description": "Privathusholdninger (utvidet avgrensning) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2006-12-31 – 2023-12-31.",
+      "description": "Privathusholdninger (utvidet avgrensning) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2006-12-31 – 2024-12-31.",
       "short_title": "Privathusholdninger (utvidet avgrensning)",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -9689,12 +9811,13 @@
       "distribution": {
         "1": 0.95,
         "0": 0.05
-      }
+      },
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_KODE218": {
       "type": "register",
       "data_type": "int",
-      "description": "Uføretrygd fra folketrygden Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Uføretrygd fra folketrygden Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Uføretrygd fra folketrygden",
@@ -9705,12 +9828,13 @@
       "keywords": [
         "folketrygden",
         "uføretrygd"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_KONTANTSTOTTE": {
       "type": "register",
       "data_type": "int",
-      "description": "Kontantstøtte Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1998-01-01 – 2023-12-31.",
+      "description": "Kontantstøtte Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1998-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Kontantstøtte",
@@ -9720,12 +9844,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "kontantstøtte"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_LONN": {
       "type": "register",
       "data_type": "float",
-      "description": "Lønnsinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2023-12-31.",
+      "description": "Lønnsinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2024-12-31.",
       "short_title": "Lønnsinntekter",
       "temporalitet": "Akkumulert",
       "enhetstype": "Person",
@@ -9781,12 +9906,13 @@
         "latent_z_coefficient": 0.22,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_NARINNT": {
       "type": "register",
       "data_type": "int",
-      "description": "Netto næringsinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2023-12-31.",
+      "description": "Netto næringsinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Netto næringsinntekter",
@@ -9797,12 +9923,13 @@
       "keywords": [
         "netto",
         "næringsinntekter"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_OVERFOR": {
       "type": "register",
       "data_type": "float",
-      "description": "Overføringer Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2023-12-31.",
+      "description": "Overføringer Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2024-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Overføringer",
@@ -9812,7 +9939,8 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "overføringer"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_PGIVINNT": {
       "type": "register",
@@ -9833,7 +9961,7 @@
     "INNTEKT_PRIM_MARK": {
       "type": "register",
       "data_type": "int",
-      "description": "Markedsverdi primærbolig (beregnet) Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2023-12-31.",
+      "description": "Markedsverdi primærbolig (beregnet) Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Markedsverdi primærbolig (beregnet)",
@@ -9845,7 +9973,8 @@
         "beregnet",
         "markedsverdi",
         "primærbolig"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_REAL": {
       "type": "register",
@@ -9866,7 +9995,7 @@
     "INNTEKT_REALISASJONSGEVINST": {
       "type": "register",
       "data_type": "float",
-      "description": "Realisasjonsgevinster Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Realisasjonsgevinster Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Realisasjonsgevinster",
@@ -9876,12 +10005,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "realisasjonsgevinster"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_REALISASJONSTAP": {
       "type": "register",
       "data_type": "int",
-      "description": "Realisasjonstap Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Realisasjonstap Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Realisasjonstap",
@@ -9891,12 +10021,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "realisasjonstap"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_RENTINNT": {
       "type": "register",
       "data_type": "int",
-      "description": "Renteinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Renteinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Renteinntekter",
@@ -9906,12 +10037,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "renteinntekter"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_RENTUT": {
       "type": "register",
       "data_type": "int",
-      "description": "Renteutgifter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Renteutgifter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Renteutgifter",
@@ -9921,12 +10053,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "renteutgifter"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_SEK_MARK": {
       "type": "register",
       "data_type": "float",
-      "description": "Beregnet markedsverdi av sekundærbolig Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2023-12-31.",
+      "description": "Beregnet markedsverdi av sekundærbolig Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2024-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Beregnet markedsverdi av sekundærbolig",
@@ -9938,12 +10071,13 @@
         "beregnet",
         "markedsverdi",
         "sekundærbolig"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_SKPLOVF": {
       "type": "register",
       "data_type": "float",
-      "description": "Skattepliktige overføringer Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2023-12-31.",
+      "description": "Skattepliktige overføringer Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2024-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Skattepliktige overføringer",
@@ -9954,12 +10088,13 @@
       "keywords": [
         "overføringer",
         "skattepliktige"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_SOSIAL": {
       "type": "register",
       "data_type": "int",
-      "description": "Sosialhjelp Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Sosialhjelp Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Sosialhjelp",
@@ -9969,12 +10104,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "sosialhjelp"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_STUDENTHUSH": {
       "type": "register",
       "data_type": "string",
-      "description": "Studenthusholdning Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2004-12-31 – 2023-12-31.",
+      "description": "Studenthusholdning Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2004-12-31 – 2024-12-31.",
       "short_title": "Studenthusholdning",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -9990,12 +10126,13 @@
       "distribution": {
         "1": 0.08,
         "0": 0.92
-      }
+      },
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_STUDIESTIPEND": {
       "type": "register",
       "data_type": "float",
-      "description": "Studiestipend Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Studiestipend Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Studiestipend",
@@ -10005,12 +10142,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "studiestipend"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_SUM_ARBAVKL": {
       "type": "register",
       "data_type": "int",
-      "description": "Arbeidsavklaringspenger Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2023-12-31.",
+      "description": "Arbeidsavklaringspenger Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Arbeidsavklaringspenger",
@@ -10020,12 +10158,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "arbeidsavklaringspenger"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_SYKEPENGER": {
       "type": "register",
       "data_type": "float",
-      "description": "Sykepenger Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2023-12-31.",
+      "description": "Sykepenger Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2024-12-31.",
       "short_title": "Sykepenger",
       "temporalitet": "Akkumulert",
       "enhetstype": "Person",
@@ -10033,7 +10172,8 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "sykepenger"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_TJENPEN": {
       "type": "register",
@@ -10053,7 +10193,7 @@
     "INNTEKT_USIKRET_GJELD": {
       "type": "register",
       "data_type": "int",
-      "description": "Usikret gjeld Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2019-01-01 – 2023-12-31.",
+      "description": "Usikret gjeld Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2019-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Usikret gjeld",
@@ -10064,12 +10204,13 @@
       "keywords": [
         "gjeld",
         "usikret"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_UTSKATT": {
       "type": "register",
       "data_type": "int",
-      "description": "Utlignet skatt Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Utlignet skatt Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Utlignet skatt",
@@ -10080,12 +10221,13 @@
       "keywords": [
         "skatt",
         "utlignet"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_VERDIPAPIR": {
       "type": "register",
       "data_type": "int",
-      "description": "Verdipapirer (markedsverdi) Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2013-01-01 – 2023-12-31.",
+      "description": "Verdipapirer (markedsverdi) Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2013-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Verdipapirer (markedsverdi)",
@@ -10096,12 +10238,13 @@
       "keywords": [
         "markedsverdi",
         "verdipapirer"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_WIES": {
       "type": "register",
       "data_type": "int",
-      "description": "Inntekt etter skatt Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Inntekt etter skatt Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Inntekt etter skatt",
@@ -10113,12 +10256,13 @@
         "etter",
         "inntekt",
         "skatt"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_WKAPINNT": {
       "type": "register",
       "data_type": "int",
-      "description": "Kapitalinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Kapitalinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Kapitalinntekter",
@@ -10128,12 +10272,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "kapitalinntekter"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_WNARINNT": {
       "type": "register",
       "data_type": "int",
-      "description": "Netto næringsinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Netto næringsinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Netto næringsinntekter",
@@ -10144,12 +10289,13 @@
       "keywords": [
         "netto",
         "næringsinntekter"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_WOVERFOR": {
       "type": "register",
       "data_type": "int",
-      "description": "Overføringer Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Overføringer Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Overføringer",
@@ -10159,12 +10305,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "overføringer"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_WSAMINNT": {
       "type": "register",
       "data_type": "int",
-      "description": "Samlet inntekt Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Samlet inntekt Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Samlet inntekt",
@@ -10175,12 +10322,13 @@
       "keywords": [
         "inntekt",
         "samlet"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_WSKATOVF": {
       "type": "register",
       "data_type": "int",
-      "description": "Utlignet skatt og negative overføringer Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Utlignet skatt og negative overføringer Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Utlignet skatt og negative overføringer",
@@ -10193,12 +10341,13 @@
         "overføringer",
         "skatt",
         "utlignet"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_WSKFROVF": {
       "type": "register",
       "data_type": "float",
-      "description": "Skattefrie overføringer Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Skattefrie overføringer Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Skattefrie overføringer",
@@ -10209,12 +10358,13 @@
       "keywords": [
         "overføringer",
         "skattefrie"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_WSKPLOVF": {
       "type": "register",
       "data_type": "int",
-      "description": "Skattepliktige overføringer Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Skattepliktige overføringer Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Skattepliktige overføringer",
@@ -10225,12 +10375,13 @@
       "keywords": [
         "overføringer",
         "skattepliktige"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_WYRKINNT": {
       "type": "register",
       "data_type": "int",
-      "description": "Yrkesinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2023-12-31.",
+      "description": "Yrkesinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 1993-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Yrkesinntekter",
@@ -10288,12 +10439,13 @@
         "latent_z_coefficient": 0.2,
         "as_int": true,
         "min": 0
-      }
+      },
+      "updated_at": "2026-02-24"
     },
     "INNTEKT_YRKINNT": {
       "type": "register",
       "data_type": "float",
-      "description": "Yrkesinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2023-12-31.",
+      "description": "Yrkesinntekter Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2006-01-01 – 2024-12-31.",
       "mean": 0,
       "std": 1,
       "short_title": "Yrkesinntekter",
@@ -10303,12 +10455,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "yrkesinntekter"
-      ]
+      ],
+      "updated_at": "2026-02-24"
     },
     "INTRO_AVSL_OPPFOLG_KOMMNR": {
       "type": "register",
       "data_type": "string",
-      "description": "Avslutningskommune Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2023-12-31.",
+      "description": "Avslutningskommune Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2025-12-31.",
       "short_title": "Avslutningskommune",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -10316,12 +10469,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "avslutningskommune"
-      ]
+      ],
+      "updated_at": "2026-10-16"
     },
     "INTRO_FORST_BOSETTING_KOMMNR": {
       "type": "register",
       "data_type": "string",
-      "description": "Første bosettingskommune Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2023-12-31.",
+      "description": "Første bosettingskommune Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2025-12-31.",
       "labels": {
         "1": "Norskfødt",
         "2": "Innvandret",
@@ -10335,12 +10489,13 @@
       "keywords": [
         "bosettingskommune",
         "første"
-      ]
+      ],
+      "updated_at": "2026-10-16"
     },
     "INTRO_GJENNOMFORINGSFRIST": {
       "type": "register",
       "data_type": "int",
-      "description": "Frist for gjennomføring av introduksjonsprogrammet Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2023-12-31.",
+      "description": "Frist for gjennomføring av introduksjonsprogrammet Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2025-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Frist for gjennomføring av introduksjonsprogrammet",
@@ -10352,12 +10507,13 @@
         "frist",
         "gjennomføring",
         "introduksjonsprogrammet"
-      ]
+      ],
+      "updated_at": "2026-10-16"
     },
     "INTRO_HAR_FRAVAER": {
       "type": "register",
       "data_type": "string",
-      "description": "Fravær fra introduksjonsprogrammet Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2023-12-31.",
+      "description": "Fravær fra introduksjonsprogrammet Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2025-12-31.",
       "short_title": "Fravær fra introduksjonsprogrammet",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -10374,12 +10530,13 @@
       "distribution": {
         "1": 0.3,
         "0": 0.7
-      }
+      },
+      "updated_at": "2026-10-16"
     },
     "INTRO_HAR_UTVIDET_INTRO": {
       "type": "register",
       "data_type": "string",
-      "description": "Utvidet introduksjonsprogram Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2023-12-31.",
+      "description": "Utvidet introduksjonsprogram Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2025-12-31.",
       "short_title": "Utvidet introduksjonsprogram",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -10396,12 +10553,13 @@
       "distribution": {
         "1": 0.15,
         "0": 0.85
-      }
+      },
+      "updated_at": "2026-10-16"
     },
     "INTRO_KATEGORI_KODE": {
       "type": "register",
       "data_type": "string",
-      "description": "Kategorikode Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2023-12-31.",
+      "description": "Kategorikode Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2025-12-31.",
       "short_title": "Kategorikode",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -10414,12 +10572,13 @@
         "1": "Kategori A",
         "2": "Kategori B",
         "3": "Kategori C"
-      }
+      },
+      "updated_at": "2026-10-16"
     },
     "INTRO_LOVVERK": {
       "type": "register",
       "data_type": "string",
-      "description": "Lovverk personen er omfattet av Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2023-12-31.",
+      "description": "Lovverk personen er omfattet av Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2025-12-31.",
       "short_title": "Lovverk personen er omfattet av",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -10433,12 +10592,13 @@
       "labels": {
         "1": "Introduksjonsloven",
         "2": "Integreringsloven"
-      }
+      },
+      "updated_at": "2026-10-16"
     },
     "INTRO_OPPFOLG_KOMMNR": {
       "type": "register",
       "data_type": "string",
-      "description": "Oppfølgingskommune Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2023-12-31.",
+      "description": "Oppfølgingskommune Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2025-12-31.",
       "short_title": "Oppfølgingskommune",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -10446,12 +10606,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "oppfølgingskommune"
-      ]
+      ],
+      "updated_at": "2026-10-16"
     },
     "INTRO_PERMISJON_I_PERIODEN": {
       "type": "register",
       "data_type": "string",
-      "description": "Permisjon fra introduksjonsprogrammet Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2023-12-31.",
+      "description": "Permisjon fra introduksjonsprogrammet Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2025-12-31.",
       "short_title": "Permisjon fra introduksjonsprogrammet",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -10468,12 +10629,13 @@
       "distribution": {
         "1": 0.1,
         "0": 0.9
-      }
+      },
+      "updated_at": "2026-10-16"
     },
     "INTRO_PROXY_AVSL_DATO": {
       "type": "register",
       "data_type": "date:yyyymmdd",
-      "description": "Avslutningsdato introduksjonsprogrammet Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2023-12-31.",
+      "description": "Avslutningsdato introduksjonsprogrammet Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2025-12-31.",
       "short_title": "Avslutningsdato introduksjonsprogrammet",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -10482,12 +10644,13 @@
       "keywords": [
         "avslutningsdato",
         "introduksjonsprogrammet"
-      ]
+      ],
+      "updated_at": "2026-10-16"
     },
     "INTRO_PROXY_START_DATO": {
       "type": "register",
       "data_type": "date:yyyymmdd",
-      "description": "Startdato introduksjonsprogrammet Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2023-12-31.",
+      "description": "Startdato introduksjonsprogrammet Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-12-31 – 2025-12-31.",
       "short_title": "Startdato introduksjonsprogrammet",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -10496,12 +10659,13 @@
       "keywords": [
         "introduksjonsprogrammet",
         "startdato"
-      ]
+      ],
+      "updated_at": "2026-10-16"
     },
     "INTROSTFDT_MOTTAK": {
       "type": "register",
       "data_type": "string",
-      "description": "Introduksjonsstønad, mottak Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 2005-01-01 – 2023-12-01.",
+      "description": "Introduksjonsstønad, mottak Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 2005-01-01 – 2024-12-01.",
       "short_title": "Introduksjonsstønad, mottak",
       "temporalitet": "Forløp",
       "enhetstype": "Person",
@@ -10518,12 +10682,13 @@
       "distribution": {
         "1": 0.7,
         "0": 0.3
-      }
+      },
+      "updated_at": "2026-03-04"
     },
     "KJORETOY_AKSLER": {
       "type": "register",
       "data_type": "int",
-      "description": "Antall aksler Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2024-12-31.",
+      "description": "Antall aksler Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2025-12-31.",
       "min": 0,
       "max": 100,
       "short_title": "Antall aksler",
@@ -10534,12 +10699,13 @@
       "keywords": [
         "aksler",
         "antall"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_BREDDE": {
       "type": "register",
       "data_type": "int",
-      "description": "Bredde på kjøretøyet Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2024-12-31.",
+      "description": "Bredde på kjøretøyet Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2025-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Bredde på kjøretøyet",
@@ -10550,12 +10716,13 @@
       "keywords": [
         "bredde",
         "kjøretøyet"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_BRUKTIMP": {
       "type": "register",
       "data_type": "string",
-      "description": "Bruktimportert Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-12-31 – 2024-12-31.",
+      "description": "Bruktimportert Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-12-31 – 2025-12-31.",
       "short_title": "Bruktimportert",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Kjøretøy",
@@ -10571,12 +10738,13 @@
       "distribution": {
         "0": 0.65,
         "1": 0.35
-      }
+      },
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_DRIVSTOFF_OMK": {
       "type": "register",
       "data_type": "string",
-      "description": "Drivstofftype Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2024-12-31.",
+      "description": "Drivstofftype Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2025-12-31.",
       "short_title": "Drivstofftype",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Kjøretøy",
@@ -10598,12 +10766,13 @@
         "3": 0.25,
         "4": 0.15,
         "5": 0.05
-      }
+      },
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_EG_VEKT": {
       "type": "register",
       "data_type": "int",
-      "description": "Kjøretøyets egenvekt Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2024-12-31.",
+      "description": "Kjøretøyets egenvekt Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2025-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Kjøretøyets egenvekt",
@@ -10614,12 +10783,13 @@
       "keywords": [
         "egenvekt",
         "kjøretøyets"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_FREG_AR": {
       "type": "register",
       "data_type": "int",
-      "description": "Første registreringsår (årsmodell) Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2024-12-31.",
+      "description": "Første registreringsår (årsmodell) Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2025-12-31.",
       "min": 1970,
       "max": 2025,
       "mean": 2012,
@@ -10633,12 +10803,13 @@
         "første",
         "registreringsår",
         "årsmodell"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_KJ_ART": {
       "type": "register",
       "data_type": "string",
-      "description": "Kjøringens art Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1999-12-31 – 2024-12-31.",
+      "description": "Kjøringens art Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1999-12-31 – 2025-12-31.",
       "short_title": "Kjøringens art",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Kjøretøy",
@@ -10659,12 +10830,13 @@
         "02": 0.03,
         "03": 0.02,
         "04": 0.1
-      }
+      },
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_KJORELENGDE_GJSNITT_AAR": {
       "type": "register",
       "data_type": "int",
-      "description": "Gjennomsnittlig årlig kjørelengde Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2006-12-31 – 2024-12-31.",
+      "description": "Gjennomsnittlig årlig kjørelengde Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2006-12-31 – 2025-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Gjennomsnittlig årlig kjørelengde",
@@ -10676,12 +10848,13 @@
         "gjennomsnittlig",
         "kjørelengde",
         "årlig"
-      ]
+      ],
+      "updated_at": "2026-07-03"
     },
     "KJORETOY_KJORETOYID_FNR": {
       "type": "register",
       "data_type": "int",
-      "description": "Kjøretøy-ID, person Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2024-12-31.",
+      "description": "Kjøretøy-ID, person Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2025-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Kjøretøy-ID, person",
@@ -10691,12 +10864,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "kjøretøy-id"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_KJT_GRUP": {
       "type": "register",
       "data_type": "string",
-      "description": "Kjøretøygruppekode Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2024-12-31.",
+      "description": "Kjøretøygruppekode Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2025-12-31.",
       "labels": {
         "101": "Personbil unntatt ambulanse",
         "106": "Personbil (Ambulanse)",
@@ -10822,12 +10996,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "kjøretøygruppekode"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_LADBAR": {
       "type": "register",
       "data_type": "string",
-      "description": "Ladbar Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2016-12-31 – 2024-12-31.",
+      "description": "Ladbar Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2016-12-31 – 2025-12-31.",
       "short_title": "Ladbar",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Kjøretøy",
@@ -10843,12 +11018,13 @@
       "distribution": {
         "0": 0.6,
         "1": 0.4
-      }
+      },
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_LENGDE": {
       "type": "register",
       "data_type": "int",
-      "description": "Lengde på kjøretøyet Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2024-12-31.",
+      "description": "Lengde på kjøretøyet Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2025-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Lengde på kjøretøyet",
@@ -10859,12 +11035,13 @@
       "keywords": [
         "kjøretøyet",
         "lengde"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_MAALERAVLESNING_AARMND": {
       "type": "register",
       "data_type": "int",
-      "description": "År og måned for siste måleravlesning Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2006-12-31 – 2024-12-31.",
+      "description": "År og måned for siste måleravlesning Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2006-12-31 – 2025-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "År og måned for siste måleravlesning",
@@ -10875,12 +11052,13 @@
       "keywords": [
         "måleravlesning",
         "siste"
-      ]
+      ],
+      "updated_at": "2026-07-03"
     },
     "KJORETOY_MAALERAVLESNING_KM": {
       "type": "register",
       "data_type": "int",
-      "description": "Målerstand Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2006-12-31 – 2024-12-31.",
+      "description": "Målerstand Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2006-12-31 – 2025-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Målerstand",
@@ -10890,12 +11068,13 @@
       "databank": "no.ssb.fdb",
       "keywords": [
         "målerstand"
-      ]
+      ],
+      "updated_at": "2026-07-03"
     },
     "KJORETOY_TEKN_AKSLER_DRIFT": {
       "type": "register",
       "data_type": "int",
-      "description": "Antall aksler med drift Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2024-12-31.",
+      "description": "Antall aksler med drift Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2025-12-31.",
       "min": 0,
       "max": 100,
       "short_title": "Antall aksler med drift",
@@ -10907,12 +11086,13 @@
         "aksler",
         "antall",
         "drift"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_TEKN_ANTALL_DORER": {
       "type": "register",
       "data_type": "int",
-      "description": "Antall dører Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2024-12-31.",
+      "description": "Antall dører Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2025-12-31.",
       "min": 0,
       "max": 100,
       "short_title": "Antall dører",
@@ -10923,12 +11103,13 @@
       "keywords": [
         "antall",
         "dører"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_TEKN_CO2_UTSLIPP": {
       "type": "register",
       "data_type": "float",
-      "description": "CO₂-utslipp Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2005-12-31 – 2024-12-31.",
+      "description": "CO₂-utslipp Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2005-12-31 – 2025-12-31.",
       "mean": 110.0,
       "std": 45.0,
       "short_title": "CO₂-utslipp",
@@ -10939,12 +11120,13 @@
       "keywords": [
         "co₂-utslipp"
       ],
-      "min": 0.0
+      "min": 0.0,
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_TEKN_DRIVSTOFF_FORBRUK": {
       "type": "register",
       "data_type": "float",
-      "description": "Drivstofforbruk (l/10 km) Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-12-31 – 2024-12-31.",
+      "description": "Drivstofforbruk (l/10 km) Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2008-12-31 – 2025-12-31.",
       "mean": 0.6,
       "std": 0.15,
       "short_title": "Drivstofforbruk (l/10 km)",
@@ -10956,12 +11138,13 @@
         "drivstofforbruk",
         "l/10"
       ],
-      "min": 0.0
+      "min": 0.0,
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_TEKN_SITTEPL_FORAN": {
       "type": "register",
       "data_type": "int",
-      "description": "Antall sitteplasser foran Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2024-12-31.",
+      "description": "Antall sitteplasser foran Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2025-12-31.",
       "min": 0,
       "max": 100,
       "short_title": "Antall sitteplasser foran",
@@ -10973,12 +11156,13 @@
         "antall",
         "foran",
         "sitteplasser"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_TEKN_SITTEPL_TOTALT": {
       "type": "register",
       "data_type": "int",
-      "description": "Antall sitteplasser totalt Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2024-12-31.",
+      "description": "Antall sitteplasser totalt Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2025-12-31.",
       "min": 0,
       "max": 100,
       "short_title": "Antall sitteplasser totalt",
@@ -10990,12 +11174,13 @@
         "antall",
         "sitteplasser",
         "totalt"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_TEKN_THV_M_BREMS": {
       "type": "register",
       "data_type": "int",
-      "description": "Tillatt tilhengervekt med brems Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2024-12-31.",
+      "description": "Tillatt tilhengervekt med brems Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2025-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Tillatt tilhengervekt med brems",
@@ -11007,12 +11192,13 @@
         "brems",
         "tilhengervekt",
         "tillatt"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_TEKN_THV_U_BREMS": {
       "type": "register",
       "data_type": "int",
-      "description": "Tillatt tilhengervekt uten brems Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2024-12-31.",
+      "description": "Tillatt tilhengervekt uten brems Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2025-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Tillatt tilhengervekt uten brems",
@@ -11024,17 +11210,18 @@
         "brems",
         "tilhengervekt",
         "tillatt"
-      ]
+      ],
+      "updated_at": "2026-05-29"
     },
     "KJORETOY_TEKN_TKNAVN": {
       "type": "register",
       "data_type": "string",
-      "description": "EU-kode for kjøretøygruppe Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2024-12-31.",
+      "description": "EU-kode for kjøretøygruppe Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2025-12-31.",
       "short_title": "EU-kode for kjøretøygruppe",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Kjøretøy",
       "microdata_datatype": "Alfanumerisk",
-      "updated_at": "2025-07-14",
+      "updated_at": "2026-05-29",
       "databank": "no.ssb.fdb",
       "topics": [
         "Kjøretøy → Landtransport → Motorvogn → Transport og reiseliv"
@@ -11063,14 +11250,14 @@
     "KJORETOY_TEKN_VOGNTOGVEKT": {
       "type": "register",
       "data_type": "int",
-      "description": "Tillatt vogntogvekt Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2024-12-31.",
+      "description": "Tillatt vogntogvekt Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2020-12-31 – 2025-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Tillatt vogntogvekt",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Kjøretøy",
       "microdata_datatype": "Numerisk (Heltall)",
-      "updated_at": "2025-07-14",
+      "updated_at": "2026-05-29",
       "databank": "no.ssb.fdb",
       "topics": [
         "Kjøretøy → Landtransport → Motorvogn → Transport og reiseliv"
@@ -11083,14 +11270,14 @@
     "KJORETOY_TOT_VEKT": {
       "type": "register",
       "data_type": "int",
-      "description": "Kjøretøyets totalvekt Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2024-12-31.",
+      "description": "Kjøretøyets totalvekt Enhetstype: Kjøretøy. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1998-12-31 – 2025-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Kjøretøyets totalvekt",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Kjøretøy",
       "microdata_datatype": "Numerisk (Heltall)",
-      "updated_at": "2025-07-14",
+      "updated_at": "2026-05-29",
       "databank": "no.ssb.fdb",
       "topics": [
         "Kjøretøy → Landtransport → Motorvogn → Transport og reiseliv"
@@ -11357,12 +11544,12 @@
     "KVALIFSTFDT_MOTTAK": {
       "type": "register",
       "data_type": "string",
-      "description": "Kvalifiseringsstønad, mottak Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 2008-01-01 – 2023-12-01.",
+      "description": "Kvalifiseringsstønad, mottak Enhetstype: Person. Temporalitet: Forløp. Gyldighetsperiode: 2008-01-01 – 2024-12-01.",
       "short_title": "Kvalifiseringsstønad, mottak",
       "temporalitet": "Forløp",
       "enhetstype": "Person",
       "microdata_datatype": "Alfanumerisk",
-      "updated_at": "2024-12-11",
+      "updated_at": "2026-01-27",
       "databank": "no.ssb.fdb",
       "topics": [
         "Sosiale forhold og kriminalitet → Trygd og stønad"
@@ -11383,14 +11570,14 @@
     "KVALIFSTZFDT_ANT_KOM": {
       "type": "register",
       "data_type": "int",
-      "description": "Kvalifiseringsstønad, antall kommuner Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2023-12-31.",
+      "description": "Kvalifiseringsstønad, antall kommuner Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2024-12-31.",
       "min": 0,
       "max": 100,
       "short_title": "Kvalifiseringsstønad, antall kommuner",
       "temporalitet": "Akkumulert",
       "enhetstype": "Person",
       "microdata_datatype": "Numerisk (Heltall)",
-      "updated_at": "2024-12-11",
+      "updated_at": "2026-01-27",
       "databank": "no.ssb.fdb",
       "topics": [
         "Sosiale forhold og kriminalitet → Trygd og stønad"
@@ -11404,14 +11591,14 @@
     "KVALIFSTZFDT_KVP_STONAD": {
       "type": "register",
       "data_type": "int",
-      "description": "Kvalifiseringsstønad, beløp i året Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2023-12-31.",
+      "description": "Kvalifiseringsstønad, beløp i året Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2010-01-01 – 2024-12-31.",
       "min": 0,
       "max": 9999,
       "short_title": "Kvalifiseringsstønad, beløp i året",
       "temporalitet": "Akkumulert",
       "enhetstype": "Person",
       "microdata_datatype": "Numerisk (Heltall)",
-      "updated_at": "2024-12-11",
+      "updated_at": "2026-01-27",
       "databank": "no.ssb.fdb",
       "topics": [
         "Sosiale forhold og kriminalitet → Trygd og stønad"
@@ -15598,14 +15785,14 @@
     "REGSYS_ARB_ARBEIDSTID": {
       "type": "register",
       "data_type": "float",
-      "description": "Arbeidstid (eksakte timer), hovedarbeidsforhold Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2024-11-16.",
+      "description": "Arbeidstid (eksakte timer), hovedarbeidsforhold Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2025-11-16.",
       "mean": 35.0,
       "std": 10.0,
       "short_title": "Arbeidstid (eksakte timer), hovedarbeidsforhold",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
       "microdata_datatype": "Numerisk (Desimaltall)",
-      "updated_at": "2025-05-13",
+      "updated_at": "2026-03-27",
       "databank": "no.ssb.fdb",
       "topics": [
         "Arbeid og lønn → Sysselsetting"
@@ -15621,12 +15808,12 @@
     "REGSYS_ARB_ARBKOMM": {
       "type": "register",
       "data_type": "string",
-      "description": "Arbeidsstedskommune, hovedarbeidsforhold Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2024-11-16.",
+      "description": "Arbeidsstedskommune, hovedarbeidsforhold Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2025-11-16.",
       "short_title": "Arbeidsstedskommune, hovedarbeidsforhold",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
       "microdata_datatype": "Alfanumerisk",
-      "updated_at": "2025-05-13",
+      "updated_at": "2026-03-27",
       "databank": "no.ssb.fdb",
       "topics": [
         "Arbeid og lønn → Sysselsetting"
@@ -15639,7 +15826,7 @@
     "REGSYS_ARB_ARBMARK_STATUS": {
       "type": "register",
       "data_type": "string",
-      "description": "Arbeidsmarkedsstatus, hovedarbeidsforhold Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2024-11-16.",
+      "description": "Arbeidsmarkedsstatus, hovedarbeidsforhold Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2025-11-16.",
       "distribution": {
         "0": 0.27,
         "1": 0.62,
@@ -15694,7 +15881,7 @@
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
       "microdata_datatype": "Alfanumerisk",
-      "updated_at": "2025-05-13",
+      "updated_at": "2026-03-27",
       "databank": "no.ssb.fdb",
       "topics": [
         "Arbeid og lønn → Sysselsetting"
@@ -15707,7 +15894,7 @@
     "REGSYS_ARB_KILDE": {
       "type": "register",
       "data_type": "string",
-      "description": "Kilde for arbeidsmarkedsstatus, hovedarbeidsforhold Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2024-11-16.",
+      "description": "Kilde for arbeidsmarkedsstatus, hovedarbeidsforhold Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2025-11-16.",
       "labels": {
         "A": "A-melding",
         "M": "Manuell",
@@ -15719,7 +15906,7 @@
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
       "microdata_datatype": "Alfanumerisk",
-      "updated_at": "2025-05-13",
+      "updated_at": "2026-03-27",
       "databank": "no.ssb.fdb",
       "topics": [
         "Arbeid og lønn → Sysselsetting"
@@ -15733,12 +15920,12 @@
     "REGSYS_ARB_YRKE_STYRK08": {
       "type": "register",
       "data_type": "string",
-      "description": "Yrkeskode STYRK08, hovedarbeidsforhold Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2024-11-16.",
+      "description": "Yrkeskode STYRK08, hovedarbeidsforhold Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2025-11-16.",
       "short_title": "Yrkeskode STYRK08, hovedarbeidsforhold",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
       "microdata_datatype": "Alfanumerisk",
-      "updated_at": "2025-05-13",
+      "updated_at": "2026-03-27",
       "databank": "no.ssb.fdb",
       "topics": [
         "Arbeid og lønn → Sysselsetting"
@@ -15770,7 +15957,7 @@
     "REGSYS_ARBTID": {
       "type": "register",
       "data_type": "string",
-      "description": "Forventet/avtalt arbeidstid, intervaller Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2000-11-01 – 2014-11-30.",
+      "description": "Forventet/avtalt arbeidstid, intervaller Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2000-11-01 – 2014-11-01.",
       "short_title": "Forventet/avtalt arbeidstid, intervaller",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -15855,14 +16042,14 @@
     "REGSYS_FRTK_ID_SSB": {
       "type": "register",
       "data_type": "int",
-      "description": "Foretak (hovedarbeidsforhold) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2024-11-16.",
+      "description": "Foretak (hovedarbeidsforhold) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2025-11-16.",
       "min": 0,
       "max": 9999,
       "short_title": "Foretak (hovedarbeidsforhold)",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
       "microdata_datatype": "Numerisk (Heltall)",
-      "updated_at": "2025-05-13",
+      "updated_at": "2026-03-27",
       "databank": "no.ssb.fdb",
       "topics": [
         "Virksomheter og foretak"
@@ -15968,7 +16155,7 @@
     "REGSYS_NARING_SN2002": {
       "type": "register",
       "data_type": "string",
-      "description": "Næring hovedarbeidsgiver (SN2002) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2002-11-01 – 2007-11-30.",
+      "description": "Næring hovedarbeidsgiver (SN2002) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2002-11-01 – 2007-11-01.",
       "short_title": "Næring hovedarbeidsgiver (SN2002)",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -16006,7 +16193,7 @@
     "REGSYS_NARING_SN94": {
       "type": "register",
       "data_type": "string",
-      "description": "Næring hovedarbeidsgiver (SN94) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2000-11-01 – 2001-11-30.",
+      "description": "Næring hovedarbeidsgiver (SN94) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2000-11-01 – 2001-11-01.",
       "short_title": "Næring hovedarbeidsgiver (SN94)",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -16067,7 +16254,7 @@
     "REGSYS_SEKTOR": {
       "type": "register",
       "data_type": "string",
-      "description": "Institusjonell sektor Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2000-11-01 – 2012-11-30.",
+      "description": "Institusjonell sektor Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2000-11-01 – 2012-11-01.",
       "short_title": "Institusjonell sektor",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -16126,14 +16313,14 @@
     "REGSYS_VIRK_ID_SSB": {
       "type": "register",
       "data_type": "int",
-      "description": "Personens hovedarbeidsforhold – virksomhet Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2024-11-16.",
+      "description": "Personens hovedarbeidsforhold – virksomhet Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2015-11-16 – 2025-11-16.",
       "min": 0,
       "max": 9999,
       "short_title": "Personens hovedarbeidsforhold – virksomhet",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
       "microdata_datatype": "Numerisk (Heltall)",
-      "updated_at": "2025-05-13",
+      "updated_at": "2026-03-27",
       "databank": "no.ssb.fdb",
       "topics": [
         "Arbeid og lønn → Sysselsetting → Virksomheter og foretak"
@@ -16166,7 +16353,7 @@
     "REGSYS_YRKE_PUBL": {
       "type": "register",
       "data_type": "string",
-      "description": "Yrke (publiseringskategorier basert på STYRK2008) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2009-11-01 – 2015-11-30.",
+      "description": "Yrke (publiseringskategorier basert på STYRK2008) Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2009-11-01 – 2015-11-01.",
       "short_title": "Yrke (publiseringskategorier basert på STYRK2008)",
       "temporalitet": "Tverrsnitt",
       "enhetstype": "Person",
@@ -23397,6 +23584,246 @@
         "1": "Usikker om benign eller malign",
         "2": "Carcinoma in situ",
         "3": "Malignt ved primærutgangspunkt"
+      }
+    },
+    "BEFOLKNING_GRUNNKRETS": {
+      "type": "register",
+      "data_type": "string",
+      "description": "Krever require no.ssb.fdb:60 (eller nyere). 8 sifre = kommune (4) + delområde (2) + grunnkrets (2): delområde = substr(gk, 1, 6), kommune = substr(gk, 1, 4). Kodene følger kommunereformene (2020, 2024). Kodelisten har også delområdenavn (6-sifrede koder). Små, stabile geografiske enheter (ca. 14 000), gruppert i ca. 1 550 delområder; egnet til egne områdeinndelinger (bydeler, levekårssoner). Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 1990-01-01 – 2026-01-01.",
+      "short_title": "Grunnkrets (bosted)",
+      "temporalitet": "Tverrsnitt",
+      "enhetstype": "Person",
+      "microdata_datatype": "Alfanumerisk",
+      "updated_at": "2026-11-17",
+      "databank": "no.ssb.fdb",
+      "databank_min_versjon": 60,
+      "topics": [
+        "Befolkning"
+      ],
+      "keywords": [
+        "grunnkrets",
+        "delområde",
+        "bydel",
+        "levekårssone",
+        "nabolag",
+        "geografi",
+        "bosted",
+        "småområde"
+      ],
+      "populasjon": "Variabelen omfatter bosatte per 01.01.ÅÅÅÅ. Observasjoner utenfor kodelisten (ugyldige koder) er fjernet.",
+      "full_beskrivelse": "Landet er delt inn i ca. 14 000 grunnkretser som igjen er gruppert sammen til ca. 1 550 delområder. Formålet med å dele kommunen inn i grunnkretser er å lage små, stabile og geografisk enheter som kan gi et fleksibelt grunnlag for arbeide med og presentere regionalstatistikk. Hensikten med dette er igjen å gi et mer effektivt statistisk grunnlag for kommunal og regional analyse, forvaltning og planlegging. I tillegg til at grunnkretser skal være stabil over en rimelig tidsperiode, skal de også bestå av et geografisk sammenhengende område. Et annet hovedkriterium er at grunnkretsene bør være mest mulig ensartet når det gjelder natur og næringsgrunnlag, kommunikasjonsforhold og bygningsmessig struktur. Delområde er et mellomnivå mellom kommune og grunnkrets. En slik delområdeinndeling er egnet for data som blir for detaljert på grunnkretsnivå, samtidig som den er egnet til regionale oversiktsanalyser. Ved utarbeidelse av delområder ble det lagt vekt på at området hørte naturlig sammen kommunikasjonsmessig, og helst burde området være en naturlig enhet.",
+      "source_url": "https://microdata.no/discovery/variable/no.ssb.fdb/60/BEFOLKNING_GRUNNKRETS",
+      "external_metadata": "codelists/BEFOLKNING_GRUNNKRETS.json",
+      "codelist_size": 14488,
+      "labels_sample": {
+        "03010101": "Sentrum 1 - Rode 1",
+        "03010303": "Sentrum 3 - Rode 3",
+        "46010101": "Nordnes",
+        "11030101": "Buøy 2",
+        "18040101": "Moloen",
+        "55010101": "Hansjordnes",
+        "31030101": "Bergersborg"
+      }
+    },
+    "ARBLONN_ARB_LARLING_PUB_AGGR": {
+      "type": "register",
+      "data_type": "string",
+      "description": "Variabelen angir om arbeidsforholdet regnes som en lærlingjobb eller ikke. For at arbeidsforholdet skal regnes som et lærlingarbeidsforhold må personen være registrert som lærling i fylkeskommunenes administrative datasystem for inntak til videregående opplæring (VIGO). I tillegg må ett av følgende punkter være oppfylt for arbeidsforholdet til lærlingen: - Bedriften arbeidsforholdet er registrert på i a-ordningen samsvarer med informasjon fra VIGO om hvilken bedrift personen er lærling i. - Arbeidsforholdet er innrapportert med en yrkeskode i a-ordningen som indikerer at lønnstakeren er lærling. A-ordningen er en samordnet digital innsamling av opplysninger om arbeidsforhold, inntekt og skattetrekk til Skatteetaten, NAV og SSB. Ordningen innebærer at SSB får opplysninger om lønn og ansatte direkte fra a-meldingen, som er den elektroniske meldingen som inneholder alle opplysningene som samles inn. Data foreligger per måned og alle måneder inneholder en fullstendig situasjonsbeskrivelse om arbeid og lønn samlet. SSB innhenter data fra A-ordningen for å fremstille statistikk om sysselsetting, lønn, ledighet og arbeidsmarkedstiltak. Mer informasjon om A-ordningen og bruk av data i statistikk og for forskning og analyse: - Om a-ordningen hos Skatteetaten - Variabelområdet a-ordningen hos SSB - Registerbasert lønns- og sysselsettingsstatistikk basert på a-ordningen hos SSB. Enhetstype: Jobb. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2017-11-16 – 2025-11-16.",
+      "short_title": "Merke for lærlingarbeidsforhold",
+      "temporalitet": "Tverrsnitt",
+      "enhetstype": "Jobb",
+      "microdata_datatype": "Alfanumerisk",
+      "updated_at": "2026-03-27",
+      "databank": "no.ssb.fdb",
+      "topics": [
+        "A-ordningen",
+        "Arbeid og lønn",
+        "Arbeidsmarked",
+        "Lønn",
+        "Sysselsetting",
+        "Utdanning",
+        "Utdanningsnivå"
+      ],
+      "keywords": [
+        "lærlingarbeidsforhold",
+        "merke"
+      ],
+      "labels": {
+        "0": "Ikke-lærlingarbeidsforhold",
+        "1": "Lærlingarbeidsforhold"
+      }
+    },
+    "BOFORHOLD_HEIS": {
+      "type": "register",
+      "data_type": "string",
+      "description": "Denne variabelen angir om det er installert heis i bygningen. Som heis regnes personheis, ikke vareheis eller trappeheis installert i enebolig. Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2022-01-01 – 2024-01-01.",
+      "short_title": "Heis i bygning",
+      "temporalitet": "Tverrsnitt",
+      "enhetstype": "Person",
+      "microdata_datatype": "Alfanumerisk",
+      "updated_at": "2026-01-27",
+      "databank": "no.ssb.fdb",
+      "topics": [
+        "Boforhold",
+        "Husholdning",
+        "Levekår",
+        "Sosiale forhold og kriminalitet"
+      ],
+      "keywords": [
+        "bygning",
+        "heis"
+      ],
+      "labels": {
+        "J": "Ja",
+        "N": "Nei"
+      }
+    },
+    "BOSTOTTE_BOSTOTTE_MND": {
+      "type": "register",
+      "data_type": "float",
+      "description": "Variabelen viser husstandens mottatte bostøtte (NOK) i statistikkmåneden. Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2014-01-01 – 2025-12-31.",
+      "short_title": "Mottatt bostøtte",
+      "temporalitet": "Akkumulert",
+      "enhetstype": "Person",
+      "microdata_datatype": "Numerisk (desimaltall)",
+      "updated_at": "2026-05-29",
+      "databank": "no.ssb.fdb",
+      "topics": [
+        "Bostøtte"
+      ],
+      "keywords": [
+        "bostøtte",
+        "mottatt"
+      ]
+    },
+    "BOSTOTTE_BOUTGIFT_MND": {
+      "type": "register",
+      "data_type": "float",
+      "description": "Variabelen viser husstandens registrerte boutgifter i statistikkmåneden. Etter hvilke boutgifter som kan inkluderes i bostøttesøknaden (ref. forskrift om bostøtte). Enhetstype: Person. Temporalitet: Akkumulert. Gyldighetsperiode: 2017-01-01 – 2025-12-31.",
+      "short_title": "Boutgift, månedlig",
+      "temporalitet": "Akkumulert",
+      "enhetstype": "Person",
+      "microdata_datatype": "Numerisk (desimaltall)",
+      "updated_at": "2026-05-29",
+      "databank": "no.ssb.fdb",
+      "topics": [
+        "Bostøtte"
+      ],
+      "keywords": [
+        "boutgift",
+        "månedlig"
+      ]
+    },
+    "BOSTOTTE_OVERGANGSORDNING_MND": {
+      "type": "register",
+      "data_type": "string",
+      "description": "Variabelen indikerer om husstanden er omfattet av en overgangsordning i statistikkmåneden. Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2014-01-31 – 2025-12-31.",
+      "short_title": "Overgangsordning",
+      "temporalitet": "Tverrsnitt",
+      "enhetstype": "Person",
+      "microdata_datatype": "Alfanumerisk",
+      "updated_at": "2026-05-29",
+      "databank": "no.ssb.fdb",
+      "topics": [
+        "Bostøtte"
+      ],
+      "keywords": [
+        "overgangsordning"
+      ],
+      "labels": {
+        "1": "Omfattet av overgangsordningen fra 2009",
+        "2": "Omfattet av overgangsordningen fra 2015"
+      }
+    },
+    "BOSTOTTE_VEDTAKSKODE_MND": {
+      "type": "register",
+      "data_type": "string",
+      "description": "Variabelen viser resultatet av vedtaket for den gjeldende statistikkmåneden. Enhetstype: Person. Temporalitet: Tverrsnitt. Gyldighetsperiode: 2017-01-31 – 2025-12-31.",
+      "short_title": "Vedtak",
+      "temporalitet": "Tverrsnitt",
+      "enhetstype": "Person",
+      "microdata_datatype": "Alfanumerisk",
+      "updated_at": "2026-05-29",
+      "databank": "no.ssb.fdb",
+      "topics": [
+        "Bostøtte"
+      ],
+      "keywords": [
+        "vedtak"
+      ],
+      "labels": {
+        "V00": "Innvilget",
+        "V02": "Ingen støtteberettigede",
+        "V03": "For høy inntekt i forhold til boutgift og at inntektsgrunnlaget i husstanden er for høyt i forhold til boutgiftene",
+        "V04": "Boligen utenfor ordningen",
+        "V05": "Ikke i registrert i folkeregisteret på situasjonsdato",
+        "V09": "Manglende opplysninger",
+        "V11": "Hovedperson er død",
+        "V48": "Noen i husstanden er ikke bosatt på søknadsadresse"
+      }
+    },
+    "NUDB_VGS_STP_REA3058": {
+      "type": "register",
+      "data_type": "string",
+      "description": "Standpunktkarakter i videregående skole for Matematikk R2. Først undervist: Høst 10 Sist undervist: Vår 21 Først undervist: Høst 22 Merknad: Faget bygger på matematikk R1. Enhetstype: Person. Temporalitet: Fast. Gyldighetsperiode: ∞.",
+      "short_title": "Matematikk R2",
+      "temporalitet": "Fast",
+      "enhetstype": "Person",
+      "microdata_datatype": "Alfanumerisk",
+      "updated_at": "2026-02-24",
+      "databank": "no.ssb.fdb",
+      "topics": [
+        "Karakter",
+        "Standpunktkarakter",
+        "Videregående utdanning"
+      ],
+      "keywords": [
+        "matematikk"
+      ],
+      "labels": {
+        "1": "Uttrykker at eleven har svært lav kompetanse i faget",
+        "2": "Uttrykker at eleven har lav kompetanse i faget",
+        "3": "Uttrykker at eleven har nokså god kompetanse i faget",
+        "4": "Uttrykker at eleven har god kompetanse i faget",
+        "5": "Uttrykker at eleven har meget god kompetanse i faget",
+        "6": "Uttrykker at eleven har fremragende kompetanse i faget",
+        "9": "Mangler vurdering",
+        "D": "Deltatt",
+        "F": "Fritatt fra standpunkt",
+        "GK": "Godkjent",
+        "IV": "Ikke vurderingsgrunnlag"
+      }
+    },
+    "NUDB_VGS_STP_REA3062": {
+      "type": "register",
+      "data_type": "string",
+      "description": "Standpunktkarakter i videregående skole for Matematikk S2. Først undervist: Høst 10 Sist undervist: Vår 21 Først undervist: Høst 22 Merknad: Faget bygger på matematikk S1. Enhetstype: Person. Temporalitet: Fast. Gyldighetsperiode: ∞.",
+      "short_title": "Matematikk S2",
+      "temporalitet": "Fast",
+      "enhetstype": "Person",
+      "microdata_datatype": "Alfanumerisk",
+      "updated_at": "2026-02-24",
+      "databank": "no.ssb.fdb",
+      "topics": [
+        "Karakter",
+        "Standpunktkarakter",
+        "Videregående utdanning"
+      ],
+      "keywords": [
+        "matematikk"
+      ],
+      "labels": {
+        "1": "Uttrykker at eleven har svært lav kompetanse i faget",
+        "2": "Uttrykker at eleven har lav kompetanse i faget",
+        "3": "Uttrykker at eleven har nokså god kompetanse i faget",
+        "4": "Uttrykker at eleven har god kompetanse i faget",
+        "5": "Uttrykker at eleven har meget god kompetanse i faget",
+        "6": "Uttrykker at eleven har fremragende kompetanse i faget",
+        "9": "Mangler vurdering",
+        "D": "Deltatt",
+        "F": "Fritatt fra standpunkt",
+        "GK": "Godkjent",
+        "IV": "Ikke vurderingsgrunnlag"
       }
     }
   },

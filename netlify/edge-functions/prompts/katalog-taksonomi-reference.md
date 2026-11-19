@@ -9,7 +9,7 @@ vises per variabel i prompten — denne fila er kun orientering. -->
 # microdata.no — katalog-taksonomi
 
 ## Databanker
-- `no.ssb.fdb` — versjon **53**, 729 variabler (all SSB-registerdata).
+- `no.ssb.fdb` — versjon **60**, 730 variabler (all SSB-registerdata). Oppdateres med `python3 tools/fdb_refresh.py` (perioder, nye/fjernede variabler) og `python3 tools/grunnkrets_metadata.py`.
 - `no.fhi.npr` — versjon **1** (`require no.fhi.npr:1 as dnpr`), 12 variabler:
   Norsk pasientregister, somatiske sykehus 2016–2025. Enhetstyper `Episode NPR`
   (`SOM_EP_*`, person-ref `SOM_EP_PERSONID`) og `Prosedyre NPR` (`SOM_PROS_*`,

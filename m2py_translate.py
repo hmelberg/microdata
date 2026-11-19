@@ -76,7 +76,8 @@ SESSION = {"create-dataset", "use", "clone-dataset", "delete-dataset",
            "rename-dataset", "clone-units"}
 # label verbs are display-only in the emulator (the data keeps its codes), so
 # they are no-ops on the offline data — recorded as comments, not flagged.
-LABELS = {"define-labels", "assign-labels", "drop-labels", "list-labels"}
+LABELS = {"define-labels", "assign-labels", "drop-labels", "list-labels",
+          "citation"}   # citation: kildehenvisning, ingen dataendring
 
 SUPPORTED = TRANSFORM | ANALYSIS | PLOT | SESSION | LABELS
 

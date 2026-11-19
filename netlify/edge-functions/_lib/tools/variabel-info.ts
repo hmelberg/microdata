@@ -17,6 +17,8 @@ interface VariabelMeta {
   keywords?: string[];
   databank?: string;
   populasjon?: string;
+  full_beskrivelse?: string;
+  databank_min_versjon?: number;
   nokkel_for?: string;
   external_metadata?: string;
   codelist_size?: number;
@@ -56,6 +58,8 @@ function detaljBlokk(navn: string, m: VariabelMeta): string {
   const linjer = [
     `## ${navn} — ${m.short_title ?? ""}`.trimEnd(),
     m.description ? m.description : "",
+    m.full_beskrivelse ? `Om variabelen: ${m.full_beskrivelse}` : "",
+    m.databank_min_versjon ? `Finnes fra databankversjon ${m.databank_min_versjon} (require ${m.databank ?? "no.ssb.fdb"}:${m.databank_min_versjon} eller nyere).` : "",
     `Type: ${m.type ?? "?"} · Datatype: ${m.microdata_datatype ?? m.data_type ?? "?"} · ` +
       `Temporalitet: ${m.temporalitet ?? "?"} · Enhetstype: ${m.enhetstype ?? "?"}` +
       (m.databank ? ` · Databank: ${m.databank}` : ""),
@@ -68,6 +72,13 @@ function detaljBlokk(navn: string, m: VariabelMeta): string {
 function kodelisteBlokk(json: unknown, kodeSok = ""): string {
   const labels = (json as { labels?: Record<string, string> })?.labels;
   if (!labels || typeof labels !== "object") return "";
+  // Valgfri gyldighet per kode ({kode: [fraÅr, tilÅr|null]}) — årsavhengige
+  // kodeverk som grunnkrets (følger kommunereformene).
+  const gyldig = (json as { gyldig?: Record<string, [number, number | null]> })?.gyldig;
+  const linje = ([k, v]: [string, string]) => {
+    const g = gyldig?.[k];
+    return g ? `  ${k} = ${v} (${g[0]}–${g[1] ?? ""})` : `  ${k} = ${v}`;
+  };
   const entries = Object.entries(labels);
   const q = kodeSok.trim().toLowerCase();
   if (q) {
@@ -82,14 +93,14 @@ function kodelisteBlokk(json: unknown, kodeSok = ""): string {
       return `KODELISTE (${entries.length} koder): ingen koder matcher «${kodeSok}». ` +
         "Prøv et kortere kode-prefiks eller et annet ord.";
     }
-    const viste = treff.slice(0, MAX_KODE_TREFF).map(([k, v]) => `  ${k} = ${v}`);
+    const viste = treff.slice(0, MAX_KODE_TREFF).map(linje);
     const hale = treff.length > MAX_KODE_TREFF
       ? `  … ${treff.length - MAX_KODE_TREFF} treff til (avkortet — snevre inn søket)`
       : "";
     return [`KODELISTE — treff på «${kodeSok}» (${treff.length} av ${entries.length}):`, ...viste, hale]
       .filter(Boolean).join("\n");
   }
-  const viste = entries.slice(0, MAX_KODER).map(([k, v]) => `  ${k} = ${v}`);
+  const viste = entries.slice(0, MAX_KODER).map(linje);
   const hale = entries.length > MAX_KODER
     ? `  … ${entries.length - MAX_KODER} koder til (avkortet — bruk kode_sok med kode-prefiks eller ord)`
     : "";

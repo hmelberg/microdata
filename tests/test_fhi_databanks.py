@@ -20,7 +20,7 @@ def _run(script):
     return it, out
 
 
-HEADER = "require no.ssb.fdb:53 as db\nrequire no.fhi.npr:1 as dnpr\nrequire no.fhi.kreftregisteret:1 as krg\n"
+HEADER = "require no.ssb.fdb:60 as db\nrequire no.fhi.npr:1 as dnpr\nrequire no.fhi.kreftregisteret:1 as krg\n"
 
 
 def test_catalog_has_fhi_entries_with_databank_and_entity():
@@ -147,3 +147,49 @@ create-dataset ep
 import dnpr/SOM_EP_PERSONID as pid, values_from({missing})
 """)
     assert "FEIL" in out and missing in out
+
+
+# ── Grunnkrets (SSB FDB v60) ────────────────────────────────────────────────
+
+def test_grunnkrets_matches_kommune_and_year_valid_codes():
+    import json
+    it, out = _run("""require no.ssb.fdb:60 as db
+create-dataset p
+import db/BEFOLKNING_KOMMNR_FORMELL 2023-01-01 as kom
+import db/BEFOLKNING_GRUNNKRETS 2023-01-01 as gk
+generate delomr = substr(gk, 1, 6)
+""")
+    assert "FEIL" not in out
+    df = it.datasets["p"]
+    assert (df["gk"].str.len() == 8).all()
+    assert (df["gk"].str[:4] == df["kom"]).all()
+    gyldig = json.loads((Path(META).parent / "codelists" / "BEFOLKNING_GRUNNKRETS.json")
+                        .read_text(encoding="utf-8"))["gyldig"]
+    for code in df["gk"].unique()[:200]:
+        fra, til = gyldig[code]
+        assert fra <= 2023 and (til is None or til >= 2023)
+
+
+def test_grunnkrets_codelist_follows_kommune_reform():
+    import json
+    d = json.loads((Path(META).parent / "codelists" / "BEFOLKNING_GRUNNKRETS.json")
+                   .read_text(encoding="utf-8"))
+    assert d["gyldig"]["12010101"] == [1990, 2019]      # Nordnes, Bergen før 2020
+    assert d["gyldig"]["46010101"] == [2020, None]      # Nordnes, Bergen fra 2020
+    assert d["labels"]["46010101"] == "Nordnes"
+
+
+# ── citation ────────────────────────────────────────────────────────────────
+
+def test_citation_lists_required_databanks_in_order():
+    import datetime
+    _, out = _run(HEADER + "create-dataset p\nimport db/BEFOLKNING_KJOENN as k\ncitation\n")
+    assert ("Analysen er gjennomført i microdata.no med datagrunnlag fra: SSB (registerdata), "
+            "FHI (Norsk pasientregister), FHI (Kreftregisteret). Data analysert: "
+            + datetime.date.today().isoformat()) in out
+    assert "Opprettet en kobling fra no.ssb.fdb:60 til db" in out
+
+
+def test_citation_without_require_is_an_error():
+    _, out = _run("create-dataset p\ncitation\n")
+    assert "FEIL" in out and "require" in out

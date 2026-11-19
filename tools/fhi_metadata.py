@@ -183,6 +183,38 @@ def _clean_description(text: str) -> str:
     return re.sub(r"\s+", " ", " ".join(keep)).strip()
 
 
+def codelist_history(represented: list[dict]) -> list[tuple[int, list[tuple[str, str]]]]:
+    """Kodelisten per gyldighetsperiode: [(startår, [(kode, etikett), …]), …].
+
+    Delta-semantikken (verifisert mot BEFOLKNING_GRUNNKRETS, der kommune-
+    reformene bytter ut tusenvis av koder): fjern indeksene i `remove` fra
+    forrige liste, erstatt `replace`-indeksene i den forkortede listen, og sett
+    inn `insert`-oppføringene i stigende indeksrekkefølge. Andre rekkefølger gir
+    duplikater og lar utgåtte kommunenumre bli liggende.
+    """
+    out: list[tuple[int, list[tuple[str, str]]]] = []
+    cur: list[tuple[str, str]] = []
+    for rv in represented:
+        vd = rv.get("valueDomain") or {}
+        start = (rv.get("validPeriod") or {}).get("start")
+        year = (_dt.date(1970, 1, 1) + _dt.timedelta(days=int(start))).year if start is not None else None
+        if vd.get("codeList"):
+            cur = [(str(e["code"]), str(e["category"])) for e in vd["codeList"]]
+        elif vd.get("delta"):
+            d = vd["delta"]
+            removed = set(d.get("remove") or [])
+            cur = [x for i, x in enumerate(cur) if i not in removed]
+            for k, e in (d.get("replace") or {}).items():
+                if int(k) < len(cur):
+                    cur[int(k)] = (str(e["code"]), str(e["category"]))
+            for k, e in sorted(((int(k), e) for k, e in (d.get("insert") or {}).items())):
+                cur.insert(k, (str(e["code"]), str(e["category"])))
+        else:
+            continue
+        out.append((year, list(cur)))
+    return out
+
+
 def _union_codelist(represented: list[dict]) -> tuple[dict[str, str], list[str]]:
     """Union av alle koder over alle perioder; siste etikett vinner."""
     labels: dict[str, str] = {}

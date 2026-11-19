@@ -254,6 +254,11 @@ _M2PY_MESSAGES_EN = {
     'FEIL: Ugyldig alpha-verdi: {val}': 'ERROR: Invalid alpha value: {val}',
     'FEIL: Ugyldig seed-verdi: {val}': 'ERROR: Invalid seed value: {val}',
     "FEIL: Ukjent kommando '{cmd}'.": "ERROR: Unknown command '{cmd}'.",
+    'FEIL: citation krever minst én koblet databank (require).': 'ERROR: citation requires at least one connected data bank (require).',
+    'Analysen er gjennomført i microdata.no med datagrunnlag fra: {sources}. Data analysert: {date}': 'The analysis was carried out in microdata.no with data from: {sources}. Data analysed: {date}',
+    'SSB (registerdata)': 'SSB (register data)',
+    'FHI (Norsk pasientregister)': 'NIPH (Norwegian Patient Registry)',
+    'FHI (Kreftregisteret)': 'NIPH (Cancer Registry of Norway)',
     'FEIL: assign-labels: ugyldig syntaks — forventer variabelnavn og kodelistenavn: assign-labels var kodeliste': 'ERROR: assign-labels: invalid syntax — expected a variable name and a code list name: assign-labels var codelist',
     "FEIL: define-labels: ugyldig syntaks — forventer kodelistenavn etterfulgt av verdi/etikett-par, f.eks. define-labels yrke 1 'Ufaglært arbeider' 2 'Faglært'. Husk anførselstegn rundt etiketter med mellomrom.": "ERROR: define-labels: invalid syntax — expected a code list name followed by value/label pairs, e.g. define-labels yrke 1 'Unskilled worker' 2 'Skilled'. Remember quotes around labels with spaces.",
     'FEIL: delete-dataset krever datasettnavn.': 'ERROR: delete-dataset requires a dataset name.',
@@ -1227,6 +1232,7 @@ class MicroParser:
 
 import pandas as pd
 import numpy as np
+import datetime
 import hashlib
 from functools import lru_cache
 def _eval_int(x):
@@ -3326,6 +3332,54 @@ class MockDataEngine:
             var_name: vals,
         })
 
+    def _generate_grunnkrets(self, uids, parsed_args):
+        d1 = (parsed_args or {}).get('date1') or f"{_DEMO_REF_YEAR}-01-01"
+        try:
+            year = int(str(d1)[:4])
+        except (TypeError, ValueError):
+            year = int(_DEMO_REF_YEAR)
+        self.ensure_variable_resolved('BEFOLKNING_GRUNNKRETS')
+        meta = self.catalog.get('BEFOLKNING_GRUNNKRETS') or {}
+        gyldig = meta.get('gyldig') or {}
+        labels = meta.get('labels') or {}
+        cache = self.__dict__.setdefault('_grunnkrets_cache', {})
+        if year not in cache:
+            by_kom, any_year = {}, {}
+            for code in (gyldig or labels):
+                code = str(code)
+                if len(code) != 8:          # 6-sifrede koder er delområder, ikke kretser
+                    continue
+                any_year.setdefault(code[:4], []).append(code)
+                g = gyldig.get(code)
+                if g and not (g[0] <= year and (g[1] is None or g[1] >= year)):
+                    continue
+                by_kom.setdefault(code[:4], []).append(code)
+            # Kommunenummer som ikke har kretser akkurat dette året (f.eks. når
+            # kommunegeneratoren gir et nummer fra et annet år): bruk kommunens
+            # kretser fra nærmeste periode, så substr(gk, 1, 4) fortsatt stemmer.
+            for k, codes in any_year.items():
+                by_kom.setdefault(k, codes)
+            kom_df = self.generate('import', {'var': 'db/BEFOLKNING_KOMMNR_FORMELL', 'date1': str(d1)},
+                                   pd.DataFrame())
+            kcol = _get_df_key_col(kom_df) or 'unit_id'
+            kom_map = dict(zip(kom_df[kcol].astype(np.int64).tolist(),
+                               kom_df['BEFOLKNING_KOMMNR_FORMELL'].astype(str).tolist()))
+            cache[year] = (by_kom, kom_map)
+        by_kom, kom_map = cache[year]
+        ids = np.asarray(uids, dtype=np.int64)
+        u = _fhi_u01(ids, 31)
+        out = np.empty(len(ids), dtype=object)
+        for i, uid in enumerate(ids.tolist()):
+            kom = kom_map.get(uid)
+            opts = by_kom.get(kom) if kom else None
+            if opts:
+                out[i] = opts[int(u[i] * len(opts))]
+            elif kom and kom not in ('nan', 'None') and kom.isdigit() and len(kom) == 4:
+                out[i] = f"{kom}0101"   # kodeliste utilgjengelig: plausibel reserve
+            else:
+                out[i] = np.nan
+        return out
+
     def _entity_structure(self, entity_type):
         """Deterministisk 1:N-struktur for en enhetstype (cachet per motor).
 
@@ -3671,6 +3725,14 @@ class MockDataEngine:
                 and _var_entity == 'person' and len(uids) > 0:
             data[var_name] = np.array([str(_norway_synth_kjonn_from_uid(int(u))) for u in uids],
                                       dtype=object)
+            return pd.DataFrame(data)
+
+        # Grunnkrets: trekk en krets som gjelder på importdatoen, innenfor
+        # personens bostedskommune (BEFOLKNING_KOMMNR_FORMELL samme dato), så
+        # substr(gk, 1, 4) stemmer med kommunen.
+        if (var_path.split('/')[-1] if var_path else '') == 'BEFOLKNING_GRUNNKRETS' \
+                and _var_entity == 'person' and len(uids) > 0:
+            data[var_name] = self._generate_grunnkrets(uids, parsed_args)
             return pd.DataFrame(data)
 
         # Realism framework (opt-in via `realism` block in catalog metadata).
@@ -4093,6 +4155,14 @@ _REJECTED_COLLAPSE_STATS = {'first', 'last'}
 _SUPPORTED_COLLAPSE_STATS_DISPLAY = (
     'count, sum, mean, sd, median, min, max, p25, p75, gini, iqr, percent'
 )
+
+# Kildenavn per databank i citation-teksten (samme etiketter som microdata.no
+# viser i databankoversikten).
+_DATABANK_CITATION_LABELS = {
+    'no.ssb.fdb': 'SSB (registerdata)',
+    'no.fhi.npr': 'FHI (Norsk pasientregister)',
+    'no.fhi.kreftregisteret': 'FHI (Kreftregisteret)',
+}
 
 # ── NPR (Norsk pasientregister) ──────────────────────────────────────────────
 _NPR_ENTITY = 'episode_npr'
@@ -8311,6 +8381,7 @@ class MicroInterpreter:
     def __init__(self, metadata_path=None, catalog=None, echo_commands: bool = True, metadata_base_url=None):
         self.datasets = {}
         self.dataset_entity_types = {}   # datasett-navn -> 'person' | 'episode_npr'
+        self.required_databanks = []     # databanker koblet med require (for citation)
         self.dataset_key_cols: dict = {}  # datasett-navn -> nøkkelkolonne etter collapse
         self.active_name = None
         self.parser = MicroParser()
@@ -9571,6 +9642,10 @@ class MicroInterpreter:
         if cmd == 'require':
             lines.append(f'{comment} (no-op i denne kjøringen)')
             return lines
+        if cmd == 'citation':
+            lines.append(f'{comment}')
+            lines.append('print("Analysen er gjennomført i microdata.no. Data analysert: " + __import__("datetime").date.today().isoformat())')
+            return lines
         if cmd in ['import', 'import-event']:
             if isinstance(args, dict):
                 var = args.get('var', '')
@@ -9904,14 +9979,36 @@ class MicroInterpreter:
             if cmd == 'require':
                 # Tilnærmet microdata-tekst:
                 # "Opprettet en kobling fra <kilde> til <alias>"
-                parts = args.split() if isinstance(args, str) else list(args)
-                source = parts[0] if parts else ''
-                alias = parts[-1] if len(parts) >= 3 and parts[-2].lower() == 'as' else (parts[-1] if parts else '')
+                if isinstance(args, dict):
+                    # Parseren gir {"source", "alias"} (list(dict) ga nøklene: «fra source til alias»).
+                    source = str(args.get('source', '')).strip()
+                    alias = str(args.get('alias', '')).strip()
+                else:
+                    parts = args.split() if isinstance(args, str) else list(args)
+                    source = parts[0] if parts else ''
+                    alias = parts[-1] if len(parts) >= 3 and parts[-2].lower() == 'as' else (parts[-1] if parts else '')
+                if source:
+                    _bank = source.split(':')[0].strip()
+                    if _bank and _bank not in self.required_databanks:
+                        self.required_databanks.append(_bank)
                 if source and alias:
                     self._log(_t("Opprettet en kobling fra {source} til {alias}", source=source, alias=alias))
                 else:
                     self._log(_t("Opprettet en (lokal) kobling"))
                 return  # No-op mot faktisk SSB, kun logg for kompatibilitet
+
+            if cmd == 'citation':
+                # Kildehenvisning for databankene scriptet har koblet til (require),
+                # i samme ordlyd som microdata.no.
+                _labels = [_DATABANK_CITATION_LABELS.get(b, b) for b in self.required_databanks]
+                if not _labels:
+                    self._log(_t("FEIL: citation krever minst én koblet databank (require)."))
+                    return
+                self._log(_t("Analysen er gjennomført i microdata.no med datagrunnlag fra: {sources}. "
+                             "Data analysert: {date}",
+                             sources=", ".join(_t(l) for l in _labels),
+                             date=datetime.date.today().isoformat()))
+                return
 
             if cmd == 'clone-dataset':
                 self.datasets[args[1]] = self.datasets[args[0]].copy(deep=True)

@@ -102,7 +102,7 @@ med når analysen faktisk bruker variabler derfra.
 
 | Databank | \`require\`-linje | Alias | Brukes til |
 |---|---|---|---|
-| SSB FDB | \`require no.ssb.fdb:53 as db\` | \`db\` | All SSB registerdata (inntekt, demografi, utdanning, geografi). Gjeldende versjon er **53** — bruk nyeste med mindre brukeren ber om en eldre. |
+| SSB FDB | \`require no.ssb.fdb:60 as db\` | \`db\` | All SSB registerdata (inntekt, demografi, utdanning, geografi). Gjeldende versjon er **60** — bruk den med mindre brukeren ber om en eldre (eldre versjoner mangler bl.a. \`BEFOLKNING_GRUNNKRETS\`). |
 | FHI NPR | \`require no.fhi.npr:1 as dnpr\` | \`dnpr\` | Norsk pasientregister, somatiske sykehus 2016–2025: episoder (\`SOM_EP_*\`: diagnoser, inn-/utdato, omsorgsnivå, hastegrad, RHF) og prosedyrer (\`SOM_PROS_*\`). |
 | FHI Kreftregisteret | \`require no.fhi.kreftregisteret:1 as krg\` | \`krg\` | Kreftregisteret: ett krefttilfelle per rad (\`S_*\`: kreftsete, morfologi, stadium/TNM, behandling; \`P_*\`: personstatus). |
 
@@ -369,7 +369,42 @@ personen, \`TRAFULYK_PERS_TRAFULYK\` er ulykke-id (samme verdi ⇒ samme ulykke)
 ### Kommune/geografi
 Mange registre har egen kommune-variabel (Alfanumerisk kommunekode — bruk
 \`tabulate\`/\`by()\`, ikke numerisk). Bosted: \`BEFOLKNING_KOMMNR_FAKTISK\` /
-\`BEFOLKNING_KOMMNR_FORMELL\`. Fylke: \`generate fylke = substr(komm, 1, 2)\`.`;
+\`BEFOLKNING_KOMMNR_FORMELL\`. Fylke: \`generate fylke = substr(komm, 1, 2)\`.
+
+### Grunnkrets og egne områder (under kommunenivå)
+\`BEFOLKNING_GRUNNKRETS\` (bosted, \`Tverrsnitt\`, årlig per \`YYYY-01-01\`,
+1990–2026) er det fineste geografiske nivået (~14 000 kretser, ~1 550
+delområder). Den finnes først fra databankversjon 60 (\`require no.ssb.fdb:60 as db\`).
+- Koden er 8 sifre: kommune (4) + delområde (2) + krets (2).
+  \`generate delomr = substr(gk, 1, 6)\`, \`generate kom = substr(gk, 1, 4)\`.
+- Kodene er ÅRSAVHENGIGE (følger kommunereformene 2020/2024 og
+  renummereringer): Nordnes i Bergen er \`12010101\` t.o.m. 2019 og
+  \`46010101\` fra 2020. Bruk koder som gjelder på importdatoen; finn kode fra
+  stedsnavn med \`variabel_info(navn="BEFOLKNING_GRUNNKRETS", kode_sok="Nordnes")\`
+  (viser gyldighetsår per kode). Kodelisten har også delområdenavn under de
+  6-sifrede kodene (\`030101\` …), nyttig for å navngi delområdene i svaret.
+- Avgrens tidlig: \`import db/BEFOLKNING_GRUNNKRETS 2025-01-01 as gk, values(...)\`
+  tar EKSAKTE koder; for en hel kommune, importer og \`keep if startswith(gk, '0301')\`.
+- Egne områder (bydeler, levekårssoner, nærmiljø): bygg en sone-variabel fra
+  delområde/krets, f.eks.
+  \`generate sone = 0\` og \`replace sone = 1 if inlist(delomr, '030101', '030102')\`.
+  Bydeler i de store byene finnes også direkte som \`BEFOLKNING_BYDEL\`.
+- Personvern: kretsene er små, så tabeller per krets får mange små celler som
+  plattformen skjuler. Aggreger til delområde, bydel eller egne soner før
+  \`tabulate\`/\`collapse\`, og tabuler aldri alle kretser i landet.
+
+Mønster (andel lavinntekt per delområde i Oslo):
+\`\`\`microdata
+require no.ssb.fdb:60 as db
+create-dataset oslo
+import db/BEFOLKNING_GRUNNKRETS 2023-01-01 as gk
+keep if startswith(gk, '0301')
+generate delomr = substr(gk, 1, 6)
+import db/INNTEKT_WLONN 2022-12-31 as lonn
+generate lav = 0
+replace lav = 1 if lonn < 300000
+collapse (mean) lav -> andel_lav (count) gk -> antall, by(delomr)
+\`\`\``;
 
 const PSEUDONYM_RULES = `\
 ## Nøkkelvariabler — kun for kobling, aldri analyse
@@ -602,7 +637,7 @@ fritekst, f.eks. \`"hjerteinfarkt"\` eller \`"I21"\`) i stedet for å gjette.
 
 Mønster (andel med hjerteinfarkt-episode i 2023, etter kjønn):
 \`\`\`microdata
-require no.ssb.fdb:53 as db
+require no.ssb.fdb:60 as db
 require no.fhi.npr:1 as dnpr
 
 create-dataset personer
@@ -635,6 +670,17 @@ tabulate sete3
 
 - I \`collapse\`, send alltid \`by(<person-alias>)\` eksplisitt.`;
 
+const CITATION_RULE = `\
+## Kildehenvisning (citation)
+
+\`citation\` (uten argumenter) skriver en datert kildehenvisning for alle
+databankene scriptet har koblet til med \`require\`, f.eks. «Analysen er
+gjennomført i microdata.no med datagrunnlag fra: SSB (registerdata), FHI
+(Norsk pasientregister). Data analysert: 2026-11-16». Legg \`citation\` som
+SISTE linje når resultatene skal brukes i en rapport, artikkel eller
+presentasjon, når scriptet bruker flere databanker, eller når brukeren spør
+om kilde/kildehenvisning.`;
+
 const OUTPUT_INSTRUCTION = `\
 ## Svarformat
 
@@ -647,7 +693,7 @@ Svar i markdown, på brukerens språk.
 - Ikke pakk svaret i JSON. Ikke produser forslag bare for å produsere.`;
 
 // Komplette, verifiserte eksempel-scripts (få-skudd). Følger gjeldende regler:
-// require :53, alfanumeriske koder i fnutter, dato-uttrekk, collapse, familie-
+// require :60, alfanumeriske koder i fnutter, dato-uttrekk, collapse, familie-
 // kobling via _FNR-pekere. Plasseres sist i prefikset (etter katalog/kommandoer/
 // funksjoner) så modellen har sett vokabularet først.
 const CANONICAL_EXAMPLES = `\
@@ -655,7 +701,7 @@ const CANONICAL_EXAMPLES = `\
 
 ### Eksempel 1 — Beskrivende statistikk etter kjønn (2022)
 \`\`\`microdata
-require no.ssb.fdb:53 as db
+require no.ssb.fdb:60 as db
 create-dataset befolkning
 import db/BEFOLKNING_KJOENN as kjonn            // alfanumerisk: 1=Mann, 2=Kvinne
 import db/INNTEKT_WLONN 2022-01-01 as inntekt
@@ -667,7 +713,7 @@ summarize inntekt if kjonn == '2'
 
 ### Eksempel 2 — Ny variabel, dato-uttrekk og aggregering per gruppe
 \`\`\`microdata
-require no.ssb.fdb:53 as db
+require no.ssb.fdb:60 as db
 create-dataset personer
 import db/INNTEKT_WLONN 2022-01-01 as inntekt
 import db/BEFOLKNING_FOEDSELS_AAR_MND as faarmnd   // YYYYMM (heltall)
@@ -680,7 +726,7 @@ collapse (mean) inntekt -> snitt_innt (count) inntekt -> antall, by(aldersgruppe
 
 ### Eksempel 3 — Familie-kobling + regresjon (barnas vs foreldrenes inntekt)
 \`\`\`microdata
-require no.ssb.fdb:53 as db
+require no.ssb.fdb:60 as db
 create-dataset persondata
 import db/INNTEKT_WLONN 2019-01-01 as inntekt
 import db/BEFOLKNING_FAR_FNR as fnr_far   // Fast → ingen dato (EKT_FNR/SAMB_FNR er derimot Tverrsnitt → krever dato)
@@ -801,6 +847,7 @@ const RULE_BLOCKS = [
   VISUALIZATION_RULES,
   MISSING_VALUES,
   NPR_RULES,
+  CITATION_RULE,
   OUTPUT_INSTRUCTION,
 ].join("\n\n");
 
@@ -855,7 +902,7 @@ blir tilgjengelig som en DataFrame (Python) / data.frame (R):
 
 \`\`\`
 #micro
-require no.ssb.fdb:53 as fd
+require no.ssb.fdb:60 as fd
 create-dataset folk
 import fd/BEFOLKNING_KJOENN as kjonn
 import fd/INNTEKT_WLONN 2022-01-01 as inntekt

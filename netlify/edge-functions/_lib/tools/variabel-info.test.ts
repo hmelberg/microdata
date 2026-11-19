@@ -18,6 +18,12 @@ const META = {
       external_metadata: "codelists/NPR_ICD10.json", codelist_size: 4,
       populasjon: "Episoder ved somatiske sykehus",
     },
+    BEFOLKNING_GRUNNKRETS: {
+      type: "register", data_type: "string", microdata_datatype: "Alfanumerisk",
+      description: "Grunnkrets.", short_title: "Grunnkrets", temporalitet: "Tverrsnitt",
+      enhetstype: "Person", databank: "no.ssb.fdb", databank_min_versjon: 60,
+      external_metadata: "codelists/BEFOLKNING_GRUNNKRETS.json",
+    },
     SOM_EP_SH_REG: {
       type: "register", data_type: "string", microdata_datatype: "Alfanumerisk",
       description: "Regionalt helseforetak.", short_title: "RHF", temporalitet: "Fast",
@@ -46,6 +52,12 @@ function mockFetch(kodeliste404 = false): typeof fetch {
     const u = String(url);
     if (u.endsWith("/variable_metadata.json")) {
       return Promise.resolve(new Response(JSON.stringify(META), { status: 200 }));
+    }
+    if (u.includes("/codelists/BEFOLKNING_GRUNNKRETS.json")) {
+      return Promise.resolve(new Response(JSON.stringify({
+        labels: { "12010101": "Nordnes", "46010101": "Nordnes" },
+        gyldig: { "12010101": [1990, 2019], "46010101": [2020, null] },
+      }), { status: 200 }));
     }
     if (u.includes("/codelists/NPR_ICD10.json")) {
       return Promise.resolve(new Response(JSON.stringify(ICD10), { status: 200 }));
@@ -121,4 +133,12 @@ Deno.test("variabelInfo: inline-etiketter brukes når kodelistefil mangler", asy
   const svar = await variabelInfo("https://x.test", "SOM_EP_SH_REG", { fetchImpl: mockFetch() });
   assertStringIncludes(svar, "KODELISTE (2 koder)");
   assertStringIncludes(svar, "Helse Vest");
+});
+
+Deno.test("variabelInfo: årsgyldighet per kode og minste databankversjon", async () => {
+  _resetVariabelCache();
+  const svar = await variabelInfo("https://x.test", "BEFOLKNING_GRUNNKRETS", { fetchImpl: mockFetch() }, "nordnes");
+  assertStringIncludes(svar, "require no.ssb.fdb:60");
+  assertStringIncludes(svar, "12010101 = Nordnes (1990–2019)");
+  assertStringIncludes(svar, "46010101 = Nordnes (2020–)");
 });

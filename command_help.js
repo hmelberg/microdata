@@ -215,9 +215,15 @@ window.MICRODATA_COMMAND_HELP = {
   // Datasett
   "require": {
     "syntax": "require datastore as local-alias",
-    "description": "Opprett kobling fra versjonert datakilde til et lokalt alias som brukes ved import (f.eks. no.ssb.fdb:9 as fdb).",
-    "description_en": "Create a link from a versioned data source to a local alias used when importing (e.g. no.ssb.fdb:9 as fdb).",
+    "description": "Opprett kobling fra versjonert datakilde til et lokalt alias som brukes ved import (f.eks. no.ssb.fdb:60 as db, no.fhi.npr:1 as dnpr, no.fhi.kreftregisteret:1 as krg). Én require per databank.",
+    "description_en": "Create a link from a versioned data source to a local alias used when importing (e.g. no.ssb.fdb:60 as db, no.fhi.npr:1 as dnpr, no.fhi.kreftregisteret:1 as krg). One require per data bank.",
     "source": "https://microdata.no/manual/kommandoer_og_funksjoner/kommandoer#require"
+  },
+  "citation": {
+    "syntax": "citation",
+    "description": "Lag en korrekt og datert kildehenvisning for databankene scriptet har koblet til med require (f.eks. «Analysen er gjennomført i microdata.no med datagrunnlag fra: SSB (registerdata). Data analysert: 2026-11-16»). Skriv kommandoen nederst i scriptet.",
+    "description_en": "Generate a correct, dated source citation for the data banks the script connected to with require. Put the command at the end of the script.",
+    "source": "https://www.microdata.no/kommando-for-a-generere-korrekt-kildehenvisning/"
   },
   "create-dataset": {
     "syntax": "create-dataset new-dataset",

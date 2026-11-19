@@ -401,7 +401,7 @@ window.M2PY_I18N.en = {
   "// La oss starte med et eksempel": "// Let's start with an example",
   "//- Du kan endre det fritt eller hente et nytt under eksempler i menyen.": "//- You can edit it freely or fetch a new one under Examples in the menu.",
   "// Først må vi koble oss opp mot basen med data": "// First we connect to the database",
-  "require no.ssb.fdb:51 as db  // Her lager vi koblingen og gir den et navn (db).": "require no.ssb.fdb:51 as db  // Here we create the connection and give it a name (db).",
+  "require no.ssb.fdb:60 as db  // Her lager vi koblingen og gir den et navn (db).": "require no.ssb.fdb:60 as db  // Here we create the connection and give it a name (db).",
   "create-dataset df  // Vi starter så med å opprette et nytt datasett kalt df": "create-dataset df  // We then start by creating a new dataset called df",
   "// Vi kan så importere ulike variabler": "// We can then import various variables",
   "import db/INNTEKT_LONN 2022-01-01 as inntekt  // Akkumulerte variabler krever en importdato (YYYY-MM-DD)": "import db/INNTEKT_LONN 2022-01-01 as inntekt  // Accumulated variables require an import date (YYYY-MM-DD)",
