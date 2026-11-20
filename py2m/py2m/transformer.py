@@ -1505,7 +1505,7 @@ class Py2MTransformer:
                 # safe here (unlike the assignment path, nothing persists
                 # into the real working dataset).
                 collapse_lines = ([f"keep if {filt}"] if filt else []) + [
-                    f"collapse ({stat}) {col} -> {col}, by({by_str})"
+                    f"collapse ({stat}) {col}, by({by_str})"
                 ]
                 self._groupby_display_clone(collapse_lines)
             return

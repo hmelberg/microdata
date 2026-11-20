@@ -800,7 +800,7 @@ def try_groupby_collapse(
       df.groupby(g)['y'].mean().reset_index()
       df[cond].groupby(g)['y'].mean()          ← prefix filter
     → [keep if cond]
-      collapse (mean) y -> y, by(g)
+      collapse (mean) y, by(g)
     """
     root, steps = decompose(value_node)
     if not is_df_root(root, df_name):
@@ -864,7 +864,9 @@ def try_groupby_collapse(
             specs = _parse_named_agg_kwargs(agg_step.kwargs)
         if specs is None:
             return None
-        parts = " ".join(f"({stat}) {src} -> {tgt}" for src, stat, tgt in specs)
+        # Samme navn: utelat `->` (microdata.no avviser `-> x` når x finnes).
+        parts = " ".join(f"({stat}) {src}" if src == tgt else f"({stat}) {src} -> {tgt}"
+                         for src, stat, tgt in specs)
         return filter_lines + [f"collapse {parts}, by({by_str})"]
 
     # Pattern B: groupby(g)[col].stat_method()
@@ -880,7 +882,7 @@ def try_groupby_collapse(
         stat = _stat_alias(tail[1].name)
         if stat is None:
             return None
-        return filter_lines + [f"collapse ({stat}) {src_col} -> {src_col}, by({by_str})"]
+        return filter_lines + [f"collapse ({stat}) {src_col}, by({by_str})"]
 
     return None
 

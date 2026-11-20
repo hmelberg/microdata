@@ -458,7 +458,8 @@ handle_summarise <- function(args, df_name, group_by = NULL) {
     if (!is.null(stat)) {
       src <- if (length(cargs) >= 1) translate_expr(cargs[[1]], df_name) else NULL
       if (!is.null(src)) {
-        specs <- c(specs, paste0("(", stat, ") ", src, " -> ", new_col))
+        specs <- c(specs, paste0("(", stat, ") ", src,
+                                 if (identical(src, new_col)) "" else paste0(" -> ", new_col)))
         next
       }
     }

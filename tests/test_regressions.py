@@ -893,16 +893,17 @@ class TestKonfidensnivaaUtenFlyttallsstøy:
         it = MicroInterpreter(metadata_path=None)
         it.datasets["d"] = pd.DataFrame({
             "y": np.arange(60.0) + np.random.default_rng(0).normal(0, 1, 60),
-            "x": np.arange(60.0), "g": [1, 2, 3] * 20})
+            "x": np.arange(60.0), "z": np.random.default_rng(1).normal(0, 1, 60),
+            "g": [1, 2, 3] * 20})
         it.active_name = "d"
         it._execute_instruction(it.parser.parse_line(line))
         return "\n".join(str(m) for m in it.output_log)
 
     def test_regress_standardnivaa(self):
-        assert "[0.025      0.975]" in self._head("regress y x")
+        assert "[0.025      0.975]" in self._head("regress y x z")
 
     def test_regress_med_level(self):
-        out = self._head("regress y x, level(90)")
+        out = self._head("regress y x z, level(90)")
         assert "0.050000000" not in out and "[0.05" in out
 
     def test_flernivaamodell(self):

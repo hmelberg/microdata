@@ -251,7 +251,7 @@
   list(lines = lines, warnings = warns)
 }
 
-# across(cols, mean) in summarise → one "(stat) col -> col" spec per column.
+# across(cols, mean) in summarise → one "(stat) col" spec per column (same name ⇒ no `->`).
 .expand_across_summarise <- function(cargs, df_name) {
   if (length(cargs) < 2)
     return(list(specs = character(0), warnings = "// across: needs columns and a function"))
@@ -261,5 +261,6 @@
   if (is.null(cols) || is.null(stat))
     return(list(specs = character(0),
                 warnings = paste0("// across: unsupported function '", fn, "' in summarise")))
-  list(specs = paste0("(", stat, ") ", cols, " -> ", cols), warnings = character(0))
+  # Samme navn: utelat `->` (microdata.no avviser `-> x` når x finnes).
+  list(specs = paste0("(", stat, ") ", cols), warnings = character(0))
 }

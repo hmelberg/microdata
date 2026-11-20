@@ -30,7 +30,7 @@ def _make_interp():
     event = (rng.random(N_TOTAL) < 0.5).astype(int)
     tid = rng.integers(1, 120, N_TOTAL)
     it.datasets["testdata"] = pd.DataFrame(
-        {"y": y, "x": x, "g": g, "event": event, "tid": tid}
+        {"y": y, "x": x, "z": rng.normal(0, 1, N_TOTAL), "g": g, "event": event, "tid": tid}
     )
     it.active_name = "testdata"
     return it
@@ -44,14 +44,14 @@ def _run(it, line):
 class TestRegressionCommandsHonorIf:
     def test_regress_if_filters_observations(self):
         it = _make_interp()
-        out = _run(it, "regress y x if g == 1")
+        out = _run(it, "regress y x z if g == 1")
         m = re.search(r"No\. Observations:\s*(\d+)", out)
         assert m, f"fant ikke nobs i output:\n{out}"
         assert int(m.group(1)) == N_GROUP1
 
     def test_regress_if_changes_estimate(self):
         it = _make_interp()
-        out = _run(it, "regress y x if g == 1")
+        out = _run(it, "regress y x z if g == 1")
         # Stigningstallet for gruppe 1 er ~2.0; samlet (begge grupper) er det ~0.4
         m = re.search(r"^x\s+(-?\d+\.\d+)", out, re.M)
         assert m, f"fant ikke koeffisient i output:\n{out}"

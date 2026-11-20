@@ -238,7 +238,7 @@ expect("base subset → keep if (with clone for new name)",
 expect("base aggregate → collapse",
   "agg <- aggregate(income ~ sector, data = df, FUN = mean)",
   c("clone-dataset df agg", "use agg",
-    "collapse (mean) income -> income, by(sector)"))
+    "collapse (mean) income, by(sector)"))
 
 # base merge → join (same shape as left_join)
 res_bmerge <- translate('df3 <- merge(df, df2, by = "id")')
@@ -265,7 +265,7 @@ expect("across with lambda in mutate",
 expect("across with bare function in summarise",
   "stats <- df |> group_by(sex) |> summarise(across(c(income, age), mean))",
   c("clone-dataset df stats", "use stats",
-    "collapse (mean) income -> income (mean) age -> age, by(sex)"))
+    "collapse (mean) income (mean) age, by(sex)"))
 
 expect("na_if in mutate",
   "df <- df |> mutate(grade = na_if(grade, -1))",

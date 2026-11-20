@@ -124,7 +124,7 @@ class TestStatAlias:
 
     def test_std_still_works(self):
         assert tr("df = df.groupby('g').agg({'x':'std'}).reset_index()") == (
-            "collapse (sd) x -> x, by(g)"
+            "collapse (sd) x, by(g)"
         )
 
 

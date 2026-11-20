@@ -157,7 +157,7 @@ def _reg_df(n=200, seed=3):
     x = rng.normal(0, 1, n)
     g = rng.integers(1, 6, n)
     y = 2 * x + rng.normal(0, 1, n)
-    return pd.DataFrame({"y": y, "x": x, "g": g})
+    return pd.DataFrame({"y": y, "x": x, "z": rng.normal(0, 1, n), "g": g})
 
 
 class TestRobustClusterErrors:
@@ -168,12 +168,12 @@ class TestRobustClusterErrors:
 
     def test_cluster_with_valid_variable_works(self):
         it = _interp(_reg_df())
-        out = _run(it, "regress y x, cluster(g)")
+        out = _run(it, "regress y x z, cluster(g)")
         assert "FEIL" not in out and "cluster" in out
 
     def test_robust_works(self):
         it = _interp(_reg_df())
-        out = _run(it, "regress y x, robust")
+        out = _run(it, "regress y x z, robust")
         assert "FEIL" not in out and "HC1" in out
 
 
@@ -737,7 +737,7 @@ class TestModelPopulationMinimum:
     def _reg_df(self, n=8):
         rng = np.random.default_rng(1)
         x = rng.normal(size=n)
-        return pd.DataFrame({"y": 2 * x + rng.normal(size=n), "x": x})
+        return pd.DataFrame({"y": 2 * x + rng.normal(size=n), "x": x, "z": rng.normal(size=n)})
 
     def _surv_df(self, n=8, groups=None):
         rng = np.random.default_rng(2)
@@ -756,7 +756,7 @@ class TestModelPopulationMinimum:
 
     def test_regress_allowed_at_t7(self, dc_on):
         it = _interp(self._reg_df(30))
-        out = _run(it, "regress y x")
+        out = _run(it, "regress y x z")
         assert "FEIL" not in out
 
     def test_regress_if_subset_blocked(self, dc_on):

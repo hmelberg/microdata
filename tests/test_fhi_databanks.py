@@ -268,3 +268,60 @@ import db/BOSATTEFDT_BOSTED 2023-12-31 as k23
     # Bergen 2019 (1201) og 2020 (4601) er samme kommune → de fleste «blir».
     berg = df[df["k19"] == "1201"]
     assert (berg["k20"] == "4601").mean() > 0.9
+
+
+# ── collapse/merge-regler fra ekte microdata.no-kjøring (2026-11-20) ─────────
+
+_EP = HEADER + """
+create-dataset personer
+import db/BEFOLKNING_KJOENN as kjonn
+create-dataset ep
+import dnpr/SOM_EP_AAR as aar, values("2024")
+import dnpr/SOM_EP_PERSONID as pid
+generate dm = 1
+"""
+
+
+def test_collapse_explicit_target_with_existing_name_is_an_error():
+    _, out = _run(_EP + "collapse (max) dm -> dm, by(pid)\n")
+    assert "FEIL" in out and "finnes allerede" in out
+
+
+def test_merge_on_collapsed_by_variable_is_an_error_but_implicit_works():
+    _, out = _run(_EP + "collapse (max) dm, by(pid)\nmerge dm into personer on pid\n")
+    assert "FEIL" in out and "implisitte" in out
+    it, out = _run(_EP + "collapse (max) dm, by(pid)\nmerge dm into personer\nuse personer\n")
+    assert "FEIL" not in out
+    assert it.datasets["personer"]["dm"].notna().sum() > 0
+
+
+def test_regress_needs_two_coefficients(monkeypatch):
+    import m2py
+    monkeypatch.setattr(m2py, "M2PY_DISCLOSURE_CONTROL", "1", raising=False)
+    base = """require no.ssb.fdb:60 as db
+create-dataset p
+import db/INNTEKT_WLONN 2022-12-31 as y
+import db/BEFOLKNING_KJOENN as kjonn
+import db/BEFOLKNING_FOEDSELS_AAR_MND as f
+generate alder = 2022 - int(f/100)
+"""
+    _, out = _run(base + "regress y alder\n")
+    assert "FEIL" in out and "to koeffisienter" in out
+    _, out = _run(base + "regress y alder i.kjonn\n")
+    assert "FEIL" not in out
+
+
+def test_confidentiality_v1_allows_single_regressor_but_not_with_fhi(monkeypatch):
+    import m2py
+    monkeypatch.setattr(m2py, "M2PY_DISCLOSURE_CONTROL", "1", raising=False)
+    body = """create-dataset p
+import db/INNTEKT_WLONN 2022-12-31 as y
+import db/BEFOLKNING_FOEDSELS_AAR_MND as f
+generate alder = 2022 - int(f/100)
+regress y alder
+"""
+    _, out = _run("configure confidentiality v1\nrequire no.ssb.fdb:60 as db\n" + body)
+    assert "FEIL" not in out
+    _, out = _run("configure confidentiality v1\nrequire no.ssb.fdb:60 as db\n"
+                  "require no.fhi.npr:1 as dnpr\n" + body)
+    assert "FEIL" in out and "NPR" in out

@@ -497,8 +497,8 @@ window.MICRODATA_COMMAND_HELP = {
   },
   "configure": {
     "syntax": "configure [konfigurasjon, ...]",
-    "description": "Aktiver spesielle konfigurasjoner for skriptet (f.eks. alpha eller nocache).",
-    "description_en": "Enable special configurations for the script (e.g. alpha or nocache).",
+    "description": "Aktiver spesielle konfigurasjoner for skriptet (f.eks. alpha eller nocache). `configure confidentiality v1` øverst gir de gamle anonymitetsreglene (overgangsordning for eksisterende brukere; ikke med NPR/Kreftregisteret).",
+    "description_en": "Enable special configurations for the script (e.g. alpha or nocache). `configure confidentiality v1` at the top selects the old confidentiality rules (transitional, existing users only; not with NPR/Cancer Registry data).",
     "source": "https://microdata.no/manual/kommandoer_og_funksjoner/kommandoer#configure"
   }
 };

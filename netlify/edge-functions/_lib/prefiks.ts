@@ -72,7 +72,9 @@ const GRAMMAR_CHEATSHEET = `\
   \`replace post = 1 if panel@date == 2018\`. (Alternativ uten reshape:
   \`import-panel db/INNTEKT_WLONN 2014-12-31 2018-12-31\` lager long-format direkte.)
 - Reshape: \`reshape long ...\`, \`reshape wide ...\`.
-- Aggregering: \`collapse (stat) var -> nytt_navn [, by(<én_variabel>)]\`.
+- Aggregering: \`collapse (stat) var [-> nytt_navn] [, by(<én_variabel>)]\`.
+  \`-> navn\` må være et NYTT navn — \`collapse (max) x -> x\` feiler («finnes
+  allerede»). Vil du beholde navnet, dropp \`->\`: \`collapse (max) x, by(pid)\`.
   Gyldige stats: \`count\`, \`sum\`, \`mean\`, \`sd\`, \`median\`, \`min\`, \`max\`,
   \`p25\`, \`p75\`, \`gini\`, \`iqr\`, \`percent\`. **\`first\`/\`last\` finnes IKKE.**
   Kun ÉN variabel i \`by(...)\`; for sammensatt gruppering bygg en nøkkel først:
@@ -235,8 +237,20 @@ Merge DYTTER fra det aktive datasettet INN i \`<mål>\`. Du kan ikke "pulle"
 fra mål-siden ved å være i målet. Hjelpemiddel: \`merge X into Y\` betyr "fra
 her (aktiv) inn til Y med X".
 
-\`on <var>\` — felles nøkkel som finnes i BEGGE datasett. Bare ÉN variabel
-i \`on\`; for sammensatt join bygg en composite key først.
+\`on <var>\` — en EKSPLISITT variabel i MÅLdatasettet som inneholder ID-ene til
+enhetene i det aktive (kilde-)datasettet; i kilden kobles det på enhets-ID-en,
+som godt kan være implisitt. Uten \`on\` kobles kildens enhets-ID mot målets
+enhets-ID (f.eks. person ↔ person). Bare ÉN variabel i \`on\`; for sammensatt
+join bygg en composite key først.
+
+**Etter \`collapse ..., by(K)\` er K IMPLISITT.** K blir datasettets enhets-ID og
+er ikke lenger en variabel, så den kan ikke stå i \`on\` med mindre målet har en
+egen variabel med det navnet:
+- \`collapse (max) dm, by(pid)\` → \`merge dm into personer\` (UTEN \`on\`:
+  pid-verdiene er personenes ID). ❌ \`merge dm into personer on pid\` feiler
+  («pid finnes ikke»).
+- \`collapse (mean) inntekt -> snitt, by(kommune)\` → \`merge snitt into
+  personer on kommune\` når \`personer\` har en egen \`kommune\`-variabel.
 
 ### Standardsekvens for merge
 
@@ -259,6 +273,8 @@ ikke finnes.
 - \`merge x from kilde\` (\`from\` finnes ikke i syntaksen)
 - \`merge x into mål\` når \`x\` ikke er i aktiv (samme feil som over)
 - \`merge x into mål on k1 k2\` (kun én nøkkel i \`on\`)
+- \`merge x into personer on pid\` etter \`collapse ..., by(pid)\` — pid er nå
+  implisitt; skriv \`merge x into personer\`
 
 ### Når du faktisk trenger flere datasett
 - Ulike enhetstyper (Person vs Jobb vs Hendelse) — hold separat, collapse til
@@ -285,8 +301,9 @@ Vil du beholde originalen:
 
 ### collapse vs aggregate (lett å forveksle)
 - \`collapse (stat) var -> navn, by(grp)\` ERSTATTER det aktive datasettet med
-  én rad per by-gruppe. Bare aggregerte kolonner + by-variabelen overlever.
-  \`->\` navngir utdata-VARIABELEN, ikke et nytt datasett.
+  én rad per by-gruppe. Bare de aggregerte variablene overlever; by-variabelen
+  blir den IMPLISITTE enhets-ID-en (ikke en variabel). \`->\` navngir utdata-
+  VARIABELEN (nytt navn), ikke et nytt datasett; uten \`->\` beholdes navnet.
 - \`aggregate (stat) var -> navn, by(grp)\` BEVARER alle rader og legger til en
   ny kolonne med aggregatet broadcast til alle radene i gruppen.
 
@@ -336,7 +353,7 @@ Felles gruppe-id; \`collapse ... by(<gruppe-id>)\` og \`merge\` tilbake.
 ### Koble hendelser/entiteter til person (fler-rad → person)
 Disse registrene har én rad per hendelse/enhet, med en person-ref-kolonne.
 Bygg et eget datasett, \`collapse\` til person-nivå \`by(person-ref)\`, og merge
-inn i persondatasettet. "Antall X per person" = \`collapse (count) ... by(ref)\`.
+inn i persondatasettet UTEN \`on\` (person-refen er da implisitt person-ID). "Antall X per person" = \`collapse (count) ... by(ref)\`.
 
 | Entitet | Person-ref-kolonne |
 |---|---|
@@ -357,7 +374,7 @@ create-dataset jobber
 import db/ARBEIDSFORHOLD_PERSON as pid           // person-ref for jobb-entiteten
 import db/<jobb-variabel> 2022-01-01 as jobbvar
 collapse (count) jobbvar -> antall_jobber, by(pid)
-merge antall_jobber into persondata on pid       // pid ↔ personens PERSONID_1
+merge antall_jobber into persondata              // pid er nå implisitt ID = personens ID
 use persondata
 replace antall_jobber = 0 if sysmiss(antall_jobber)   // ingen jobb ⇒ 0
 \`\`\`
@@ -451,9 +468,10 @@ heltall, men er ikke tall. Navnekonvensjon: ender på \`_FNR\`
 \`is_pseudonym\` i katalogen.
 
 ### 2. by-variabelen i et collapsed datasett
-Etter \`collapse (stat) v -> w, by(K)\` blir K rad-identifikatoren i det nye
-datasettet og arver nøkkelstatus. Også \`rename K NYTT_NAVN\` etterpå
-endrer ikke statusen — den nye kolonnen er fortsatt nøkkel.
+Etter \`collapse (stat) v -> w, by(K)\` blir K den IMPLISITTE enhets-ID-en i
+det nye datasettet — ikke lenger en variabel. Den kan ikke analyseres, og
+heller ikke stå i \`on\` (bruk \`merge w into mål\` uten \`on\` når målet har
+samme enhet, eller \`on <målvariabel>\` når målet har en variabel med K-verdiene).
 
 ### 3. Eneste kolonne etter clone-units
 \`clone-units A B\` lager B med kun populasjons-ID-en. Den kolonnen ER
@@ -461,7 +479,7 @@ nøkkelen.
 
 ### Tillatt
 - som \`by()\`-nøkkel i \`collapse\` / \`aggregate\`
-- som \`on\`-nøkkel i \`merge\`
+- som \`on\`-nøkkel i \`merge\` (når den er en eksplisitt variabel i MÅLET)
 - som radidentifikator i sin egen rolle
 
 ### Forbudt (scriptet feiler)
@@ -579,10 +597,11 @@ er året før; foretrekk årsslutt.) Kuttes serien før årsslutt viser taggen d
 faktiske slutt-dagen (\`…-09-30\`) — bruk den.`;
 
 const PRIVACY_RULES = `\
-## Personvern / avsløringskontroll (plattformen håndhever disse)
+## Personvern / anonymitetskriterier (plattformen håndhever disse)
 
-Plattformen stopper scripts som bryter disse reglene med feilmelding. Forutse
-og unngå dem i generert kode:
+Plattformen stopper eller sensurerer kommandoer som bryter anonymitets-
+kriteriene. Et script som bryter dem kan ikke kjøres uansett — vurder dem når
+du PLANLEGGER scriptet, ikke bare når en feil dukker opp:
 
 **T1 — Minimum 1 000 enheter per populasjon.** Etter \`keep if\`/\`drop if\`/\`sample\`
 må populasjonen ha ≥ 1000 enheter. Stratifiserte analyser på sjeldne grupper:
@@ -614,6 +633,36 @@ undergruppen (T1 sikrer ≥ 1000 totalt, men subgrupper kan ha < 10).
 forklaringsvariabler gir < 5 enheter med samme verdikombo. Løsning: grovere
 kategorier, færre kategoriske dummies, eller større populasjon.
 
+**T10 — \`regress\` krever minst TO koeffisienter utenom konstantleddet.**
+\`regress inntekt diabetes\` avvises («for få forklaringsvariabler/koeffisienter»).
+Ta alltid med minst én kontrollvariabel som er relevant for spørsmålet
+(\`regress inntekt diabetes alder i.kjonn\`). Vil brukeren ha den rå forskjellen,
+vis den med \`summarize inntekt, by(diabetes)\` / \`tabulate\` i stedet.
+*Overgangsordning:* \`configure confidentiality v1\` ØVERST i scriptet gir de
+gamle reglene (bl.a. \`regress\` med én forklaringsvariabel), men bare for
+eksisterende brukere (ikke nye) og ALDRI sammen med NPR- eller
+Kreftregisteret-data. Standard er de nye reglene; foreslå v1-linjen bare når
+en enkel regresjon virkelig er viktig, scriptet ikke bruker FHI-data, og si at
+den kun virker for brukere med overgangsordningen.
+
+**T11 — Kategoriske/binære forklaringsvariabler fjernes ved lav frekvens.**
+Har en dummy (0/1) eller \`i.\`-variabel få enheter i minst én av gruppene
+(også i kryss med de andre kategoriske variablene), fjernes den fra modellen
+(«… ble fjernet pga lav frekvens i minst en av gruppene»). Typisk for sjeldne
+tilstander (en diagnose) krysset med alder og kjønn.
+
+**Planlegg for små celler (T5/T9/T11).** Sjeldne egenskaper × fine inndelinger
+gir celler under grensen. Vurder ut fra problemstillingen:
+- **Grovere variabler:** aldersgrupper på 5 år eller mer i stedet for ettårig
+  alder som kategori (eller alder som kontinuerlig variabel, ikke \`i.alder\`);
+  slå sammen sjeldne kategorier (f.eks. flere beslektede diagnosekoder, flere år).
+- **Avgrens populasjonen** til der det er mange: f.eks. voksne i yrkesaktiv alder,
+  og utelat de aller eldste/yngste der gruppene blir tynne. Si i prosa hvorfor.
+- **Færre samtidige kategoriske kontroller**, og ingen interaksjoner med den
+  sjeldne variabelen med mindre gruppene er store.
+- Er utfallet/eksponeringen sjelden, kommenter at resultatet kan bli sensurert,
+  og foreslå \`tabulate <sjelden> <gruppe>\` først for å se gruppestørrelsene.
+
 **Inspeksjon av enkeltobservasjoner er alltid forbudt:** aldri \`list\`/\`browse\`/\`print\`/\`head\`/\`tail\`/\`show\`.`;
 
 const NPR_RULES = `\
@@ -632,8 +681,9 @@ UTEN dato):
 | \`Prosedyre NPR\` (\`SOM_PROS_*\`) | prosedyre utført i en episode | \`SOM_PROS_PERSONID\` | \`SOM_PROS_EPISODEID\` → episoden |
 | \`Krefttilfelle\` (\`S_*\`, \`P_*\`) | krefttilfelle (én person kan ha flere) | \`P_PERSONIDMICRODATA\` | — |
 
-Person-ref-verdien er personens \`PERSONID_1\` i SSB-data, så \`merge … on <pid>\`
-kobler direkte til et persondatasett. Person-refene er nøkkelvariabler: bruk dem
+Person-ref-verdien er personens \`PERSONID_1\` i SSB-data. Etter
+\`collapse ..., by(pid)\` er pid implisitt person-ID, så \`merge … into personer\`
+(uten \`on\`) kobler direkte til et persondatasett. Person-refene er nøkkelvariabler: bruk dem
 bare i \`by()\`/\`on\`/\`values_from()\`, aldri i analyse. Bland aldri enhetstyper
 i samme datasett.
 
@@ -680,8 +730,8 @@ import dnpr/SOM_EP_PERSONID as pid
 import dnpr/SOM_EP_HOVEDTILSTAND1 as diag
 generate ami = 0
 replace ami = 1 if substr(diag, 1, 3) == 'I21'      // I21 = akutt hjerteinfarkt
-collapse (max) ami -> ami, by(pid)
-merge ami into personer on pid                      // pid ↔ PERSONID_1
+collapse (max) ami, by(pid)                         // uten -> beholdes navnet
+merge ami into personer                             // pid er nå implisitt person-ID
 use personer
 replace ami = 0 if sysmiss(ami)                     // ingen episode ⇒ 0
 tabulate kjonn ami

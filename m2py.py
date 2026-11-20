@@ -4364,6 +4364,8 @@ _RESIDENCE_KOMMUNE_VARS = frozenset({
 
 # Kildenavn per databank i citation-teksten (samme etiketter som microdata.no
 # viser i databankoversikten).
+_FHI_DATABANKS = frozenset({'no.fhi.npr', 'no.fhi.kreftregisteret'})
+
 _DATABANK_CITATION_LABELS = {
     'no.ssb.fdb': 'SSB (registerdata)',
     'no.fhi.npr': 'FHI (Norsk pasientregister)',
@@ -5770,6 +5772,17 @@ class StatsEngine:
                     "collapse erstatter data med aggregert resultat; bruk én collapse med alle (stat) var -> navn i samme kommando, f.eks. collapse (mean) inntekt -> snitt (count) inntekt -> antall, by(kommune)",
                     missing=missing)
                 )
+            # microdata.no: eksplisitt `-> navn` til en variabel som allerede
+            # finnes (også `-> samme navn`) feiler med «finnes allerede».
+            # Implisitt (uten ->) beholder kildenavnet og er lov.
+            for t in args['targets']:
+                if t.get('target') and t['target'] in df.columns:
+                    raise ValueError(
+                        _t("collapse: variabelen '{name}' finnes allerede. Bruk et nytt navn "
+                           "etter -> (f.eks. collapse ({stat}) {src} -> {src}_{stat}), eller dropp "
+                           "-> for å beholde navnet: collapse ({stat}) {src}, by(...).",
+                           name=t['target'], stat=t.get('stat') or 'max', src=t['src'])
+                    )
             # B11: dupliserte målnavn — `collapse (mean) x (sd) x, by(g)` uten
             # -> nye navn lot siste statistikk stille overskrive den første.
             # microdata.no-dokumentasjonen definerer ingen auto-suffiks-atferd,
@@ -7194,6 +7207,15 @@ class RegressionHandler:
         X = self._add_const(df_clean[indep_vars], add_const)
 
         if cmd == 'regress':
+            # microdata.no (avsløringskontroll): minst to koeffisienter utenom
+            # konstantleddet — `regress y x` avvises (bekreftet 2026-11-20).
+            if (len(indep_vars) < 2 and _is_disclosure_control()
+                    and getattr(self, 'confidentiality', None) != 'v1'):
+                raise ValueError(
+                    _t("Regresjonsmodellen har for få forklaringsvariabler/koeffisienter. "
+                       "Nedre grense er to koeffisienter. Legg til minst én forklaringsvariabel "
+                       "(f.eks. alder eller i.kjonn).")
+                )
             model = sm.OLS(Y, X).fit()
             model = self._apply_cov(model, options, df_clean)
             return (self._with_control_note(str(model.summary(alpha=alpha)),
@@ -10198,6 +10220,11 @@ class MicroInterpreter:
                     _bank = source.split(':')[0].strip()
                     if _bank and _bank not in self.required_databanks:
                         self.required_databanks.append(_bank)
+                    if _bank in _FHI_DATABANKS and self._config.get('confidentiality') == 'v1':
+                        self._log(_t("FEIL: configure confidentiality v1 (gamle anonymitetsregler) kan ikke "
+                                     "brukes sammen med data fra NPR eller Kreftregisteret. Fjern "
+                                     "configure-linjen."))
+                        return
                 if source and alias:
                     self._log(_t("Opprettet en kobling fra {source} til {alias}", source=source, alias=alias))
                 else:
@@ -10294,6 +10321,21 @@ class MicroInterpreter:
                     _resolve_merge_key = _KEYS.resolve_merge_key
                     _src_collapse_key = self.dataset_key_cols.get(self.active_name)
                     _tgt_collapse_key = self.dataset_key_cols.get(into_name)
+
+                    # microdata.no: by-variabelen i en collapse blir datasettets
+                    # IMPLISITTE identifikator og er ikke lenger en variabel. Den kan
+                    # derfor ikke stå i `on` (som må finnes i måldatasettet).
+                    if (on_var and on_var == _src_collapse_key
+                            and on_var not in target_df.columns):
+                        self._log(
+                            _t("FEIL: '{on_var}' finnes ikke i {into_name}. Etter collapse ..., "
+                               "by({on_var}) er '{on_var}' den implisitte identifikatoren i "
+                               "{active_name}, ikke en variabel. Skriv uten on: "
+                               "merge {cols} into {into_name}",
+                               on_var=on_var, into_name=into_name, active_name=self.active_name,
+                               cols=' '.join(var_list))
+                        )
+                        return
 
                     def _is_person_ref(alias):
                         if not alias:
@@ -10488,6 +10530,19 @@ class MicroInterpreter:
                             self._log(_t("seed = {val} {no_effect}", val=self._config['seed'], no_effect=_NO_EFFECT))
                         except ValueError:
                             self._log(_t("FEIL: Ugyldig seed-verdi: {val}", val=args_list[1]))
+                    elif key == 'confidentiality' and len(args_list) >= 2:
+                        _ver = str(args_list[1]).lower()
+                        if _ver != 'v1':
+                            self._log(_t("FEIL: configure confidentiality støtter bare v1."))
+                        elif any(b in _FHI_DATABANKS for b in self.required_databanks):
+                            self._log(_t("FEIL: configure confidentiality v1 (gamle anonymitetsregler) kan ikke "
+                                         "brukes sammen med data fra NPR eller Kreftregisteret."))
+                        else:
+                            # Overgangsordning for eksisterende brukere: gamle regler
+                            # (bl.a. regress med én forklaringsvariabel).
+                            self._config['confidentiality'] = 'v1'
+                            self.reg_engine.confidentiality = 'v1'
+                            self._log(_t("Anonymitetsregler: v1 (overgangsordning)"))
                     elif key == 'nocache':
                         self._config['cache'] = False
                         self._log(_t("cache av {no_effect}", no_effect=_NO_EFFECT))

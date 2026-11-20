@@ -68,7 +68,7 @@ df |> group_by(sex) |> summarise(mean_inc = mean(income), n = n())
 
 Supported aggregation statistics: `mean`, `sum`, `sd`, `median`, `min`, `max`, `n()` → `count`, `IQR` → `iqr`.
 
-`summarise(across(c(income, age), mean))` expands to one `(stat) col -> col`
+`summarise(across(c(income, age), mean))` expands to one `(stat) col`
 spec per column in the same `collapse`.
 
 #### group_by + mutate → aggregate
@@ -131,7 +131,7 @@ These are desugared into their dplyr equivalents and translate identically:
 | `subset(df, age > 18)` | `keep if age > 18` (with `clone-dataset` if assigned to a new name) |
 | `subset(df, cond, select=c(a,b))` | `keep if cond` + `keep a b` |
 | `transform(df, y = expr)` | `generate y = expr` |
-| `aggregate(y ~ g, data=df, FUN=mean)` | `collapse (mean) y -> y, by(g)` |
+| `aggregate(y ~ g, data=df, FUN=mean)` | `collapse (mean) y, by(g)` |
 | `merge(x, y, by="id")` | same as `left_join` (`merge <vars_from_y> into x on id`) |
 
 ### Dataset operations
