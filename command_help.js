@@ -435,8 +435,8 @@ window.MICRODATA_COMMAND_HELP = {
   // Statistikk
   "summarize": {
     "syntax": "summarize var-list [if] [, options]",
-    "description": "Vis univariat nøkkelstatistikk (antall, mean, sd, min, max osv.) for numeriske variabler.",
-    "description_en": "Display univariate summary statistics (count, mean, sd, min, max, etc.) for numeric variables.",
+    "description": "Vis univariat nøkkelstatistikk (antall, mean, sd, min, max osv.) for numeriske variabler. Har ingen by()-opsjon — statistikk per gruppe: tabulate gruppe, summarize(var) [p50 std …].",
+    "description_en": "Display univariate summary statistics (count, mean, sd, min, max, etc.) for numeric variables. Has no by() option — statistics by group: tabulate group, summarize(var) [p50 std …].",
     "source": "https://microdata.no/manual/kommandoer_og_funksjoner/kommandoer#summarize"
   },
   "summarize-panel": {

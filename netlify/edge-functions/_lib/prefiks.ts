@@ -57,6 +57,17 @@ const GRAMMAR_CHEATSHEET = `\
   \`replace <navn> = <uttrykk> [if <cond>]\`, \`recode ...\`.
 - Analyse: \`summarize\`, \`tabulate\`, \`correlate\`, \`regress\`, \`logit\`,
   \`anova\`, \`ci\`, \`normaltest\`, \`ivregress\`.
+- **Statistikk per gruppe = \`tabulate\` med \`summarize()\`, ALDRI
+  \`summarize ..., by()\`** (summarize har ingen by-opsjon → «Opsjonen eksisterer
+  ikke»). \`summarize\` er bare for hele (evt. \`if\`-filtrerte) populasjonen.
+  - \`tabulate gruppe, summarize(inntekt)\` → gjennomsnitt per gruppe
+  - \`tabulate kjonn gruppe, summarize(inntekt) p50 std\` → median og sd per celle
+  - Statistikker: \`mean\` (standard), \`std\`, \`sum\`, \`p25\`, \`p50\`, \`p75\`,
+    \`gini\`, \`iqr\`. Andel med en egenskap = gjennomsnittet av en 0/1-dummy:
+    \`tabulate inntektsgruppe, summarize(hadde_forgiftning)\`.
+  - Andre \`tabulate\`-opsjoner: \`rowpct\`, \`colpct\`, \`cellpct\`, \`chi2\`,
+    \`missing\`, \`rowsort()\`, \`colsort()\`, \`top(n)\`, \`bottom(n)\`, \`flatten\`.
+    Grupperingsvariablene må være kategoriske.
 - Panel-data: bygg med \`import-panel\`, \`import-event\` eller
   \`reshape-to-panel <var-prefix>\` (wide→long; lager kolonnen \`panel@date\`).
   Panel-kommandoer (\`summarize-panel\`, \`tabulate-panel\`, \`transitions-panel\`,
@@ -169,7 +180,9 @@ referansene over. Aldri emit en konstruksjon bare fordi den er gyldig Stata.
 
 Vanlige Stata-vaner som IKKE er gyldige her (❌ Stata → ✅ microdata):
 - ❌ \`egen ... = ...\` → ✅ \`collapse\`/\`aggregate\`, eller \`generate\`
-- ❌ \`bysort x: ...\` / \`by x: ...\` → ✅ \`collapse (stat) var, by(x)\`
+- ❌ \`bysort x: ...\` / \`by x: ...\` → ✅ \`tabulate x, summarize(var)\` (vise
+  tall per gruppe) eller \`collapse\`/\`aggregate (stat) var, by(x)\` (lage data)
+- ❌ \`summarize var, by(x)\` → ✅ \`tabulate x, summarize(var) [p50 std …]\`
 - ❌ \`foreach\` / \`forvalues\` → ✅ \`for i in <verdier> ... end\`
 - ❌ \`local\`/\`global\`-makroer, \`\${m}\`, backtick-makroer → ✅ \`let navn = ...\`;
   iteratoren \`$i\` finnes kun inne i \`for\`-løkker
@@ -637,7 +650,7 @@ kategorier, færre kategoriske dummies, eller større populasjon.
 \`regress inntekt diabetes\` avvises («for få forklaringsvariabler/koeffisienter»).
 Ta alltid med minst én kontrollvariabel som er relevant for spørsmålet
 (\`regress inntekt diabetes alder i.kjonn\`). Vil brukeren ha den rå forskjellen,
-vis den med \`summarize inntekt, by(diabetes)\` / \`tabulate\` i stedet.
+vis den med \`tabulate diabetes, summarize(inntekt)\` i stedet.
 *Overgangsordning:* \`configure confidentiality v1\` ØVERST i scriptet gir de
 gamle reglene (bl.a. \`regress\` med én forklaringsvariabel), men bare for
 eksisterende brukere (ikke nye) og ALDRI sammen med NPR- eller
@@ -789,7 +802,7 @@ import db/INNTEKT_WLONN 2022-01-01 as inntekt
 tabulate kjonn
 summarize inntekt
 summarize inntekt if kjonn == '1'               // menn — kode i fnutter
-summarize inntekt if kjonn == '2'
+tabulate kjonn, summarize(inntekt) p50 std      // statistikk per gruppe
 \`\`\`
 
 ### Eksempel 2 — Ny variabel, dato-uttrekk og aggregering per gruppe

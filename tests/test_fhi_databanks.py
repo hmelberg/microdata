@@ -325,3 +325,15 @@ regress y alder
     _, out = _run("configure confidentiality v1\nrequire no.ssb.fdb:60 as db\n"
                   "require no.fhi.npr:1 as dnpr\n" + body)
     assert "FEIL" in out and "NPR" in out
+
+
+def test_group_statistics_use_tabulate_summarize_not_summarize_by():
+    base = """require no.ssb.fdb:60 as db
+create-dataset p
+import db/INNTEKT_WLONN 2022-12-31 as y
+import db/BEFOLKNING_KJOENN as kjonn
+"""
+    _, out = _run(base + "summarize y, by(kjonn)\n")
+    assert "FEIL" in out and "tabulate kjonn, summarize(y)" in out
+    _, out = _run(base + "tabulate kjonn, summarize(y) p50 std\n")
+    assert "FEIL" not in out

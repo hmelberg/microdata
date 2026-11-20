@@ -10995,6 +10995,16 @@ class MicroInterpreter:
                 run_opts['_condition_mask'] = self._eval_condition_mask(df_target, cond)
             if cmd in ['tabulate', 'tabulate-panel', 'transitions-panel']:
                 run_opts['_label_manager'] = self.label_manager
+            if cmd == 'summarize' and isinstance(opts, dict) and opts.get('by'):
+                # microdata.no: summarize har ingen by()-opsjon. Statistikk per
+                # gruppe gjøres med tabulate <gruppe>, summarize(<var>) [stat].
+                _bv = opts.get('by')
+                _sv = ' '.join(args) if isinstance(args, (list, tuple)) else str(args)
+                self._log(_t("FEIL: Feil ved by({by}): Opsjonen eksisterer ikke for kommandoen summarize. "
+                             "Statistikk per gruppe: tabulate {by}, summarize({var}) "
+                             "[mean/std/sum/p25/p50/p75/gini/iqr]",
+                             by=_bv, var=(_sv.split() or ['<var>'])[0]))
+                return
             if cmd in ['generate', 'aggregate', 'collapse', 'summarize', 'summarize-panel', 'correlate', 'ci', 'anova', 'tabulate', 'tabulate-panel', 'normaltest', 'transitions-panel']:
                 # T7: deskriptiv statistikk krever populasjon ≥10. Unntak: tabulate (frekvenser)
                 # og generate/aggregate/collapse (transformasjoner). Sjekk på df_target som

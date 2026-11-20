@@ -631,22 +631,15 @@ class TestVolumeTableWinsorizeAndRound:
 # ---------------------------------------------------------------------------
 
 class TestGroupedSummarizeT7:
-    def test_summarize_by_small_group_refused(self, dc_on):
-        # Total (103) passerer T7, men gruppe 1 har bare 3 enheter.
-        df = pd.DataFrame({
-            "g": [1] * 3 + [2] * 100,
-            "x": [float(i) for i in range(103)],
-        })
-        out = _run(_interp(df), "summarize x, by(g)")
-        assert "FEIL" in out
-
-    def test_summarize_by_big_groups_allowed(self, dc_on):
+    def test_summarize_by_is_not_a_microdata_option(self, dc_on):
+        # microdata.no: summarize har ingen by() — «Opsjonen eksisterer ikke».
+        # Statistikk per gruppe gjøres med tabulate g, summarize(x).
         df = pd.DataFrame({
             "g": [1] * 50 + [2] * 50,
             "x": [float(i) for i in range(100)],
         })
         out = _run(_interp(df), "summarize x, by(g)")
-        assert "FEIL" not in out
+        assert "FEIL" in out and "tabulate g, summarize(x)" in out
 
     def test_summarize_panel_small_tid_group_refused(self, dc_on):
         df = pd.DataFrame({
@@ -656,14 +649,6 @@ class TestGroupedSummarizeT7:
         })
         out = _run(_interp(df), "summarize-panel x")
         assert "FEIL" in out
-
-    def test_small_groups_allowed_when_dc_off(self, dc_off):
-        df = pd.DataFrame({
-            "g": [1] * 3 + [2] * 100,
-            "x": [float(i) for i in range(103)],
-        })
-        out = _run(_interp(df), "summarize x, by(g)")
-        assert "FEIL" not in out
 
 
 class TestSummarizePanelWinsorize:
